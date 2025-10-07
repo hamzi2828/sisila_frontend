@@ -1,22 +1,40 @@
 // app/(routes)/main/page.tsx
 import HeroCarousel from "./components/HeroCarousel";
-import PopularCatgories from "./components/PopularCatgories";
 import WhyChooseUs from "./components/WhyChooseUs";
-import TheBest from "./components/TheBest";
-import Collection from "./components/Collection";
-import TopPick from "./components/TopPick";
 import BlogsSection from "./components/BlogsSection";
-
+import GymAboutSection from "./components/GymAboutSection";
+import GymFolioClasses from "./components/GymFolioClasses";
+import GymfolioGallery from "./components/GymfolioGallery";
+import GymTrainersSection from "./components/GymTrainersSection";
+import ContactSection from "./components/ContactSection";
+import ExploreCategories from "./components/ExploreCategories";
+import ThemesSection from "./components/ThemesSection";
+import SeriesSection from "./components/SeriesSection";
+import TrendingRailSection from "./components/TrendingRailSection";
+import InstagramFeedSection from "./components/InstagramFeedSection";
+import EditorialGallerySection from "./components/EditorialGallerySection";
+import NewArrivalsSection from "./components/NewArrivalsSection"; 
 export default function MainPage() {
   return (
-    <main className="pt-20">
+    <main >
       <HeroCarousel />
-      <PopularCatgories />
-      <WhyChooseUs />
-      <TheBest />
-      <Collection />
-      <TopPick />
+      <ExploreCategories />
+      <ThemesSection/>
+        <SeriesSection />
+      <NewArrivalsSection />
+      {/* <EditorialGallerySection /> */}
+    
+      
+      {/* <TrendingRailSection /> */}
+      
+      {/* <GymAboutSection />
+      <WhyChooseUs /> */}
+      {/* <GymFolioClasses />
+      <GymfolioGallery />
+      <GymTrainersSection />
+      <ContactSection /> */}
       <BlogsSection />
+      <InstagramFeedSection />
     </main>
   );
 }

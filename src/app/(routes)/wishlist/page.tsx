@@ -1,688 +1,556 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect } from "react";
-import Image from "next/image";
-import Link from "next/link";
+import { useMemo, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 
-interface WishlistItem {
-  id: number;
-  name: string;
-  brand: string;
+type SavedItem = {
+  id: string;
+  title: string;
   price: number;
-  originalPrice: number;
   image: string;
-  color: string;
-  sizes: string[];
-  rating: number;
-  inStock: boolean;
-  discount: number;
-  category: string;
-  addedDate: string;
-}
+  kind: 'Tee' | 'Hoodie' | 'Crew' | 'LS' | 'Cap' | 'Tote';
+  tag?: string; // Poetry, Street, etc.
+  compareAt?: number;
+  stock?: 'in' | 'low' | 'out';
+  savedAt?: string;
+};
 
-const WishlistPage: React.FC = () => {
-  const initialItems: WishlistItem[] = [
-    {
-      id: 1,
-      name: "WORDMARK CREW SOCKS 3 PACK",
-      brand: "CRE CUT",
-      price: 21600.0,
-      originalPrice: 24000.0,
-      image: "/images/gym-2.svg",
-      color: "PEARL WHITE",
-      sizes: ["S", "M", "L"],
-      rating: 5.0,
-      inStock: true,
-      discount: 10,
-      category: "Accessories",
-      addedDate: "2024-08-10",
-    },
-    {
-      id: 2,
-      name: "COMPRESSION LEGGINGS",
-      brand: "CRE CUT",
-      price: 4299.0,
-      originalPrice: 4999.0,
-      image: "/images/gym-3.svg",
-      color: "CHARCOAL GREY",
-      sizes: ["XS", "S", "M", "L", "XL"],
-      rating: 4.8,
-      inStock: true,
-      discount: 14,
-      category: "Bottoms",
-      addedDate: "2024-08-12",
-    },
-    {
-      id: 3,
-      name: "HIGH SUPPORT SPORTS BRA",
-      brand: "CRE CUT",
-      price: 2499.0,
-      originalPrice: 2999.0,
-      image: "/images/gym-4.svg",
-      color: "OCEAN BLUE",
-      sizes: ["XS", "S", "M", "L"],
-      rating: 4.9,
-      inStock: false,
-      discount: 17,
-      category: "Tops",
-      addedDate: "2024-08-08",
-    },
-    {
-      id: 4,
-      name: "PERFORMANCE ZIP HOODIE",
-      brand: "CRE CUT",
-      price: 5999.0,
-      originalPrice: 6999.0,
-      image: "/images/gym-5.svg",
-      color: "HEATHER GREY",
-      sizes: ["S", "M", "L", "XL"],
-      rating: 4.7,
-      inStock: true,
-      discount: 14,
-      category: "Outerwear",
-      addedDate: "2024-08-11",
-    },
-    {
-      id: 5,
-      name: "ATHLETIC TANK TOP",
-      brand: "CRE CUT",
-      price: 1899.0,
-      originalPrice: 2299.0,
-      image: "/images/gym-2.svg",
-      color: "MINT GREEN",
-      sizes: ["XS", "S", "M", "L"],
-      rating: 4.6,
-      inStock: true,
-      discount: 17,
-      category: "Tops",
-      addedDate: "2024-08-13",
-    },
-    {
-      id: 6,
-      name: "RUNNING SHORTS",
-      brand: "CRE CUT",
-      price: 3299.0,
-      originalPrice: 3899.0,
-      image: "/images/gym-3.svg",
-      color: "BLACK",
-      sizes: ["S", "M", "L", "XL"],
-      rating: 4.5,
-      inStock: true,
-      discount: 15,
-      category: "Bottoms",
-      addedDate: "2024-08-09",
-    },
-  ];
+const money = (v: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
 
-  // State
-  const [items, setItems] = useState<WishlistItem[]>(initialItems);
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const [toast, setToast] = useState<{ show: boolean; msg: string; type: "success" | "info" | "error" }>({
-    show: false,
-    msg: "",
-    type: "success",
-  });
+// Main saved items
+const SAVED_INITIAL: SavedItem[] = [
+  {
+    id: 'verses-tee',
+    title: 'Verses Tee',
+    price: 38,
+    image:
+      'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Tee',
+    tag: 'Poetry',
+    stock: 'in',
+    savedAt: '2w',
+  },
+  {
+    id: 'block-hoodie',
+    title: 'Block Hoodie',
+    price: 74,
+    image:
+      'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Hoodie',
+    tag: 'Street',
+    stock: 'low',
+    savedAt: '5d',
+  },
+  {
+    id: 'palette-crew',
+    title: 'Palette Crew',
+    price: 66,
+    image:
+      'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Crew',
+    tag: 'Artistic',
+    stock: 'in',
+    savedAt: '1w',
+  },
+  {
+    id: 'city-ls',
+    title: 'City LS',
+    price: 58,
+    image:
+      'https://images.unsplash.com/photo-1503342217505-b0a15cf704d9?auto=format&fit=crop&w=1400&q=80',
+    kind: 'LS',
+    tag: 'Street',
+    stock: 'in',
+    savedAt: '3d',
+  },
+  {
+    id: 'grotesk-tee',
+    title: 'Grotesk Tee',
+    price: 40,
+    image:
+      'https://images.unsplash.com/photo-1548883354-94bcfe3213e7?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Tee',
+    tag: 'Typography',
+    stock: 'in',
+    savedAt: '1d',
+  },
+  {
+    id: 'neon-alley-hoodie',
+    title: 'Neon Alley Hoodie',
+    price: 78,
+    image:
+      'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Hoodie',
+    tag: 'Anime',
+    compareAt: 88,
+    stock: 'out',
+    savedAt: '3w',
+  },
+  {
+    id: 'forest-tee',
+    title: 'Forest Tee',
+    price: 42,
+    image:
+      'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Tee',
+    tag: 'Nature',
+    stock: 'in',
+    savedAt: '4d',
+  },
+  {
+    id: 'varsity-tee',
+    title: 'Varsity Tee',
+    price: 44,
+    image:
+      'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Tee',
+    tag: 'Retro',
+    stock: 'in',
+    savedAt: '5w',
+  },
+];
 
-  // Derived
-  const totalSavings = items.reduce((acc, item) => acc + (item.originalPrice - item.price), 0);
+// Back in stock suggestions
+const BACK_IN_STOCK: SavedItem[] = [
+  {
+    id: 'ink-verse-tee',
+    title: 'Ink & Verse Tee',
+    price: 40,
+    image:
+      'https://images.unsplash.com/photo-1493236296276-d17357e28875?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Tee',
+    tag: 'Poetry',
+    stock: 'in',
+  },
+  {
+    id: 'quiet-reader-ls',
+    title: 'Quiet Reader LS',
+    price: 58,
+    image:
+      'https://images.unsplash.com/photo-1516822003754-cca485356ecb?auto=format&fit=crop&w=1400&q=80',
+    kind: 'LS',
+    tag: 'Poetry',
+    stock: 'in',
+  },
+  {
+    id: 'margins-crew',
+    title: 'Margins Crew',
+    price: 66,
+    image:
+      'https://images.unsplash.com/photo-1514846326710-096e4a8035e1?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Crew',
+    tag: 'Poetry',
+    stock: 'in',
+  },
+];
 
-  // Helpers
-  const slugify = (text: string) =>
-    text.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-");
+// Price drops
+const PRICE_DROPS: SavedItem[] = [
+  {
+    id: 'palette-hoodie',
+    title: 'Palette Hoodie',
+    price: 61,
+    compareAt: 76,
+    image:
+      'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Hoodie',
+    tag: 'Artistic',
+    stock: 'in',
+  },
+  {
+    id: 'varsity-tee-sale',
+    title: 'Varsity Tee',
+    price: 35,
+    compareAt: 44,
+    image:
+      'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Tee',
+    tag: 'Retro',
+    stock: 'in',
+  },
+  {
+    id: 'grotesk-tee-sale',
+    title: 'Grotesk Tee',
+    price: 32,
+    compareAt: 40,
+    image:
+      'https://images.unsplash.com/photo-1548883354-94bcfe3213e7?auto=format&fit=crop&w=1400&q=80',
+    kind: 'Tee',
+    tag: 'Typography',
+    stock: 'in',
+  },
+];
 
-  const showToast = (msg: string, type: "success" | "info" | "error" = "success") => {
-    setToast({ show: true, msg, type });
-    setTimeout(() => setToast({ show: false, msg: "", type }), 2500);
-  };
+// Lists (saved collections)
+const LISTS = [
+  {
+    id: 'gift-ideas',
+    title: 'Gift ideas',
+    count: 7,
+    cover:
+      'https://images.unsplash.com/photo-1499013819532-e4ff41b00669?auto=format&fit=crop&w=1200&q=80',
+  },
+  {
+    id: 'poets-series',
+    title: 'Poets Series',
+    count: 5,
+    cover:
+      'https://images.unsplash.com/photo-1493236296276-d17357e28875?auto=format&fit=crop&w=1200&q=80',
+  },
+  {
+    id: 'street-edit',
+    title: 'Street edit',
+    count: 6,
+    cover:
+      'https://images.unsplash.com/photo-1547448415-e9f5b28e570d?auto=format&fit=crop&w=1200&q=80',
+  },
+];
 
-  const handleSelectItem = (id: number) => {
-    setSelectedItems((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
+export default function WishlistPage() {
+  const [items, setItems] = useState<typeof SAVED_INITIAL>(SAVED_INITIAL);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [filter, setFilter] = useState<'All' | SavedItem['kind']>('All');
+  const [sort, setSort] = useState<'Newest' | 'Price ↑' | 'Price ↓'>('Newest');
 
-  const handleSelectAll = () => {
-    if (selectAll) setSelectedItems([]);
-    else setSelectedItems(items.map((i) => i.id));
-    setSelectAll(!selectAll);
-  };
+  const kinds: ('All' | SavedItem['kind'])[] = ['All', 'Tee', 'Hoodie', 'Crew', 'LS'];
 
-  const handleRemove = (id: number) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-    setSelectedItems((prev) => prev.filter((x) => x !== id));
-    showToast("Removed from wishlist", "info");
-  };
-
-  const handleRemoveSelected = () => {
-    if (!selectedItems.length) return;
-    setItems((prev) => prev.filter((i) => !selectedItems.includes(i.id)));
-    setSelectedItems([]);
-    showToast("Selected items removed", "info");
-  };
-
-  const handleMoveToCart = (ids?: number[]) => {
-    const targetIds = ids && ids.length ? ids : selectedItems;
-    if (!targetIds.length) return;
-    // Simulate add to cart
-    showToast(`${targetIds.length} item(s) moved to cart`, "success");
-  };
-
-  const handleShareWishlist = async () => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    const text = `Check out my wishlist on SunLink!\n${url}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "My Wishlist", text, url });
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      showToast("Wishlist link copied to clipboard", "success");
-    } catch {
-      showToast("Could not share wishlist", "error");
+  const filtered = useMemo(() => {
+    let rows = [...items];
+    if (filter !== 'All') rows = rows.filter((r) => r.kind === filter);
+    switch (sort) {
+      case 'Price ↑':
+        rows.sort((a, b) => a.price - b.price);
+        break;
+      case 'Price ↓':
+        rows.sort((a, b) => b.price - a.price);
+        break;
+      default:
+        // Newest (pretend savedAt descending if available)
+        rows.sort((a, b) => ((b.savedAt || '') > (a.savedAt || '') ? 1 : -1));
     }
+    return rows;
+  }, [items, filter, sort]);
+
+  const toggleSelect = (id: string) =>
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const selectAll = () => setSelected(filtered.map((x) => x.id));
+  const clearSelection = () => setSelected([]);
+
+  const remove = (id: string) => {
+    setItems((prev) => prev.filter((x) => x.id !== id));
+    setSelected((s) => s.filter((x) => x !== id));
+  };
+  const removeSelected = () => {
+    setItems((prev) => prev.filter((x) => !selected.includes(x.id)));
+    setSelected([]);
+  };
+  const addToCart = (id: string) => {
+    console.log('Add to cart:', id);
+    // optional: route to /cart or toast
+  };
+  const addSelectedToCart = () => {
+    console.log('Add selected to cart:', selected);
+    setSelected([]);
   };
 
-  // Sync selectAll state
-  useEffect(() => {
-    setSelectAll(items.length > 0 && selectedItems.length === items.length);
-  }, [selectedItems, items.length]);
+  const shareWishlist = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+    } catch (_) {}
+  };
 
   return (
-    <main className="pt-20 min-h-screen bg-white font-montserrat">
-      <style jsx global>{`
-        .font-sora {
-          font-family: "Sora", sans-serif;
-        }
-        .font-manrope {
-          font-family: "Manrope", sans-serif;
-        }
-        .font-montserrat {
-          font-family: "Montserrat", sans-serif;
-        }
-        .text-custom-green {
-          color: #bee304;
-        }
-        .bg-custom-green {
-          background-color: #bee304;
-        }
-        .text-custom-gray-300 {
-          color: #aeafb2;
-        }
-        .text-custom-gray-500 {
-          color: #6a6b70;
-        }
-        .text-custom-gray-900 {
-          color: #3b3b3e;
-        }
-        .border-custom-green {
-          border-color: #bee304;
-        }
-      `}</style>
-
-      {/* Toast */}
-      {toast.show && (
-        <div
-          className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-lg shadow-md ${
-            toast.type === "success"
-              ? "bg-green-50 text-gray-800 border-l-4 border-green-400"
-              : toast.type === "info"
-              ? "bg-blue-50 text-blue-800 border-l-4 border-blue-400"
-              : "bg-red-50 text-red-700 border-l-4 border-red-400"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <span className="font-semibold">{toast.msg}</span>
-            {toast.type !== "error" && (
-              <Link href="/cart" className="underline font-semibold">
-                View cart
+    <main className="min-h-screen bg-gradient-to-b from-stone-50 to-white text-stone-900">
+      {/* HERO */}
+      <section className="px-6 md:px-10 lg:px-20 pt-16 pb-8">
+        <div className="mx-auto ">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="uppercase tracking-[0.22em] text-xs md:text-sm text-stone-500">Your saves</p>
+              <h1
+                className="mt-1 text-2xl md:text-3xl font-semibold uppercase"
+                style={{ fontFamily: 'Poppins, sans-serif' }}
+              >
+                Wishlist
+              </h1>
+              <p className="mt-1 text-stone-600">{items.length} items saved</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={shareWishlist}
+                className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-4 py-2 text-sm hover:bg-stone-50"
+              >
+                <i className="fa-regular fa-share-from-square mr-2" /> Share
+              </button>
+              <Link
+                href="/cart"
+                className="inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-stone-800"
+              >
+                <i className="fa-solid fa-cart-shopping mr-2" /> Go to Cart
               </Link>
-            )}
+            </div>
           </div>
         </div>
-      )}
+      </section>
 
-      {/* Wishlist Section */}
-      <section className="px-4 sm:px-6 lg:px-20 py-8 sm:py-12">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 lg:mb-10 gap-4">
-          <div className="space-y-2 sm:space-y-3">
-            <h1 className="font-sora text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-black leading-tight tracking-tight">
-              My Wishlist
-            </h1>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-custom-gray-500 font-manrope text-sm sm:text-base lg:text-lg">
-              <span>
-                {items.length} item{items.length !== 1 ? "s" : ""}
-              </span>
-              <span className="w-1 h-1 bg-custom-gray-300 rounded-full" />
-              <span className="font-semibold text-custom-green">Save Rs {totalSavings.toLocaleString()}</span>
-            </div>
+      {/* FILTERS + BULK BAR */}
+      <section className="px-6 md:px-10 lg:px-20 pb-4">
+        <div className="mx-auto  flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {/* Filter chips */}
+          <div className="flex flex-wrap gap-2">
+            {kinds.map((k) => {
+              const active = k === filter;
+              return (
+                <button
+                  key={k}
+                  onClick={() => setFilter(k)}
+                  className={[
+                    'inline-flex items-center rounded-full px-3 py-1 text-sm transition',
+                    active
+                      ? 'bg-black text-white'
+                      : 'border border-stone-300/80 bg-white text-stone-800 hover:bg-stone-50',
+                  ].join(' ')}
+                >
+                  {k}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Controls */}
-          <div className="flex flex-col sm:flex-row items-stretch gap-3 w-full lg:w-auto">
-            {/* View Toggle */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode("list")}
-                className={`px-3 sm:px-4 py-2 rounded-md font-medium transition-colors ${
-                  viewMode === "list" ? "bg-custom-green text-black" : "text-custom-gray-500 hover:text-custom-gray-900"
-                }`}
-              >
-                <i className="fas fa-list mr-2" />
-                List
-              </button>
-              <button
-                onClick={() => setViewMode("grid")}
-                className={`px-3 sm:px-4 py-2 rounded-md font-medium transition-colors ${
-                  viewMode === "grid" ? "bg-custom-green text-black" : "text-custom-gray-500 hover:text-custom-gray-900"
-                }`}
-              >
-                <i className="fas fa-th-large mr-2" />
-                Grid
-              </button>
-            </div>
+          {/* Sort */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="sort" className="text-sm text-stone-600">
+              Sort
+            </label>
+            <select
+              id="sort"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as any)}
+              className="rounded-xl border border-stone-300/80 bg-white px-3 py-2 text-sm outline-none"
+            >
+              <option>Newest</option>
+              <option>Price ↑</option>
+              <option>Price ↓</option>
+            </select>
+          </div>
+        </div>
 
-            {/* Share / Clear */}
-            <div className="flex gap-2">
-              <button
-                onClick={handleShareWishlist}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg hover:border-custom-green hover:text-custom-green font-semibold"
-                title="Share wishlist"
-              >
-                <i className="fas fa-share-alt mr-2" />
-                Share
-              </button>
-              {items.length > 0 && (
+        {/* Bulk bar */}
+        {selected.length > 0 ? (
+          <div className="mx-auto mt-3  rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p>
+                <span className="font-medium">{selected.length}</span> selected
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  onClick={() => {
-                    setItems([]);
-                    setSelectedItems([]);
-                    showToast("Wishlist cleared", "info");
-                  }}
-                  className="px-4 py-2 border-2 border-red-300 text-red-600 rounded-lg hover:border-red-500 font-semibold"
-                  title="Clear wishlist"
+                  onClick={addSelectedToCart}
+                  className="inline-flex items-center rounded-full bg-black px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-800"
                 >
-                  <i className="fas fa-trash-alt mr-2" />
+                  <i className="fa-solid fa-cart-plus mr-2" /> Add to cart
+                </button>
+                <button
+                  onClick={removeSelected}
+                  className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-3 py-1.5 text-sm hover:bg-stone-50"
+                >
+                  <i className="fa-regular fa-trash-can mr-2" /> Remove
+                </button>
+                <button
+                  onClick={clearSelection}
+                  className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-3 py-1.5 text-sm hover:bg-stone-50"
+                >
                   Clear
                 </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Bulk Actions */}
-        {items.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 p-3 sm:p-4 bg-gray-50 rounded-lg border gap-3 sm:gap-4">
-            <label className="flex items-center space-x-2 sm:space-x-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selectAll}
-                onChange={handleSelectAll}
-                className="w-4 h-4 sm:w-5 sm:h-5 text-custom-green border-2 border-gray-300 rounded focus:ring-2 focus:ring-custom-green"
-              />
-              <span className="font-semibold text-custom-gray-900 font-sora text-sm sm:text-base">Select All</span>
-            </label>
-
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
-              <span className="text-custom-gray-500 font-medium text-xs sm:text-sm">
-                {selectedItems.length} of {items.length} selected
-              </span>
-
-              <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
                 <button
-                  disabled={selectedItems.length === 0}
-                  onClick={() => handleMoveToCart()}
-                  className={`px-3 sm:px-6 py-2 font-semibold rounded-lg transition-colors font-sora text-xs sm:text-sm ${
-                    selectedItems.length > 0 ? "bg-custom-green text-black hover:bg-green-400" : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  }`}
+                  onClick={selectAll}
+                  className="hidden sm:inline-flex items-center rounded-full border border-stone-300/80 bg-white px-3 py-1.5 text-sm hover:bg-stone-50"
                 >
-                  <i className="fas fa-shopping-cart mr-1 sm:mr-2" />
-                  Move to Cart
-                </button>
-                <button
-                  disabled={selectedItems.length === 0}
-                  onClick={handleRemoveSelected}
-                  className={`px-3 sm:px-6 py-2 font-semibold rounded-lg transition-colors font-sora text-xs sm:text-sm ${
-                    selectedItems.length > 0 ? "bg-red-500 text-white hover:bg-red-600" : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  }`}
-                >
-                  <i className="fas fa-trash mr-1 sm:mr-2" />
-                  Remove
+                  Select all
                 </button>
               </div>
             </div>
           </div>
-        )}
+        ) : null}
+      </section>
 
-        {/* Empty State */}
-        {items.length === 0 && (
-          <div className="text-center py-12 sm:py-16 bg-gray-50 rounded-xl border">
-            <div className="w-24 h-24 mx-auto mb-6 bg-white rounded-full flex items-center justify-center shadow">
-              <i className="far fa-heart text-3xl text-custom-gray-300" />
-            </div>
-            <h3 className="text-xl font-bold text-black mb-2">Your wishlist is empty</h3>
-            <p className="text-custom-gray-500 mb-6">Save your favorite products to shop later</p>
-            <Link
-              href="/main"
-              className="inline-flex items-center px-6 py-3 bg-custom-green text-black font-semibold rounded-lg hover:bg-green-400"
-            >
-              <i className="fas fa-shopping-bag mr-2" />
-              Continue Shopping
-            </Link>
-          </div>
-        )}
-
-        {/* Wishlist Items - List View */}
-        {items.length > 0 && viewMode === "list" && (
-          <div className="space-y-4 sm:space-y-6">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-xl border-2 border-gray-200 hover:border-custom-green transition-all duration-300 hover:shadow-xl p-4 sm:p-6"
-              >
-                <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
-                  {/* Checkbox */}
-                  <input
-                    type="checkbox"
-                    checked={selectedItems.includes(item.id)}
-                    onChange={() => handleSelectItem(item.id)}
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-custom-green border-2 border-gray-300 rounded focus:ring-2 focus:ring-custom-green mt-1 sm:mt-2 order-1 sm:order-none"
-                  />
-
-                  {/* Product Image */}
-                  <div className="relative w-full sm:w-24 md:w-32 lg:w-40 aspect-square flex-shrink-0 order-2 sm:order-none">
-                    <Link href="/product-detail" className="block">
-                      <Image src={item.image} alt={item.name} fill style={{ objectFit: "cover" }} className="rounded-lg" />
-                    </Link>
-
-                    {/* Discount Badge */}
-                    {item.discount > 0 && (
-                      <div className="absolute -top-1 sm:-top-2 -right-1 sm:-right-2 bg-red-500 text-white text-xs font-bold px-2 sm:px-3 py-1 rounded-full shadow-lg">
-                        -{item.discount}%
-                      </div>
-                    )}
-
-                    {/* Stock Status */}
-                    {!item.inStock && (
-                      <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
-                        <span className="text-white font-semibold px-2 sm:px-3 py-1 bg-red-500 rounded-full text-xs sm:text-sm">
-                          Out of Stock
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Product Details */}
-                  <div className="flex-1 min-w-0 order-3 sm:order-none w-full sm:w-auto">
-                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                      <div className="space-y-2 min-w-0 flex-1">
-                        {/* Category */}
-                        <Link
-                          href={{ pathname: "/main", query: { category: slugify(item.category) } }}
-                          className="inline-block px-2 sm:px-3 py-1 bg-gray-100 text-custom-gray-500 text-xs font-medium rounded-full font-manrope hover:text-custom-green"
-                        >
-                          {item.category}
-                        </Link>
-
-                        <Link
-                          href="/product-detail"
-                          className="font-bold text-custom-gray-900 text-base sm:text-lg leading-tight font-sora break-words hover:underline"
-                        >
-                          {item.name}
-                        </Link>
-
-                        <p className="text-custom-gray-500 font-medium font-manrope text-sm sm:text-base">{item.brand}</p>
-                        <p className="text-custom-gray-500 text-xs sm:text-sm font-manrope">Color: {item.color}</p>
-
-                        {/* Rating */}
-                        <div className="flex items-center gap-2">
-                          <div className="flex">
-                            {[...Array(5)].map((_, i) => (
-                              <i key={i} className={`fas fa-star text-xs sm:text-sm ${i < Math.floor(item.rating) ? "text-yellow-400" : "text-gray-300"}`} />
-                            ))}
-                          </div>
-                          <span className="text-custom-gray-500 text-xs sm:text-sm font-medium font-manrope">({item.rating})</span>
-                        </div>
-
-                        {/* Sizes */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-custom-gray-500 text-xs sm:text-sm font-manrope">Sizes:</span>
-                          <div className="flex flex-wrap gap-1">
-                            {item.sizes.map((size) => (
-                              <span key={size} className="text-xs px-2 py-1 bg-gray-100 text-custom-gray-900 rounded font-medium">
-                                {size}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Price & Actions */}
-                      <div className="flex flex-col items-start lg:items-end space-y-3 sm:space-y-4 lg:min-w-[192px]">
-                        <div className="text-left lg:text-right">
-                          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1">
-                            <span className="font-bold text-lg sm:text-xl text-black font-sora">Rs {item.price.toLocaleString()}</span>
-                            {item.originalPrice > item.price && (
-                              <span className="text-custom-gray-300 line-through font-manrope text-sm sm:text-base">
-                                Rs {item.originalPrice.toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                          {item.originalPrice > item.price && (
-                            <p className="text-custom-green font-semibold font-manrope text-xs sm:text-sm">
-                              Save Rs {(item.originalPrice - item.price).toLocaleString()}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-2 sm:gap-3 w-full lg:w-auto">
-                          <button
-                            disabled={!item.inStock}
-                            onClick={() => handleMoveToCart([item.id])}
-                            className={`flex-1 lg:flex-none px-4 sm:px-6 py-2 sm:py-3 font-semibold rounded-lg transition-all duration-200 font-sora text-xs sm:text-sm ${
-                              item.inStock
-                                ? "bg-custom-green text-black hover:bg-green-400 hover:shadow-lg transform hover:scale-105"
-                                : "bg-gray-200 text-custom-gray-300 cursor-not-allowed"
-                            }`}
-                          >
-                            <i className={`${item.inStock ? "fas fa-shopping-cart" : "fas fa-exclamation-triangle"} mr-1 sm:mr-2`} />
-                            {item.inStock ? "Move to Cart" : "Out of Stock"}
-                          </button>
-
-                          <button
-                            onClick={() => handleRemove(item.id)}
-                            className="p-2 sm:p-3 text-custom-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
-                            title="Remove from wishlist"
-                          >
-                            <i className="fas fa-trash text-sm" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      {/* SAVED GRID */}
+      <section className="px-6 md:px-10 lg:px-20 pb-12">
+        <div className="mx-auto ">
+          {filtered.length === 0 ? (
+            <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
+              <p className="text-stone-700">No items in this filter.</p>
+              <div className="mt-3 flex justify-center gap-2">
+                <Link
+                  href="/shop"
+                  className="inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-stone-800"
+                >
+                  Browse shop
+                </Link>
+                <button
+                  onClick={() => setFilter('All')}
+                  className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-4 py-2 text-sm hover:bg-stone-50"
+                >
+                  Reset filter
+                </button>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Wishlist Items - Grid View */}
-        {items.length > 0 && viewMode === "grid" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-xl border-2 border-gray-200 hover:border-custom-green transition-all duration-300 hover:shadow-xl overflow-hidden"
-              >
-                {/* Checkbox */}
-                <div className="p-3 border-b border-gray-100">
-                  <label className="flex items-center space-x-2 cursor-pointer">
+            </div>
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filtered.map((p) => (
+                <div
+                  key={p.id}
+                  className="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 transition hover:shadow-md"
+                >
+                  {/* Select checkbox */}
+                  <label className="absolute left-2 top-2 z-10 inline-flex items-center gap-2">
                     <input
                       type="checkbox"
-                      checked={selectedItems.includes(item.id)}
-                      onChange={() => handleSelectItem(item.id)}
-                      className="w-4 h-4 text-custom-green border-2 border-gray-300 rounded focus:ring-2 focus:ring-custom-green"
+                      checked={selected.includes(p.id)}
+                      onChange={() => toggleSelect(p.id)}
+                      className="h-4 w-4 rounded border-stone-300 text-stone-900 focus:ring-stone-400"
                     />
-                    <span className="text-sm font-medium text-custom-gray-900">Select</span>
                   </label>
-                </div>
 
-                {/* Product Image */}
-                <div className="relative aspect-square">
-                  <Link href="/product-detail" className="block">
-                    <Image src={item.image} alt={item.name} fill style={{ objectFit: "cover" }} />
-                  </Link>
+                  {/* Sale badge */}
+                  {typeof p.compareAt === 'number' && p.compareAt > p.price ? (
+                    <span className="absolute right-2 top-2 z-10 inline-flex items-center rounded-full bg-rose-600 px-2.5 py-1 text-[11px] font-medium text-white">
+                      -{Math.round(((p.compareAt - p.price) / p.compareAt) * 100)}%
+                    </span>
+                  ) : null}
 
-                  {/* Discount Badge */}
-                  {item.discount > 0 && (
-                    <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
-                      -{item.discount}%
-                    </div>
-                  )}
-
-                  {/* Stock Status */}
-                  {!item.inStock && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <span className="text-white font-semibold px-3 py-1 bg-red-500 rounded-full text-sm">Out of Stock</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Product Details */}
-                <div className="p-4 space-y-3">
-                  <Link
-                    href={{ pathname: "/main", query: { category: slugify(item.category) } }}
-                    className="inline-block px-2 py-1 bg-gray-100 text-custom-gray-500 text-xs font-medium rounded-full font-manrope hover:text-custom-green"
-                  >
-                    {item.category}
-                  </Link>
-
-                  <div>
-                    <Link href="/product-detail" className="font-bold text-custom-gray-900 text-sm leading-tight font-sora line-clamp-2 hover:underline">
-                      {item.name}
-                    </Link>
-                    <p className="text-custom-gray-500 font-medium font-manrope text-sm mt-1">{item.brand}</p>
-                  </div>
-
-                  <p className="text-custom-gray-500 text-xs font-manrope">Color: {item.color}</p>
-
-                  {/* Rating */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex">
-                      {[...Array(5)].map((_, i) => (
-                        <i key={i} className={`fas fa-star text-xs ${i < Math.floor(item.rating) ? "text-yellow-400" : "text-gray-300"}`} />
-                      ))}
-                    </div>
-                    <span className="text-custom-gray-500 text-xs font-medium font-manrope">({item.rating})</span>
-                  </div>
-
-                  {/* Sizes */}
-                  <div className="flex flex-wrap gap-1">
-                    {item.sizes.map((size) => (
-                      <span key={size} className="text-xs px-2 py-1 bg-gray-100 text-custom-gray-900 rounded font-medium">
-                        {size}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Price */}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-lg text-black font-sora">Rs {item.price.toLocaleString()}</span>
-                      {item.originalPrice > item.price && (
-                        <span className="text-custom-gray-300 line-through font-manrope text-sm">
-                          Rs {item.originalPrice.toLocaleString()}
+                  {/* Image */}
+                  <Link href="/productdetail" className="block">
+                    <div className="relative w-full pt-[125%] bg-stone-100">
+                      <Image
+                        src={p.image}
+                        alt={p.title}
+                        fill
+                        sizes="(max-width:1024px) 50vw, 25vw"
+                        className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        priority
+                      />
+                      {p.tag ? (
+                        <span className="absolute left-2 bottom-2 inline-flex items-center rounded-full bg-white/90 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-stone-900">
+                          {p.tag}
                         </span>
-                      )}
+                      ) : null}
                     </div>
-                    {item.originalPrice > item.price && (
-                      <p className="text-custom-green font-semibold font-manrope text-xs">
-                        Save Rs {(item.originalPrice - item.price).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
+                  </Link>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      disabled={!item.inStock}
-                      onClick={() => handleMoveToCart([item.id])}
-                      className={`flex-1 px-4 py-2 font-semibold rounded-lg transition-all duration-200 font-sora text-sm ${
-                        item.inStock ? "bg-custom-green text-black hover:bg-green-400 hover:shadow-lg" : "bg-gray-200 text-custom-gray-300 cursor-not-allowed"
-                      }`}
-                    >
-                      <i className={`${item.inStock ? "fas fa-shopping-cart" : "fas fa-exclamation-triangle"} mr-2`} />
-                      {item.inStock ? "Move to Cart" : "Out of Stock"}
-                    </button>
+                  {/* Info */}
+                  <div className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Link href="/productdetail" className="line-clamp-1 text-sm font-medium hover:underline">
+                          {p.title}
+                        </Link>
+                        <p className="mt-0.5 text-xs text-stone-600">{p.kind}</p>
+                      </div>
+                      <button
+                        onClick={() => remove(p.id)}
+                        className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-2 py-1 text-xs hover:bg-stone-50"
+                        title="Remove"
+                      >
+                        <i className="fa-regular fa-trash-can" />
+                      </button>
+                    </div>
 
-                    <button
-                      onClick={() => handleRemove(item.id)}
-                      className="p-2 text-custom-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
-                      title="Remove from wishlist"
-                    >
-                      <i className="fas fa-trash text-sm" />
-                    </button>
+                    <div className="mt-2 flex items-center justify-between">
+                      <div className="text-sm">
+                        <span className="font-medium text-stone-900">{money(p.price)}</span>{' '}
+                        {p.compareAt ? (
+                          <span className="text-stone-400 line-through">{money(p.compareAt)}</span>
+                        ) : null}
+                      </div>
+                      <StockPill stock={p.stock} />
+                    </div>
+
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => addToCart(p.id)}
+                        className="inline-flex flex-1 items-center justify-center rounded-full bg-black px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-800"
+                      >
+                        <i className="fa-solid fa-cart-plus mr-2" />
+                        Add to cart
+                      </button>
+                      <Link
+                        href="/productdetail"
+                        className="inline-flex items-center justify-center rounded-full border border-stone-300/80 bg-white px-3 py-1.5 text-sm hover:bg-stone-50"
+                        title="View"
+                      >
+                        View
+                      </Link>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Continue Shopping */}
-        {items.length > 0 && (
-          <div className="mt-12 sm:mt-16 text-center">
-            <Link
-              href="/main"
-              className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 border-2 border-gray-300 rounded-lg text-custom-gray-900 font-semibold hover:border-custom-green hover:text-custom-green transition-colors font-sora text-sm sm:text-base lg:text-lg"
-            >
-              <i className="fas fa-arrow-left mr-2 sm:mr-3" />
-              <span>Continue Shopping</span>
-            </Link>
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
-      {/* You Might Also Like */}
-      <section className="px-4 sm:px-6 lg:px-20 py-12 sm:py-16 bg-gray-50">
-        <div className="mx-auto">
-          <h2 className="text-xl sm:text-2xl font-bold text-black mb-6 sm:mb-8 font-sora">You Might Also Like</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div
-                key={n}
-                className="bg-white rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-200 hover:border-custom-green"
+      {/* BACK IN STOCK */}
+      <Rail
+        id="back-in-stock"
+        title="Back in stock"
+        subtitle="Pieces you might have missed — now available."
+        items={BACK_IN_STOCK}
+      />
+
+      {/* PRICE DROPS */}
+      <Rail
+        id="price-drops"
+        title="Price drops"
+        subtitle="Limited-time markdowns on your favorites."
+        items={PRICE_DROPS}
+      />
+
+      {/* SAVED LISTS */}
+      <section className="px-6 md:px-10 lg:px-20 pb-12">
+        <div className="mx-auto ">
+          <div className="flex items-end justify-between">
+            <div>
+              <h2
+                className="text-2xl md:text-3xl font-semibold uppercase"
+                style={{ fontFamily: 'Poppins, sans-serif' }}
               >
-                <div className="relative aspect-square group">
-                  <Link href="/product-detail" className="block">
-                    <Image src="/images/gym-2.svg" alt="Suggested product" fill style={{ objectFit: "cover" }} />
-                  </Link>
-                  <button
-                    onClick={() => showToast("Added to wishlist", "success")}
-                    className="absolute top-2 sm:top-3 right-2 sm:right-3 p-1.5 sm:p-2 bg-white bg-opacity-90 rounded-full hover:bg-opacity-100 transition-all duration-200 transform hover:scale-110 shadow-md"
-                  >
-                    <i className="far fa-heart text-custom-gray-500 hover:text-red-500 text-xs sm:text-sm" />
-                  </button>
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity duration-300 flex items-center justify-center">
-                    <button
-                      onClick={() => showToast("Quick added to cart", "success")}
-                      className="bg-custom-green text-black px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 font-sora text-xs sm:text-sm"
-                    >
-                      Quick Add
-                    </button>
-                  </div>
+                Your lists
+              </h2>
+              <p className="mt-1 text-stone-600">Organize saved items into themed lists.</p>
+            </div>
+            <button className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-4 py-2 text-sm hover:bg-stone-50">
+              <i className="fa-solid fa-plus mr-2" />
+              New list
+            </button>
+          </div>
+
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {LISTS.map((l) => (
+              <div
+                key={l.id}
+                className="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 transition hover:shadow-md"
+              >
+                <div className="relative w-full pt-[56%] bg-stone-100">
+                  <Image
+                    src={l.cover}
+                    alt={l.title}
+                    fill
+                    sizes="(max-width:1024px) 50vw, 33vw"
+                    className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                  />
                 </div>
-                <div className="p-2 sm:p-4">
-                  <Link href="/product-detail" className="font-semibold text-custom-gray-900 text-xs sm:text-sm line-clamp-2 mb-2 font-sora hover:underline">
-                    Premium Athletic Wear
-                  </Link>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm sm:text-lg font-bold text-black font-sora">Rs 2,499</p>
-                    <div className="flex items-center">
-                      <i className="fas fa-star text-yellow-400 text-xs" />
-                      <span className="text-xs text-custom-gray-500 ml-1 font-manrope">4.8</span>
-                    </div>
+                <div className="p-4">
+                  <p className="text-sm font-semibold">{l.title}</p>
+                  <p className="text-xs text-stone-600">{l.count} saved</p>
+                  <div className="mt-3 flex gap-2">
+                    <button className="inline-flex items-center rounded-full bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-800">
+                      Open
+                    </button>
+                    <button className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-3 py-1.5 text-xs hover:bg-stone-50">
+                      Share
+                    </button>
                   </div>
                 </div>
               </div>
@@ -691,36 +559,117 @@ const WishlistPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="px-4 sm:px-6 lg:px-20 py-12 sm:py-16 bg-white border-t border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-          <div className="text-center">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-custom-green rounded-full flex items-center justify-center">
-              <i className="fas fa-heart text-black text-lg sm:text-2xl" />
-            </div>
-            <h3 className="text-lg sm:text-xl font-bold text-black mb-2 font-sora">{items.length} Items Saved</h3>
-            <p className="text-custom-gray-500 font-manrope text-sm sm:text-base">Keep track of your favorite products</p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-green-100 rounded-full flex items-center justify-center">
-              <i className="fas fa-piggy-bank text-custom-green text-lg sm:text-2xl" />
-            </div>
-            <h3 className="text-lg sm:text-xl font-bold text-black mb-2 font-sora">Rs {totalSavings.toLocaleString()} Saved</h3>
-            <p className="text-custom-gray-500 font-manrope text-sm sm:text-base">Total savings on wishlist items</p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-blue-100 rounded-full flex items-center justify-center">
-              <i className="fas fa-shipping-fast text-blue-500 text-lg sm:text-2xl" />
-            </div>
-            <h3 className="text-lg sm:text-xl font-bold text-black mb-2 font-sora">Free Delivery</h3>
-            <p className="text-custom-gray-500 font-manrope text-sm sm:text-base">On orders above Rs 2,500</p>
+      {/* RECENTLY VIEWED */}
+      <section className="px-6 md:px-10 lg:px-20 pb-20">
+        <div className="mx-auto max-w-3xl rounded-2xl border border-stone-200 bg-white p-6 text-center">
+          <p className="text-stone-700">Keep exploring</p>
+          <div className="mt-3 flex justify-center gap-2">
+            <Link
+              href="/new-arrivals"
+              className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-4 py-2 text-sm hover:bg-stone-50"
+            >
+              New Arrivals
+            </Link>
+            <Link
+              href="/trending"
+              className="inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-stone-800"
+            >
+              Trending
+            </Link>
           </div>
         </div>
       </section>
     </main>
   );
-};
+}
 
-export default WishlistPage;
+function StockPill({ stock }: { stock?: SavedItem['stock'] }) {
+  if (!stock) return null;
+  const map = {
+    in: { text: 'In stock', cls: 'bg-emerald-50 text-emerald-800 ring-emerald-200' },
+    low: { text: 'Low stock', cls: 'bg-amber-50 text-amber-800 ring-amber-200' },
+    out: { text: 'Out of stock', cls: 'bg-rose-50 text-rose-800 ring-rose-200' },
+  } as const;
+  const s = map[stock];
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs ring-1 ${s.cls}`}>
+      <i
+        className={[
+          'fa-solid',
+          stock === 'in' ? 'fa-circle-check' : stock === 'low' ? 'fa-triangle-exclamation' : 'fa-circle-xmark',
+        ].join(' ')}
+      />
+      {s.text}
+    </span>
+  );
+}
+
+function Rail({
+  id,
+  title,
+  subtitle,
+  items,
+}: {
+  id: string;
+  title: string;
+  subtitle?: string;
+  items: SavedItem[];
+}) {
+  return (
+    <section id={id} className="px-6 md:px-10 lg:px-20 pb-12">
+      <div className="mx-auto">
+        <div className="flex items-end justify-between">
+          <div>
+            <h2
+              className="text-2xl md:text-3xl font-semibold uppercase"
+              style={{ fontFamily: 'Poppins, sans-serif' }}
+            >
+              {title}
+            </h2>
+            {subtitle ? <p className="mt-1 text-stone-600">{subtitle}</p> : null}
+          </div>
+          <Link
+            href="/shop"
+            className="hidden md:inline-flex items-center rounded-full border border-stone-300/80 bg-white px-4 py-2 text-sm hover:bg-stone-50"
+          >
+            Shop all
+          </Link>
+        </div>
+
+        <div className="mt-4 no-scrollbar flex gap-5 overflow-x-auto px-1 py-2">
+          {items.map((p) => (
+            <Link
+              key={p.id}
+              href="/productdetail"
+              className="group relative h-[300px] w-[220px] shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 transition hover:shadow-md"
+            >
+              <Image
+                src={p.image}
+                alt={p.title}
+                fill
+                sizes="220px"
+                className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 p-3">
+                <p className="line-clamp-1 text-sm font-medium text-white">{p.title}</p>
+                <p className="text-xs text-white/85">{money(p.price)}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Scoped scrollbar hide for rails */}
+      <style jsx>{`
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
+    </section>
+  );
+}

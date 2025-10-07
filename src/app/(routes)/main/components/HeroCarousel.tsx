@@ -1,183 +1,221 @@
 "use client";
-import React, { useState } from "react";
+
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 
-const slides = [
+export type CTA = { label: string; href: string };
+
+export type Slide = {
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  menCta?: CTA;
+  womenCta?: CTA;
+  backgroundImage?: string; // e.g., "/images/image.png" in public/images
+  darkOverlay?: boolean;    // true => add gradient overlay for contrast
+};
+
+export type HeroCarouselProps = {
+  slides?: Slide[];         // optional; uses defaults if omitted
+  intervalMs?: number;      // autoplay interval
+  autoPlay?: boolean;       // enable/disable autoplay
+  pauseOnHover?: boolean;   // pause when mouse hovers
+  showArrows?: boolean;     // optional arrows
+  className?: string;
+};
+
+const DEFAULT_SLIDES: Slide[] = [
   {
-    heading: "Discover Premium Fashion",
+    eyebrow: "September Capsule",
+    title: "Songs of the Desert",
     description:
-      "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem.",
-    bgImage: "/images/hero.svg",
-    ariaLabel: "Premium fashion background",
+      "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor...",
+    menCta: { label: "Shop Men", href: "/category?g=men" },
+    womenCta: { label: "Shop Women", href: "/category?g=women" },
+    backgroundImage: "/images/image.png",
+    darkOverlay: true,
   },
   {
-    heading: "Latest Summer Collection",
-    description:
-      "Nulla consequat massa quis enim. Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu. In enim justo, rhoncus ut, imperdiet a, venenatis vitae, justo. Nullam dictum felis eu pede mollis pretium. Integer tincidunt.",
-    bgImage: "/images/hero.svg",
-    ariaLabel: "Summer collection background",
+    eyebrow: "Core Drop",
+    title: "Timeless Essentials",
+    description: "Built to last. Elevated basics for everyday wear.",
+    menCta: { label: "Explore Core", href: "/series?name=core" },
+    backgroundImage: "/images/image.png",
+    darkOverlay: true,
   },
   {
-    heading: "Exclusive Designer Wear",
-    description:
-      "Cras dapibus vivamus elementum semper nisi. Aenean vulputate eleifend tellus. Aenean leo ligula, porttitor eu, consequat vitae, eleifend ac, enim. Aliquam lorem ante, dapibus in, viverra quis, feugiat a, tellus.",
-    bgImage: "/images/hero.svg",
-    ariaLabel: "Designer wear background",
+    eyebrow: "Seasonal Edit",
+    title: "Resortwear 2025",
+    description: "Light, breathable, and ready for sun-drenched days.",
+    womenCta: { label: "Shop Resort", href: "/category?c=resortwear" },
+    backgroundImage: "/images/image.png",
+    darkOverlay: true,
   },
 ];
 
-const AUTO_INTERVAL = 4000;
-const HeroCarousel: React.FC = () => {
-  const [active, setActive] = useState(0);
-  const [autoPlay, setAutoPlay] = useState(true);
+const HeroCarousel: React.FC<HeroCarouselProps> = ({
+  slides,
+  intervalMs = 6000,
+  autoPlay = true,
+  pauseOnHover = true,
+  showArrows = false,
+  className = "",
+}) => {
+  const slidesToUse = slides && slides.length > 0 ? slides : DEFAULT_SLIDES;
+  const [index, setIndex] = useState(0);
+  const [isHover, setIsHover] = useState(false);
+  const total = slidesToUse.length;
 
-  React.useEffect(() => {
-    if (!autoPlay) return;
-    const timer = setInterval(() => {
-      setActive((prev) => (prev === slides.length - 1 ? 0 : prev + 1));
-    }, AUTO_INTERVAL);
-    return () => clearInterval(timer);
-  }, [autoPlay, active]);
+  useEffect(() => {
+    if (!autoPlay || total <= 1) return;
+    if (pauseOnHover && isHover) return;
+    const id = setInterval(() => setIndex((i) => (i + 1) % total), intervalMs);
+    return () => clearInterval(id);
+  }, [autoPlay, intervalMs, total, isHover, pauseOnHover]);
 
-  const pauseAndMove = (moveFn: () => void) => {
-    setAutoPlay(false);
-    moveFn();
-    setTimeout(() => setAutoPlay(true), AUTO_INTERVAL);
+  if (total === 0) return null;
+
+  const next = () => setIndex((i) => (i + 1) % total);
+  const prev = () => setIndex((i) => (i - 1 + total) % total);
+
+  // Layered overlay for better readability
+  const buildBg = (bg?: string, enableOverlay = true): React.CSSProperties => {
+    if (!bg) {
+      return {
+        background:
+          "linear-gradient(180deg, rgba(30,30,30,1) 0%, rgba(0,0,0,1) 100%)",
+      };
+    }
+
+    if (!enableOverlay) {
+      return {
+        backgroundImage: `url('${bg}')`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      };
+    }
+
+    return {
+      backgroundImage: `
+        linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.45) 58%, rgba(0,0,0,0.70) 100%),
+        radial-gradient(120% 100% at 50% 0%, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0) 60%),
+        url('${bg}')
+      `,
+      backgroundSize: "cover, cover, cover",
+      backgroundPosition: "center, center, center",
+      backgroundRepeat: "no-repeat, no-repeat, no-repeat",
+    };
   };
-
-  const handlePrev = () =>
-    pauseAndMove(() =>
-      setActive((prev) => (prev === 0 ? slides.length - 1 : prev - 1))
-    );
-  const handleNext = () =>
-    pauseAndMove(() =>
-      setActive((prev) => (prev === slides.length - 1 ? 0 : prev + 1))
-    );
-  const goTo = (idx: number) => pauseAndMove(() => setActive(idx));
 
   return (
     <section
-      id="hero"
-      className="hero-section relative overflow-hidden"
-      role="banner"
-      aria-label="Fashion showcase carousel"
+      className={`relative w-full isolate ${className}`}
+      aria-roledescription="carousel"
+      aria-label="Hero carousel"
+      onMouseEnter={() => pauseOnHover && setIsHover(true)}
+      onMouseLeave={() => pauseOnHover && setIsHover(false)}
     >
-      <div className="hero-carousel relative" id="hero-carousel">
-        {slides.map((slide, idx) => (
-          <article
-            key={idx}
-            className={`hero-slide${active === idx ? " active" : ""}`}
-            role="tabpanel"
-            aria-label={`Slide ${idx + 1} of ${slides.length}`}
-            id={`slide-${idx + 1}`}
-            style={{ display: active === idx ? "block" : "none" }}
-          >
+      {/* Slides stacked in a single grid cell for fade transitions */}
+      <div className="grid min-h-[80vh] sm:min-h-[85vh] lg:min-h-screen w-full overflow-hidden">
+        {slidesToUse.map((s, i) => {
+          const isActive = i === index;
+
+          return (
             <div
-              className="hero-background-image"
-              style={{ backgroundImage: `url('${slide.bgImage}')` }}
-              role="img"
-              aria-label={slide.ariaLabel}
+              key={i}
+              className={[
+                "row-start-1 col-start-1 w-full",
+                "transition-opacity duration-800 ease-out",
+                isActive ? "opacity-100" : "opacity-0 pointer-events-none",
+              ].join(" ")}
+              style={buildBg(s.backgroundImage, s.darkOverlay !== false)}
+              aria-roledescription="slide"
+              aria-label={`${i + 1} of ${total}`}
+              aria-hidden={!isActive}
             >
-              <div className="hero-overlay" aria-hidden="true"></div>
-              <div className="hero-content">
-                <div className="hero-text-content">
-                  <header className="hero-header-lines">
-                    <h1 className="hero-heading">{slide.heading}</h1>
-                    <p className="hero-description">{slide.description}</p>
-                  </header>
-                  <nav className="hero-buttons" aria-label="Shop categories">
-                    <Link
-                      href="/mens-wear"
-                      className="hero-cta-button"
-                      role="button"
-                      aria-label="Shop men's collection"
+              {/* Center content on all devices */}
+              <div className="mx-auto flex h-full max-w-7xl items-center justify-center px-4 sm:px-6 md:px-8 py-16 sm:py-20 md:py-24">
+                <div className="flex w-full max-w-3xl flex-col items-center text-center gap-5 sm:gap-6 lg:gap-8">
+                  {s.eyebrow && (
+                    <p
+                      className="text-white/85 text-sm sm:text-base tracking-wide"
+                      style={{ fontFamily: "Poppins, sans-serif", fontWeight: 400, lineHeight: "22px" }}
                     >
-                      <span className="hero-cta-text">Shop Men</span>
-                      <i className="fas fa-arrow-right" aria-hidden="true"></i>
-                    </Link>
-                    <Link
-                      href="/women-wear"
-                      className="hero-cta-button"
-                      role="button"
-                      aria-label="Shop women's collection"
+                      {s.eyebrow}
+                    </p>
+                  )}
+
+                  {s.title && (
+                    <h1
+                      className="text-white font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-tight md:leading-[1.15]"
+                      style={{ fontFamily: "Poppins, sans-serif" }}
                     >
-                      <span className="hero-cta-text">Shop Women</span>
-                      <i className="fas fa-arrow-right" aria-hidden="true"></i>
-                    </Link>
-                  </nav>
+                      {s.title}
+                    </h1>
+                  )}
+
+                  {s.description && (
+                    <p
+                      className="text-white/90 text-sm sm:text-base md:text-lg leading-relaxed max-w-prose"
+                      style={{ fontFamily: "Poppins, sans-serif" }}
+                    >
+                      {s.description}
+                    </p>
+                  )}
+
+                  {(s.menCta || s.womenCta) && (
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+                      {s.menCta && (
+                        <Link
+                          href={s.menCta.href}
+                          className="inline-flex justify-center rounded-lg px-6 py-3 bg-white/10 ring-1 ring-white/80 ring-inset backdrop-blur-md text-white text-sm font-semibold leading-5 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                          style={{ fontFamily: "Manrope, sans-serif" }}
+                        >
+                          {s.menCta.label}
+                        </Link>
+                      )}
+                      {s.womenCta && (
+                        <Link
+                          href={s.womenCta.href}
+                          className="inline-flex justify-center rounded-lg px-6 py-3 bg-white/10 ring-1 ring-white/80 ring-inset backdrop-blur-md text-white text-sm font-semibold leading-5 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                          style={{ fontFamily: "Manrope, sans-serif" }}
+                        >
+                          {s.womenCta.label}
+                        </Link>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          </article>
-        ))}
+          );
+        })}
       </div>
-      <nav
-        className="hero-navigation"
-        role="tablist"
-        aria-label="Carousel navigation"
-      >
-        <button
-          className="hero-nav-btn hero-prev-btn"
-          aria-label="Previous slide"
-          aria-controls="hero-carousel"
-          type="button"
-          onClick={handlePrev}
-        >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
+
+      {/* Optional arrows (off by default) */}
+      {showArrows && total > 1 && (
+        <>
+          <button
+            aria-label="Previous slide"
+            onClick={prev}
+            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white ring-1 ring-white/70 backdrop-blur hover:bg-white/15 focus:outline-none focus-visible:ring-2"
           >
-            <path
-              d="M14.9998 19.92L8.47984 13.4C7.70984 12.63 7.70984 11.37 8.47984 10.6L14.9998 4.08002"
-              stroke="white"
-              strokeWidth="1.5"
-              strokeMiterlimit="10"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <div className="hero-indicators" role="tablist" aria-label="Slide indicators">
-          {slides.map((_, idx) => (
-            <button
-              key={idx}
-              className={`hero-indicator${active === idx ? " active" : ""}`}
-              data-slide={idx}
-              role="tab"
-              aria-selected={active === idx}
-              aria-controls={`slide-${idx + 1}`}
-              aria-label={`Go to slide ${idx + 1}`}
-              type="button"
-              onClick={() => goTo(idx)}
-            ></button>
-          ))}
-        </div>
-        <button
-          className="hero-nav-btn hero-next-btn"
-          aria-label="Next slide"
-          aria-controls="hero-carousel"
-          type="button"
-          onClick={handleNext}
-        >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button
+            aria-label="Next slide"
+            onClick={next}
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white ring-1 ring-white/70 backdrop-blur hover:bg-white/15 focus:outline-none focus-visible:ring-2"
           >
-            <path
-              d="M8.91156 20.67C8.72156 20.67 8.53156 20.6 8.38156 20.45C8.09156 20.16 8.09156 19.68 8.38156 19.39L14.9016 12.87C15.3816 12.39 15.3816 11.61 14.9016 11.13L8.38156 4.61002C8.09156 4.32002 8.09156 3.84002 8.38156 3.55002C8.67156 3.26002 9.15156 3.26002 9.44156 3.55002L15.9616 10.07C16.4716 10.58 16.7616 11.27 16.7616 12C16.7616 12.73 16.4816 13.42 15.9616 13.93L9.44156 20.45C9.29156 20.59 9.10156 20.67 8.91156 20.67Z"
-              fill="white"
-            />
-          </svg>
-        </button>
-      </nav>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </>
+      )}
     </section>
   );
 };

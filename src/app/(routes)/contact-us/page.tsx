@@ -3,16 +3,18 @@
 import React from "react";
 import Link from "next/link";
 import '@fortawesome/fontawesome-free/css/all.css';
+import HeroAbout from "../about-us/components/HeroAbout";
 
 const ContactUsPage = () => {
   return (
-    <main className="pt-24">
+    <main className="pt-20">
+      <HeroAbout/>
       <section className="bg-white sm:px-6 lg:px-20 py-12 sm:py-16 lg:py-20">
         <div className="mx-auto">
           <div className="flex flex-col lg:flex-row gap-8 lg:gap-16">
             {/* Navigation Sidebar */}
             <aside className="lg:w-64 flex-shrink-0">
-              <nav className="bg-white rounded-lg shadow-sm overflow-hidden lg:sticky lg:top-8">
+              <nav className="bg-white rounded-lg shadow-sm overflow-hidden lg:sticky lg:top-20">
                 <Link href="/faqs" className="privacy-faq-nav-tab w-full px-6 py-4 text-left font-medium text-sm border-b border-gray-100 privacy-faq-nav-inactive block">
                   <i className="fas fa-question-circle mr-2"></i>
                   FAQS
