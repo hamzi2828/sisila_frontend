@@ -249,7 +249,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount = 2, logoSrc = '/images/silsi
               <Zap className="h-4 w-4 text-amber-600" aria-hidden="true" />
               Mid-season sale up to 40% off
             </span>
-            <Link href="/sale" className="rounded-full bg-black px-3 py-1 text-white hover:bg-gray-900">
+            <Link href="/shop" className="rounded-full bg-black px-3 py-1 text-white hover:bg-gray-900">
               Shop now
             </Link>
           </div>
