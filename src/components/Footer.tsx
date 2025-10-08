@@ -12,7 +12,7 @@ export default function Footer() {
     <footer className="relative border-t border-stone-200 bg-gradient-to-b from-stone-50 to-white text-stone-900">
       {/* Newsletter */}
       <section className="px-6 md:px-10 lg:px-20 py-10">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto ">
           <div className="relative overflow-hidden rounded-3xl border border-stone-200 bg-white/70 supports-[backdrop-filter]:bg-white/50 backdrop-blur">
             <div className="grid gap-6 p-6 md:grid-cols-2 md:p-10">
               <div>
@@ -68,7 +68,7 @@ export default function Footer() {
 
       {/* Links */}
       <section className="px-6 md:px-10 lg:px-20 pb-10">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto ">
           <div className="grid gap-10 md:grid-cols-12">
             {/* Brand */}
             <div className="md:col-span-4">
