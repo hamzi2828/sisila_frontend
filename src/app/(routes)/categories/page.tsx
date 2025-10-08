@@ -3,6 +3,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 
+import CategoryHero from './components/CategoryHero';
+import CategoryStickyNav from './components/CategoryStickyNav';
+import CategoryFeatureStripe from './components/CategoryFeatureStripe';
+import CategoryScrollerRow from './components/CategoryScrollerRow';
+
 // Types
 export type CategoryId =
   | 'poetry'
@@ -20,17 +25,16 @@ export type CategoryKind = 'core' | 'curation';
 
 export type CategorySection = {
   id: CategoryId;
-  kind: CategoryKind; // 'core' will be the top 5; 'curation' are additional rows
+  kind: CategoryKind;
   title: string;
   description: string;
   cover: string;
-  accent?: string; // tailwind gradient classes
+  accent?: string;
   gallery: { title: string; image: string; href?: string }[];
 };
 
-// Data (inlined — not in a separate file)
+// Data (inlined)
 const CATEGORY_SECTIONS: CategorySection[] = [
-  // Core — 5 sections
   {
     id: 'poetry',
     kind: 'core',
@@ -120,8 +124,7 @@ const CATEGORY_SECTIONS: CategorySection[] = [
       { title: 'Modern LS', image: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1000&q=80' },
     ],
   },
-
-  // Curations — 5 more sections
+  // Curations
   {
     id: 'minimal',
     kind: 'curation',
@@ -218,259 +221,63 @@ export default function CategoriesPage() {
     <main id="top" className="min-h-screen bg-gradient-to-b from-stone-50 to-white text-stone-900">
       {/* HERO */}
       <section className="px-6 md:px-10 lg:px-20 pt-16 pb-12">
-        <div className="mx-auto max-w-7xl">
-          <div className="relative overflow-hidden rounded-3xl border border-stone-200/60 bg-gradient-to-br from-black via-stone-900 to-stone-800 text-white">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-[0.08]"
-              style={{ backgroundImage: 'radial-gradient(currentColor 1px, transparent 1px)', backgroundSize: '14px 14px' }}
-            />
-            <div className="relative z-10 p-8 md:p-12 lg:p-16">
-              <p className="uppercase tracking-[0.22em] text-xs md:text-sm text-white/70" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                Brand Aesthetic
-              </p>
-              <h1 className="mt-3 text-3xl md:text-5xl lg:text-6xl font-semibold tracking-tight uppercase" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                Categories, Curated
-              </h1>
-              <p className="mt-3 max-w-2xl text-white/80">
-                Five core moods, five fresh curations — discover designs through a modern, editorial lens.
-              </p>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                {CORE_CATEGORY_SECTIONS.map((c) => (
-                  <Link key={c.id} href={`#${c.id}`} className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm hover:bg-white/15 transition">
-                    {c.title}
-                  </Link>
-                ))}
-                <Link href="#curations" className="inline-flex items-center rounded-full bg-white text-stone-900 px-4 py-2 text-sm font-medium hover:bg-stone-100 transition">
-                  View Curations
-                </Link>
-              </div>
-            </div>
-
-            {/* Floating image cluster */}
-            <div className="pointer-events-none absolute inset-y-0 right-0 hidden md:block">
-              <div className="relative h-full w-[48vw] max-w-[640px]">
-                <div className="absolute right-12 top-10 h-48 w-40 rounded-2xl ring-1 ring-white/20 overflow-hidden">
-                  <Image src={CORE_CATEGORY_SECTIONS[0]?.cover || ''} alt={CORE_CATEGORY_SECTIONS[0]?.title || 'Category cover'} fill sizes="(max-width: 768px) 160px, 240px" className="object-cover" priority />
-                </div>
-                <div className="absolute right-24 top-40 h-60 w-48 rotate-3 rounded-2xl ring-1 ring-white/20 overflow-hidden">
-                  <Image src={CORE_CATEGORY_SECTIONS[1]?.cover || ''} alt={CORE_CATEGORY_SECTIONS[1]?.title || 'Category cover'} fill sizes="(max-width: 768px) 200px, 320px" className="object-cover" />
-                </div>
-                <div className="absolute right-8 bottom-10 h-52 w-44 -rotate-2 rounded-2xl ring-1 ring-white/20 overflow-hidden">
-                  <Image src={CORE_CATEGORY_SECTIONS[2]?.cover || ''} alt={CORE_CATEGORY_SECTIONS[2]?.title || 'Category cover'} fill sizes="(max-width: 768px) 180px, 280px" className="object-cover" />
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="mx-auto ">
+          <CategoryHero core={CORE_CATEGORY_SECTIONS} />
         </div>
       </section>
 
       {/* BODY: sticky nav + content */}
       <div className="px-6 md:px-10 lg:px-20 pb-28">
-        <div className="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:gap-10">
+        <div className="mx-auto lg:grid lg:grid-cols-12 lg:gap-10">
           {/* Sticky side nav */}
           <aside className="hidden lg:block lg:col-span-3">
-            <div className="sticky top-32 space-y-8">
-              <div>
-                <p className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-500">Core</p>
-                <nav className="grid gap-2">
-                  {CORE_CATEGORY_SECTIONS.map((c) => (
-                    <Link key={c.id} href={`#${c.id}`} className="group inline-flex items-center justify-between rounded-xl border border-stone-200/70 bg-white px-3 py-2 text-sm hover:bg-stone-50 transition">
-                      <span>{c.title}</span>
-                      <span className="opacity-0 group-hover:opacity-100 transition">↗</span>
-                    </Link>
-                  ))}
-                </nav>
-              </div>
-              <div>
-                <p className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-500">Curations</p>
-                <nav className="grid gap-2">
-                  <Link href="#curations" className="inline-flex items-center justify-between rounded-xl border border-stone-200/70 bg-white px-3 py-2 text-sm hover:bg-stone-50 transition">
-                    <span>All Curations</span>
-                    <span>↓</span>
-                  </Link>
-                </nav>
-              </div>
-            </div>
+            <CategoryStickyNav core={CORE_CATEGORY_SECTIONS} />
           </aside>
 
           {/* Content */}
           <section className="lg:col-span-9 space-y-16">
-            {/* Core: feature stripes */}
             {CORE_CATEGORY_SECTIONS.map((section, idx) => (
-              <FeatureStripe key={section.id} section={section} flipped={idx % 2 === 1} />
+              <CategoryFeatureStripe key={section.id} section={section} flipped={idx % 2 === 1} />
             ))}
 
-            {/* Curations header */}
             <div id="curations" className="scroll-mt-28">
-              <h2 className="text-2xl md:text-3xl font-semibold uppercase" style={{ fontFamily: 'Poppins, sans-serif' }}>
+              <h2
+                className="text-2xl md:text-3xl font-semibold uppercase"
+                style={{ fontFamily: 'Poppins, sans-serif' }}
+              >
                 Curations
               </h2>
-              <p className="mt-2 text-stone-600">More ways to explore the brand aesthetic — modern, versatile, and culture-forward.</p>
+              <p className="mt-2 text-stone-600">
+                More ways to explore the brand aesthetic — modern, versatile, and culture-forward.
+              </p>
             </div>
 
-            {/* Curation rows: sleek horizontal scrollers */}
             {CURATIONS.map((section) => (
-              <ScrollerRow key={section.id} section={section} />
+              <CategoryScrollerRow key={section.id} section={section} />
             ))}
 
-            {/* Back to top */}
             <div className="pt-8">
-              <Link href="#top" className="text-sm text-stone-500 hover:text-stone-800 underline underline-offset-4">
+              <Link
+                href="#top"
+                className="text-sm text-stone-500 hover:text-stone-800 underline underline-offset-4"
+              >
                 Back to top
               </Link>
             </div>
           </section>
         </div>
       </div>
+
+      {/* Scoped scrollbar himax-w-7xl de */}
+      <style jsx>{`
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </main>
-  );
-}
-
-function FeatureStripe({
-  section,
-  flipped = false,
-}: {
-  section: {
-    id: string;
-    title: string;
-    description: string;
-    cover: string;
-    accent?: string;
-    gallery: { title: string; image: string; href?: string }[];
-  };
-  flipped?: boolean;
-}) {
-  const { id, title, description, accent = 'from-black/90 to-black/5', gallery } = section;
-
-  const big = gallery[0]?.image || section.cover;
-  const rightTop = gallery[1]?.image || section.cover;
-  const rightBottom = gallery[2]?.image || section.cover;
-
-  return (
-    <article id={id} className="scroll-mt-28">
-      <div className={['relative overflow-hidden rounded-3xl border border-stone-200/60 bg-white/60 ring-1 ring-black/5', 'supports-[backdrop-filter]:bg-white/40 backdrop-blur'].join(' ')}>
-        {/* Gradient header bar */}
-        <div className={`absolute inset-x-0 top-0 h-24 bg-gradient-to-r ${accent}`} />
-
-        <div className={`grid gap-0 lg:grid-cols-12 ${flipped ? 'lg:[&>.media]:order-1' : ''}`}>
-          {/* Media */}
-          <div className="media relative lg:col-span-7">
-            <div className="p-4 md:p-6 lg:p-8">
-              {/* Mobile layout: stacked (1 big + 2 small) */}
-              <div className="space-y-2 md:hidden">
-                <div className="relative w-full overflow-hidden rounded-2xl ring-1 ring-stone-200/70 pt-[62%]">
-                  <Image src={big} alt={`${title} — primary`} fill sizes="100vw" className="object-cover" priority />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="relative w-full overflow-hidden rounded-2xl ring-1 ring-stone-200/70 pt-[62%]">
-                    <Image src={rightTop} alt={`${title} — detail A`} fill sizes="50vw" className="object-cover" />
-                  </div>
-                  <div className="relative w-full overflow-hidden rounded-2xl ring-1 ring-stone-200/70 pt-[62%]">
-                    <Image src={rightBottom} alt={`${title} — detail B`} fill sizes="50vw" className="object-cover" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Desktop layout: mosaic */}
-              <div className="hidden md:grid grid-cols-12 grid-rows-6 gap-3 h-[480px] lg:h-[520px]">
-                <div className="col-span-12 md:col-span-7 row-span-6 overflow-hidden rounded-2xl ring-1 ring-stone-200/70 relative">
-                  <Image src={big} alt={`${title} — primary`} fill sizes="(max-width: 1024px) 60vw, 50vw" className="object-cover" priority />
-                </div>
-                <div className="col-span-12 md:col-span-5 row-span-3 overflow-hidden rounded-2xl ring-1 ring-stone-200/70 relative">
-                  <Image src={rightTop} alt={`${title} — detail A`} fill sizes="(max-width: 1024px) 40vw, 30vw" className="object-cover" />
-                </div>
-                <div className="col-span-12 md:col-span-5 row-span-3 overflow-hidden rounded-2xl ring-1 ring-stone-200/70 relative">
-                  <Image src={rightBottom} alt={`${title} — detail B`} fill sizes="(max-width: 1024px) 40vw, 30vw" className="object-cover" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Text & CTA panel */}
-          <div className="relative flex items-center lg:col-span-5">
-            <div className="relative z-10 p-6 md:p-8 lg:p-10">
-              <span className="inline-flex items-center rounded-full border border-stone-300/70 bg-white/70 px-3 py-1 text-xs uppercase tracking-[0.18em]">
-                {title}
-              </span>
-              <h3 className="mt-3 text-2xl md:text-3xl font-semibold uppercase" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                {title}
-              </h3>
-              <p className="mt-2 text-stone-600">{description}</p>
-
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Link href={`/productdetail?category=${id}`} className="inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 transition">
-                  Shop {title}
-                </Link>
-               
-              </div>
-            </div>
-
-            {/* Subtle corner artwork */}
-            <div className="pointer-events-none absolute inset-0">
-              <div className="absolute -bottom-10 -right-10 h-40 w-40 rounded-full bg-gradient-to-tr from-black/5 to-transparent blur-2xl" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function ScrollerRow({
-  section,
-}: {
-  section: {
-    id: string;
-    title: string;
-    description: string;
-    cover: string;
-    gallery: { title: string; image: string; href?: string }[];
-  };
-}) {
-  const { id, title, description, gallery } = section;
-
-  return (
-    <section id={id} className="scroll-mt-28">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h3 className="text-xl md:text-2xl font-semibold uppercase" style={{ fontFamily: 'Poppins, sans-serif' }}>
-            {title}
-          </h3>
-          <p className="text-stone-600">{description}</p>
-        </div>
-        <div className="flex gap-3">
-          <Link href={`/productdetail?category=${id}`} className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-4 py-2 text-sm hover:bg-stone-50 transition">
-            Explore {title}
-          </Link>
-        </div>
-      </div>
-
-      {/* Mobile-friendly scroller cards */}
-      <div className="mt-4 no-scrollbar flex gap-4 overflow-x-auto px-1 py-2 scroll-ps-1">
-        {gallery.map((item, idx) => (
-          <Link
-            href={item.href || `/productdetail?category=${id}`}
-            key={`${id}-${idx}`}
-            className="group relative shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 hover:shadow-md transition
-                       w-[76vw] sm:w-[58vw] md:w-[210px] aspect-[3/4] md:aspect-auto md:h-[280px]"
-          >
-            <Image
-              src={item.image}
-              alt={item.title}
-              fill
-              sizes="(max-width: 640px) 76vw, (max-width: 768px) 58vw, 210px"
-              className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-            />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 p-3">
-              <p className="text-sm font-medium text-white">{item.title}</p>
-              <p className="text-xs text-white/80">View</p>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </section>
   );
 }

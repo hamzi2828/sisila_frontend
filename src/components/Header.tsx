@@ -265,7 +265,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount = 2, logoSrc = '/images/silsi
 
       {/* Main header */}
       <div className={['w-full border-b border-gray-200 bg-white/70 backdrop-blur', hasScrolled ? 'shadow-[0_8px_20px_-12px_rgba(0,0,0,0.2)]' : ''].join(' ')}>
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4  py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4  py-2 px-6 lg:py-3   lg:px-0">
           {/* Left: Logo */}
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center">

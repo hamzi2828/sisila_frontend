@@ -239,7 +239,7 @@ type ThemesSectionProps = {
 export default function ThemesSection({ className = '' }: ThemesSectionProps) {
   return (
     <section className={`px-6 md:px-10 lg:px-20 py-12 ${className}`}>
-      <div className="mx-auto ">
+      <div className="mx-auto  ">
         <div className="flex items-end justify-between gap-6">
           <div>
             <p className="uppercase tracking-[0.22em] text-xs md:text-sm text-stone-500">

@@ -73,7 +73,7 @@ export default function BlogsSection({
 }) {
   return (
     <section id="stories" className={`px-6 md:px-10 lg:px-20 py-12 ${className}`}>
-      <div className="mx-auto ">
+      <div className="mx-auto  ">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>

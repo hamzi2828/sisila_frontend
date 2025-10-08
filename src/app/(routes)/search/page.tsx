@@ -2,8 +2,10 @@
 
 import { useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
+import SearchHero from './components/SearchHero';
+import SearchResults from './components/SearchResults';
+import SearchEmpty from './components/SearchEmpty';
+import SearchChips from './components/SearchChips';
 
 type Item = { id: string; title: string; price: number; tag?: string; image: string; href: string };
 
@@ -25,7 +27,9 @@ export default function SearchPage() {
   const results = useMemo(() => {
     if (!q) return CATALOG;
     const term = q.toLowerCase();
-    return CATALOG.filter((i) => i.title.toLowerCase().includes(term) || (i.tag || '').toLowerCase().includes(term));
+    return CATALOG.filter(
+      (i) => i.title.toLowerCase().includes(term) || (i.tag || '').toLowerCase().includes(term)
+    );
   }, [q]);
 
   return (
@@ -33,46 +37,19 @@ export default function SearchPage() {
       {/* Hero */}
       <section className="px-6 md:px-10 lg:px-20 pt-16 pb-8">
         <div className="mx-auto max-w-7xl">
-          <div className="rounded-3xl border border-stone-200 bg-white p-6">
-            <p className="text-sm text-stone-600">Search</p>
-            <h1 className="mt-1 text-2xl md:text-3xl font-semibold uppercase" style={{ fontFamily: 'Poppins, sans-serif' }}>
-              {q ? `Results for “${q}”` : 'Browse all'}
-            </h1>
-            <p className="mt-2 text-stone-600">{results.length} item{results.length === 1 ? '' : 's'}</p>
-          </div>
+          <SearchHero query={q} count={results.length} />
         </div>
       </section>
 
+      {/* Body */}
       <section className="px-6 md:px-10 lg:px-20 pb-20">
         <div className="mx-auto max-w-7xl">
           {results.length === 0 ? (
-            <div className="rounded-2xl border border-stone-200 bg-white p-6">
-              <p className="text-stone-700">No results for “{q}”. Try “tee”, “hoodie”, “Poetry”, or “Street”.</p>
-              <div className="mt-3 flex gap-2">
-                {['tee', 'hoodie', 'Poetry', 'Street'].map((s) => (
-                  <Link key={s} href={`/search?q=${encodeURIComponent(s)}`} className="rounded-full border border-stone-300/80 bg-white px-3 py-1.5 text-sm hover:bg-stone-50">
-                    {s}
-                  </Link>
-                ))}
-              </div>
-            </div>
+            <SearchEmpty query={q}>
+              <SearchChips chips={['tee', 'hoodie', 'Poetry', 'Street']} />
+            </SearchEmpty>
           ) : (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {results.map((p, i) => (
-                <Link key={p.id} href={p.href} className="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 hover:shadow-md transition">
-                  <div className="relative w-full pt-[125%]">
-                    <Image src={p.image} alt={p.title} fill sizes="(max-width:1024px) 50vw, 25vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" priority={i < 4} />
-                  </div>
-                  <div className="p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium">{p.title}</p>
-                      <p className="text-sm text-stone-700">${p.price}</p>
-                    </div>
-                    {p.tag ? <p className="mt-1 text-xs text-stone-500">{p.tag}</p> : null}
-                  </div>
-                </Link>
-              ))}
-            </div>
+            <SearchResults items={results} />
           )}
         </div>
       </section>

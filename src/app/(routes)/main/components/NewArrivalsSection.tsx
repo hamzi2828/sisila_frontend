@@ -26,7 +26,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 38,
     image:
       'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
-    href: '/p/verses-tee',
+    href: '/productdetail',
     badge: 'New',
     tags: ['Poets', 'Unisex'],
   },
@@ -36,7 +36,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 72,
     image:
    'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
-    href: '/p/quip-hoodie',
+    href: '/productdetail',
     badge: 'Drop',
     tags: ['Witty', 'Hoodie'],
   },
@@ -46,7 +46,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 42,
     image:
       'https://images.unsplash.com/photo-1496317899792-9d7dbcd928a1?auto=format&fit=crop&w=1200&q=80',
-    href: '/p/canvas-tee',
+    href: '/productdetail',
   },
   {
     id: 'neon-alley-hoodie',
@@ -54,7 +54,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 78,
     image:
       'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1200&q=80',
-    href: '/p/neon-alley-hoodie',
+    href: '/productdetail',
     badge: 'Limited',
   },
   {
@@ -63,7 +63,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 40,
     image:
       'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=80',
-    href: '/p/forest-tee',
+    href: '/productdetail',
   },
   {
     id: 'varsity-tee',
@@ -71,7 +71,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 44,
     image:
       'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1200&q=80',
-    href: '/p/varsity-tee',
+    href: '/productdetail',
   },
   {
     id: 'palette-crew',
@@ -79,7 +79,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 66,
     image:
       'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1200&q=80',
-    href: '/p/palette-crew',
+    href: '/productdetail',
   },
    {
     id: 'neon-alley-hoodie-2',
@@ -87,7 +87,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 78,
     image:
       'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1200&q=80',
-    href: '/p/neon-alley-hoodie',
+    href: '/productdetail',
     badge: 'Limited',
   },
   {
@@ -96,7 +96,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 40,
     image:
       'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=80',
-    href: '/p/forest-tee',
+    href: '/productdetail',
   },
   {
     id: 'varsity-tee-2',
@@ -104,7 +104,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 44,
     image:
       'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1200&q=80',
-    href: '/p/varsity-tee',
+    href: '/productdetail',
   },
   {
     id: 'palette-crew-2',
@@ -112,7 +112,7 @@ const DEFAULT_PRODUCTS: Product[] = [
     price: 66,
     image:
       'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1200&q=80',
-    href: '/p/palette-crew',
+    href: '/productdetail',
   },
 ];
 
@@ -128,7 +128,7 @@ export default function NewArrivalsSection({
 
   return (
     <section className={`px-6 md:px-10 lg:px-20 py-12 ${className}`}>
-      <div className="mx-auto">
+      <div className="mx-auto ">
         <div className="flex items-end justify-between gap-6">
           <div>
             <p className="uppercase tracking-[0.22em] text-xs md:text-sm text-stone-500">
@@ -246,12 +246,12 @@ function ProductCard({
             <h3 className="text-white font-medium">{product.title}</h3>
             <p className="text-white/85 text-sm">${product.price}</p>
           </div>
-          <button
+          {/* <button
             onClick={onAdd}
             className="opacity-0 group-hover:opacity-100 inline-flex items-center rounded-full bg-white text-stone-900 px-3 py-1.5 text-sm font-medium transition"
           >
             Add to Bag
-          </button>
+          </button> */}
         </div>
       </div>
     </div>

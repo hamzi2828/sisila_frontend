@@ -55,6 +55,26 @@ export const SERIES_SECTIONS: SeriesSection[] = [
         image:
           'https://images.unsplash.com/photo-1520975922284-c0d7a98f3f6b?auto=format&fit=crop&w=1200&q=80',
       },
+        {
+        title: 'Neon Alley',
+        image:
+          'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'City Lights',
+        image:
+          'https://images.unsplash.com/photo-1536335550880-118d3d624d07?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'Arcade Glow',
+        image:
+          'https://images.unsplash.com/photo-1544551763-5df28357f0a1?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'Night Run',
+        image:
+          'https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80',
+      },
     ],
   },
   {
@@ -94,6 +114,26 @@ export const SERIES_SECTIONS: SeriesSection[] = [
         image:
           'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&q=80',
       },
+        {
+        title: 'Neon Alley',
+        image:
+          'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'City Lights',
+        image:
+          'https://images.unsplash.com/photo-1536335550880-118d3d624d07?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'Arcade Glow',
+        image:
+          'https://images.unsplash.com/photo-1544551763-5df28357f0a1?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'Night Run',
+        image:
+          'https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80',
+      },
     ],
   },
   {
@@ -125,6 +165,26 @@ export const SERIES_SECTIONS: SeriesSection[] = [
         title: 'Velvet Seats',
         image:
           'https://images.unsplash.com/photo-1499013819532-e4ff41b00669?auto=format&fit=crop&w=1200&q=80',
+      },
+        {
+        title: 'Neon Alley',
+        image:
+          'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'City Lights',
+        image:
+          'https://images.unsplash.com/photo-1536335550880-118d3d624d07?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'Arcade Glow',
+        image:
+          'https://images.unsplash.com/photo-1544551763-5df28357f0a1?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'Night Run',
+        image:
+          'https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80',
       },
     ],
   },
@@ -158,6 +218,26 @@ export const SERIES_SECTIONS: SeriesSection[] = [
         image:
           'https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80',
       },
+        {
+        title: 'Neon Alley',
+        image:
+          'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'City Lights',
+        image:
+          'https://images.unsplash.com/photo-1536335550880-118d3d624d07?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'Arcade Glow',
+        image:
+          'https://images.unsplash.com/photo-1544551763-5df28357f0a1?auto=format&fit=crop&w=1200&q=80',
+      },
+      {
+        title: 'Night Run',
+        image:
+          'https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1200&q=80',
+      },
     ],
   },
 ];
@@ -170,7 +250,7 @@ type SeriesSectionProps = {
 export default function SeriesSection({ className = '' }: SeriesSectionProps) {
   return (
     <section className={`px-6 md:px-10 lg:px-20 py-12 ${className}`}>
-      <div className="mx-auto">
+      <div className="mx-auto ">
         <div className="flex items-end justify-between gap-6">
           <div>
             <p className="uppercase tracking-[0.22em] text-xs md:text-sm text-stone-500">

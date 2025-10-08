@@ -6,14 +6,14 @@ import Link from "next/link";
 const ExploreCategories: React.FC = () => {
   // All data here
   const categories = [
-    { title: "Songs of the Desert", image: '/images/image.png', href: "categories" },
-    { title: "Color of the sky", image: 'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1000&q=80', href: "categories" },
-    { title: "Songs of the Desert", image: "https://placehold.co/237x200",  href: "categories" },
-    { title: "Softboy season", image: '/images/image.png',  href: "categories" },
-    { title: "New Arrivals", image: "https://placehold.co/237x200",  href: "categories" },
-    { title: "New Arrivals", image: '/images/image.png',  href: "categories" },
-    { title: "New Arrivals", image: "https://placehold.co/237x200", href: "categories" },
-    { title: "New Arrivals", image: '/images/image.png',  href: "categories" },
+    { title: "Poetry", image: '/images/image.png', href: "/categories#poetry" },
+    { title: "Witty", image: 'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1000&q=80', href: "/categories#witty" },
+    { title: "Fun", image: "https://placehold.co/237x200",  href: "/categories#fun" },
+    { title: "Artistic", image: '/images/image.png',  href: "/categories#artistic" },
+    { title: "Creative", image: "https://placehold.co/237x200",  href: "/categories#creative" },
+    { title: "Minimal", image: '/images/image.png',  href: "/categories#minimal" },
+    { title: "Street", image: "https://placehold.co/237x200", href: "/categories#street" },
+    { title: "Retro", image: '/images/image.png',  href: "/categories#retro" },
   ];
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -58,15 +58,20 @@ const ExploreCategories: React.FC = () => {
 
   return (
     <section className="w-full px-6 md:px-10 lg:px-20 py-20" onKeyDown={onKeyArrows}>
-      <div className="mx-auto  space-y-12">
+      <div className="mx-auto space-y-12">
         {/* Header row */}
         <div className="flex items-center justify-between">
-          <h2
-            className="text-black/90 text-[32px] leading-[48px] font-semibold uppercase"
-            style={{ fontFamily: "Poppins, sans-serif" }}
-          >
-            explore categories
-          </h2>
+          <div>
+            <p className="uppercase tracking-[0.22em] text-xs md:text-sm text-stone-500">
+              Style Collections
+            </p>
+            <h2
+              className="mt-2 text-2xl md:text-3xl font-semibold uppercase"
+              style={{ fontFamily: "Poppins, sans-serif" }}
+            >
+              explore categories
+            </h2>
+          </div>
 
           <div className="flex items-center gap-3">
             <button
@@ -112,7 +117,7 @@ const ExploreCategories: React.FC = () => {
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
               <div className="absolute inset-0 flex items-end justify-center p-4">
                 <span
-                  className="text-white text-[20px] leading-[30px] font-bold text-center"
+                  className="text-white text-base font-semibold text-center"
                   style={{ fontFamily: "Poppins, sans-serif" }}
                 >
                   {c.title}
@@ -123,6 +128,15 @@ const ExploreCategories: React.FC = () => {
         </div>
       </div>
 
+      <style jsx>{`
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </section>
   );
 };
