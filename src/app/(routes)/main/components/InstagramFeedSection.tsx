@@ -5,18 +5,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, PackageSearch, MapPin, Headphones, CreditCard } from 'lucide-react';
 
-export type IGPost = {
-  id: string;
-  image: string;
-  href?: string;
-  likes?: number;
-};
+export type IGPost = { id: string; image: string; href?: string; likes?: number };
 
-type Props = {
-  className?: string;
-  handle?: string;
-  posts?: IGPost[];
-};
+type Props = { className?: string; handle?: string; posts?: IGPost[] };
 
 const DEFAULT_POSTS: IGPost[] = [
   { id: 'ig-1', image: 'https://images.unsplash.com/photo-1581691952693-d2d60c02f2ac?auto=format&fit=crop&w=1600&q=80', likes: 1240 },
@@ -59,37 +50,47 @@ export default function InstagramFeedSection({
   return (
     <section className={`px-6 md:px-10 lg:px-20 py-12 ${className}`}>
       <div className="mx-auto">
-        {/* Title */}
-        <h2
-          className="text-center text-2xl md:text-3xl font-semibold uppercase mb-6 pb-6   "
-          style={{ fontFamily: 'Poppins, sans-serif' }}
-        >
-          Instagram Post
-        </h2>
+        {/* Title + handle */}
+        <div className="flex flex-col items-center gap-3">
+          <h2 className="text-center text-2xl md:text-3xl font-semibold uppercase" style={{ fontFamily: 'Poppins, sans-serif' }}>
+            Instagram
+          </h2>
+          <Link href="https://instagram.com/" target="_blank" className="text-sm text-stone-700 hover:text-stone-900 hover:underline underline-offset-4">
+            {handle} • Follow us
+          </Link>
+        </div>
 
-        {/* Rail with three large rounded cards */}
-        <div className="relative mt-6">
-          {/* Left control */}
-         {/* Left control */}
-<button
-  aria-label="Previous"
-  onClick={() => scroll(-1)}
-  disabled={!canPrev}
-  className="hidden"
->
-  <ChevronLeft className="h-5 w-5" />
-</button>
+        {/* Rail */}
+        <div className="relative mt-6 group">
+          {/* Left control (md+ on hover) */}
+          <button
+            aria-label="Previous"
+            onClick={() => scroll(-1)}
+            disabled={!canPrev}
+            className={[
+              'hidden md:flex items-center justify-center',
+              'absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white p-2 ring-1 ring-stone-200 shadow-sm',
+              'opacity-0 group-hover:opacity-100 transition-opacity',
+              !canPrev ? 'pointer-events-none opacity-0' : '',
+            ].join(' ')}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
 
-{/* Right control */}
-<button
-  aria-label="Next"
-  onClick={() => scroll(1)}
-  disabled={!canNext}
-  className="hidden"
->
-  <ChevronRight className="h-5 w-5" />
-</button>
-
+          {/* Right control (md+ on hover) */}
+          <button
+            aria-label="Next"
+            onClick={() => scroll(1)}
+            disabled={!canNext}
+            className={[
+              'hidden md:flex items-center justify-center',
+              'absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white p-2 ring-1 ring-stone-200 shadow-sm',
+              'opacity-0 group-hover:opacity-100 transition-opacity',
+              !canNext ? 'pointer-events-none opacity-0' : '',
+            ].join(' ')}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
 
           <div
             ref={railRef}
@@ -101,11 +102,10 @@ export default function InstagramFeedSection({
                 href={p.href || '#'}
                 className={[
                   'group relative shrink-0 snap-start overflow-hidden rounded-3xl bg-white ring-1 ring-stone-200/80',
-                  // 3-up on desktop, wider cards on small screens
                   'w-[88%] sm:w-[64%] md:w-1/3',
                 ].join(' ')}
+                aria-label="Instagram post"
               >
-                {/* Fixed ratio wrapper so images always cover without distortion */}
                 <div className="relative w-full pt-[66%]">
                   <Image
                     src={p.image}
@@ -116,50 +116,24 @@ export default function InstagramFeedSection({
                     priority={i < 3}
                   />
                 </div>
-
-                {/* Rounded corner accent and subtle shadow already from wrapper */}
               </Link>
             ))}
           </div>
         </div>
 
-        {/* Feature row under the rail */}
+        {/* Feature row (non-duplicative to hero/footer) */}
         <div className="mt-8 grid grid-cols-1 gap-6 text-center sm:grid-cols-2 lg:grid-cols-4">
-          <Feature
-            icon={<PackageSearch className="h-5 w-5" />}
-            title="Track Your Order"
-            desc="Click here for quick updates"
-          />
-          <Feature
-            icon={<MapPin className="h-5 w-5" />}
-            title="Store locator"
-            desc="Click here to find your nearby store"
-          />
-          <Feature
-            icon={<Headphones className="h-5 w-5" />}
-            title="Support 24/7"
-            desc="Contact us 24 hours a day, 7 days a week"
-          />
-          <Feature
-            icon={<CreditCard className="h-5 w-5" />}
-            title="Payment Methods"
-            desc="COD, Credit Card: Visa, MasterCard"
-          />
+          <Feature icon={<PackageSearch className="h-5 w-5" />} title="Track Your Order" desc="Click here for quick updates" />
+          <Feature icon={<MapPin className="h-5 w-5" />} title="Store locator" desc="Find a nearby store" />
+          <Feature icon={<Headphones className="h-5 w-5" />} title="Support 24/7" desc="We’re here anytime" />
+          <Feature icon={<CreditCard className="h-5 w-5" />} title="Payment Methods" desc="COD • Visa • MasterCard" />
         </div>
       </div>
     </section>
   );
 }
 
-function Feature({
-  icon,
-  title,
-  desc,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-}) {
+function Feature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
     <div className="flex flex-col items-center">
       <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-900">

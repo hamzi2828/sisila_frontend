@@ -9,19 +9,19 @@ export type Slide = {
   eyebrow?: string;
   title?: string;
   description?: string;
-  menCta?: CTA;   // primary CTA
-  womenCta?: CTA; // secondary CTA
+  menCta?: CTA;
+  womenCta?: CTA;
   backgroundImage?: string;
   darkOverlay?: boolean;
 };
 
 export type HeroCarouselProps = {
   slides?: Slide[];
-  intervalMs?: number;   // autoplay interval
-  autoPlay?: boolean;    // enable/disable autoplay
+  intervalMs?: number;
+  autoPlay?: boolean;
   pauseOnHover?: boolean;
-  showArrows?: boolean;  // prev/next buttons (lg-only on hover)
-  showDots?: boolean;    // small dot indicators
+  showArrows?: boolean; // shows on lg when hovering hero
+  showDots?: boolean;
   className?: string;
 };
 
@@ -33,7 +33,7 @@ const DEFAULT_SLIDES: Slide[] = [
       "A modern apparel house shaped by poetry, type, cinema, and street. Editorial design and everyday silhouettes — crafted for expression.",
     menCta: { label: "Shop new arrivals", href: "/new-arrivals" },
     womenCta: { label: "About Silsila", href: "/about" },
- backgroundImage:
+   backgroundImage:
       "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1800&q=80",
     darkOverlay: true,
   },
@@ -50,12 +50,12 @@ const DEFAULT_SLIDES: Slide[] = [
   },
   {
     eyebrow: "Editorial Collections",
-    title: "Series: Poets, Alphabets, Cinema, Anime",
+    title: "Explore Categories",
     description:
       "Limited capsules that reinterpret language, motion, and character — graphic-first, culture-forward.",
     menCta: { label: "Browse Series", href: "/series" },
-    womenCta: { label: "Explore Categories", href: "/categories" },
-  backgroundImage:
+    womenCta: { label: " Categories", href: "/categories" },
+   backgroundImage:
       "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1800&q=80",
     darkOverlay: true,
   },
@@ -78,7 +78,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
   const [touchDeltaX, setTouchDeltaX] = useState(0);
   const total = slidesToUse.length;
 
-  // Autoplay (pauses on hover/touch)
   useEffect(() => {
     if (!autoPlay || total <= 1) return;
     if ((pauseOnHover && isHover) || isTouching) return;
@@ -92,7 +91,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
   const prev = () => setIndex((i) => (i - 1 + total) % total);
   const goTo = (i: number) => setIndex(i);
 
-  // Touch handlers (mobile swipe)
   const onTouchStart = (e: React.TouchEvent) => {
     setIsTouching(true);
     setTouchStartX(e.touches[0].clientX);
@@ -112,31 +110,23 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
     setIsTouching(false);
   };
 
-  const buildBg = (bg?: string, enableOverlay = true): React.CSSProperties => {
-    if (!bg) {
-      return {
-        background: "linear-gradient(180deg, rgba(30,30,30,1) 0%, rgba(0,0,0,1) 100%)",
-      };
-    }
-    if (!enableOverlay) {
-      return {
-        backgroundImage: `url('${bg}')`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-      };
-    }
-    return {
-      backgroundImage: `
-        linear-gradient(180deg, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.52) 58%, rgba(0,0,0,0.75) 100%),
-        radial-gradient(140% 100% at 50% 0%, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0) 60%),
-        url('${bg}')
-      `,
-      backgroundSize: "cover, cover, cover",
-      backgroundPosition: "center, center, center",
-      backgroundRepeat: "no-repeat, no-repeat, no-repeat",
-    };
-  };
+  const bg = (src?: string, overlay = true): React.CSSProperties =>
+    !src
+      ? { background: "linear-gradient(180deg, rgba(30,30,30,1) 0%, rgba(0,0,0,1) 100%)" }
+      : overlay
+      ? {
+          backgroundImage: `
+            linear-gradient(180deg, rgba(0,0,0,0.20) 0%, rgba(0,0,0,0.52) 58%, rgba(0,0,0,0.75) 100%),
+            url('${src}')
+          `,
+          backgroundSize: "cover, cover",
+          backgroundPosition: "center, center",
+        }
+      : {
+          backgroundImage: `url('${src}')`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        };
 
   return (
     <section
@@ -149,96 +139,60 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      {/* Slides (fade; slight translate while swiping) */}
       <div className="grid min-h-[80vh] sm:min-h-[85vh] lg:min-h-[90vh] w-full overflow-hidden">
         {slidesToUse.map((s, i) => {
-          const isActive = i === index;
+          const active = i === index;
           return (
             <div
               key={i}
               className={[
-                "row-start-1 col-start-1 w-full",
-                "transition-opacity duration-[700ms] ease-out",
-                isActive ? "opacity-100" : "opacity-0 pointer-events-none",
+                "row-start-1 col-start-1 w-full transition-opacity duration-[700ms] ease-out",
+                active ? "opacity-100" : "opacity-0 pointer-events-none",
               ].join(" ")}
-              style={buildBg(s.backgroundImage, s.darkOverlay !== false)}
+              style={bg(s.backgroundImage, s.darkOverlay !== false)}
               aria-roledescription="slide"
               aria-label={`${i + 1} of ${total}`}
-              aria-hidden={!isActive}
+              aria-hidden={!active}
             >
-              {/* Content */}
               <div className="mx-auto flex h-full max-w-7xl items-center justify-center px-4 sm:px-6 md:px-8 py-16 sm:py-20 md:py-24">
                 <div
                   className="flex w-full max-w-3xl flex-col items-center text-center gap-5 sm:gap-6 lg:gap-8 transition-transform duration-300"
-                  style={{
-                    transform: isActive ? `translateX(${touchDeltaX * 0.08}px)` : undefined,
-                  }}
+                  style={{ transform: active ? `translateX(${touchDeltaX * 0.08}px)` : undefined }}
                 >
-                  {/* Brand chip */}
                   <span className="inline-flex items-center rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-white/90">
                     Silsila
                   </span>
 
-                  {s.eyebrow && (
-                    <p
-                      className="text-white/85 text-sm sm:text-base tracking-wide"
-                      style={{ fontFamily: "Poppins, sans-serif" }}
-                    >
+                  {s.eyebrow ? (
+                    <p className="text-white/85 text-sm sm:text-base tracking-wide" style={{ fontFamily: "Poppins, sans-serif" }}>
                       {s.eyebrow}
                     </p>
-                  )}
+                  ) : null}
 
-                  {s.title && (
-                    <h1
-                      className="text-white font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-tight md:leading-[1.15]"
-                      style={{ fontFamily: "Poppins, sans-serif" }}
-                    >
+                  {s.title ? (
+                    <h1 className="text-white font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-tight md:leading-[1.15]" style={{ fontFamily: "Poppins, sans-serif" }}>
                       {s.title}
                     </h1>
-                  )}
+                  ) : null}
 
-                  {s.description && (
-                    <p
-                      className="text-white/90 text-sm sm:text-base md:text-lg leading-relaxed max-w-prose"
-                      style={{ fontFamily: "Poppins, sans-serif" }}
-                    >
+                  {s.description ? (
+                    <p className="text-white/90 text-sm sm:text-base md:text-lg leading-relaxed max-w-prose" style={{ fontFamily: "Poppins, sans-serif" }}>
                       {s.description}
                     </p>
-                  )}
-
-                  {/* Value chips */}
-                  <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-xs">
-                    <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-white/90 ring-1 ring-white/20">
-                      Free shipping $75+
-                    </span>
-                    <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-white/90 ring-1 ring-white/20">
-                      30‑day returns
-                    </span>
-                    <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-white/90 ring-1 ring-white/20">
-                      Secure checkout
-                    </span>
-                  </div>
+                  ) : null}
 
                   {(s.menCta || s.womenCta) && (
                     <div className="mt-2 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-                      {s.menCta && (
-                        <Link
-                          href={s.menCta.href}
-                          className="inline-flex justify-center rounded-full px-6 py-3 bg-white text-stone-900 text-sm font-semibold hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                          style={{ fontFamily: "Manrope, sans-serif" }}
-                        >
+                      {s.menCta ? (
+                        <Link href={s.menCta.href} className="inline-flex justify-center rounded-full px-6 py-3 bg-white text-stone-900 text-sm font-semibold hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70" style={{ fontFamily: "Manrope, sans-serif" }}>
                           {s.menCta.label}
                         </Link>
-                      )}
-                      {s.womenCta && (
-                        <Link
-                          href={s.womenCta.href}
-                          className="inline-flex justify-center rounded-full px-6 py-3 bg-white/10 ring-1 ring-white/80 ring-inset backdrop-blur-md text-white text-sm font-semibold hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                          style={{ fontFamily: "Manrope, sans-serif" }}
-                        >
+                      ) : null}
+                      {s.womenCta ? (
+                        <Link href={s.womenCta.href} className="inline-flex justify-center rounded-full px-6 py-3 bg-white/10 ring-1 ring-white/80 ring-inset backdrop-blur-md text-white text-sm font-semibold hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70" style={{ fontFamily: "Manrope, sans-serif" }}>
                           {s.womenCta.label}
                         </Link>
-                      )}
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -248,7 +202,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
         })}
       </div>
 
-      {/* Minimal dots */}
       {showDots && total > 1 && (
         <div className="absolute bottom-5 left-1/2 -translate-x-1/2">
           <div className="flex items-center gap-2">
@@ -258,30 +211,22 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
                 aria-label={`Go to slide ${i + 1}`}
                 aria-current={i === index}
                 onClick={() => goTo(i)}
-                className={[
-                  "h-2.5 rounded-full transition",
-                  i === index ? "w-6 bg-white" : "w-2.5 bg-white/40 hover:bg-white/70",
-                ].join(" ")}
+                className={["h-2.5 rounded-full transition", i === index ? "w-6 bg-white" : "w-2.5 bg-white/40 hover:bg-white/70"].join(" ")}
               />
             ))}
           </div>
         </div>
       )}
 
-      {/* Arrows: hidden on mobile; show on lg only when hovering the hero */}
       {showArrows && total > 1 && (
         <>
           <button
             aria-label="Previous slide"
             onClick={prev}
             className={[
-              // hidden on mobile; flex on lg
               "hidden lg:flex items-center justify-center",
-              // fade in on hover of the section (group)
               "lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200",
-              // disable pointer events until hover so they don't block
               "lg:pointer-events-none lg:group-hover:pointer-events-auto",
-              // position + style
               "absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white ring-1 ring-white/70 backdrop-blur hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2",
             ].join(" ")}
           >
@@ -289,7 +234,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
               <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-
           <button
             aria-label="Next slide"
             onClick={next}
