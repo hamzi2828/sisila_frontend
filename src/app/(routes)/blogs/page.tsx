@@ -5,7 +5,6 @@ import BlogIndexHeader from './components/BlogIndexHeader';
 import BlogFeatured, { BlogPost } from './components/BlogFeatured';
 import BlogGrid from './components/BlogGrid';
 import BlogPicksRail from './components/BlogPicksRail';
-import BlogNewsletterCTA from './components/BlogNewsletterCTA';
 
 const POSTS: BlogPost[] = [
   {
@@ -113,17 +112,9 @@ export default function BlogsPage() {
         </div>
       </section>
       <BlogPicksRail posts={POSTS.slice(0, 6).map(({ id, title, read, image }) => ({ id, title, read, image }))} />
-      <BlogNewsletterCTA />
+    
 
-      <style jsx>{`
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
+     
     </main>
   );
 }

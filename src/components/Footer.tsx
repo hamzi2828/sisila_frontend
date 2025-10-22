@@ -185,7 +185,7 @@ function LinksAndBrand() {
                     <li key={l.label}>
                       <Link href={l.href} className={['group inline-flex items-center gap-1 hover:underline underline-offset-4', l.subtle ? 'text-neutral-400 hover:text-neutral-100' : ''].join(' ')}>
                         <span>{l.label}</span>
-                        <ArrowRight className="h-3.5 w-3.5 opacity-0 transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0.5" />
+                        
                       </Link>
                     </li>
                   ))}
