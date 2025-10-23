@@ -2,23 +2,35 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { popularCategoriesService, PopularCategory } from "../services/popularCategoriesService";
 
 const ExploreCategories: React.FC = () => {
-  // All data here
-  const categories = [
-    { title: "Poetry", image: '/images/image.png', href: "/categories#poetry" },
-    { title: "Witty", image: 'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1000&q=80', href: "/categories#witty" },
-    { title: "Fun", image: "https://placehold.co/237x200",  href: "/categories#fun" },
-    { title: "Artistic", image: '/images/image.png',  href: "/categories#artistic" },
-    { title: "Creative", image: "https://placehold.co/237x200",  href: "/categories#creative" },
-    { title: "Minimal", image: '/images/image.png',  href: "/categories#minimal" },
-    { title: "Street", image: "https://placehold.co/237x200", href: "/categories#street" },
-    { title: "Retro", image: '/images/image.png',  href: "/categories#retro" },
-  ];
+  const [categories, setCategories] = useState<PopularCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+
+  // Fetch categories from API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await popularCategoriesService.getPopularCategories();
+        setCategories(data);
+      } catch (err) {
+        console.error('Error loading categories:', err);
+        setError('Failed to load categories');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const updateArrows = useCallback(() => {
     const el = scrollerRef.current;
@@ -55,6 +67,59 @@ const ExploreCategories: React.FC = () => {
     if (e.key === "ArrowLeft" && canPrev) scrollByStep(-1);
     if (e.key === "ArrowRight" && canNext) scrollByStep(1);
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <section className="w-full px-6 md:px-10 lg:px-20 py-20">
+        <div className="mx-auto space-y-12">
+          <div>
+            <p className="uppercase tracking-[0.22em] text-xs md:text-sm text-stone-500">
+              Style Collections
+            </p>
+            <h2
+              className="mt-2 text-2xl md:text-3xl font-semibold uppercase"
+              style={{ fontFamily: "Poppins, sans-serif" }}
+            >
+              explore categories
+            </h2>
+          </div>
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-stone-300 border-t-stone-800"></div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <section className="w-full px-6 md:px-10 lg:px-20 py-20">
+        <div className="mx-auto space-y-12">
+          <div>
+            <p className="uppercase tracking-[0.22em] text-xs md:text-sm text-stone-500">
+              Style Collections
+            </p>
+            <h2
+              className="mt-2 text-2xl md:text-3xl font-semibold uppercase"
+              style={{ fontFamily: "Poppins, sans-serif" }}
+            >
+              explore categories
+            </h2>
+          </div>
+          <div className="flex items-center justify-center py-12">
+            <p className="text-stone-600 text-sm">{error}</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Empty state
+  if (categories.length === 0) {
+    return null;
+  }
 
   return (
     <section className="w-full px-6 md:px-10 lg:px-20 py-20" onKeyDown={onKeyArrows}>
@@ -102,29 +167,34 @@ const ExploreCategories: React.FC = () => {
           role="region"
           aria-label="Category scroller"
         >
-          {categories.map((c, idx) => (
-            <Link
-              href={c.href || "categories"}
-              key={`${c.title}-${idx}`}
-              data-card
-              className="group relative h-[200px] w-[237px] shrink-0 snap-start overflow-hidden rounded-[20px]"
-            >
-              <img
-                src={c.image}
-                alt={c.title}
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-              />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-              <div className="absolute inset-0 flex items-end justify-center p-4">
-                <span
-                  className="text-white text-base font-semibold text-center"
-                  style={{ fontFamily: "Poppins, sans-serif" }}
-                >
-                  {c.title}
-                </span>
-              </div>
-            </Link>
-          ))}
+          {categories.map((category) => {
+            const categoryImage = popularCategoriesService.getCategoryImage(category);
+            const categoryHref = `/categories/${category.slug}`;
+
+            return (
+              <Link
+                href={categoryHref}
+                key={category._id}
+                data-card
+                className="group relative h-[200px] w-[237px] shrink-0 snap-start overflow-hidden rounded-[20px]"
+              >
+                <img
+                  src={categoryImage}
+                  alt={category.name}
+                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                <div className="absolute inset-0 flex items-end justify-center p-4">
+                  <span
+                    className="text-white text-base font-semibold text-center"
+                    style={{ fontFamily: "Poppins, sans-serif" }}
+                  >
+                    {category.name}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </div>
 
