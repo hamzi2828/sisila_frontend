@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { FiHome, FiUsers, FiPackage, FiDollarSign, FiSettings, FiBookOpen, FiImage, FiEdit3, FiMessageSquare, FiTag, FiUserCheck, FiActivity, FiShoppingBag } from 'react-icons/fi';
+import { FiHome, FiUsers, FiPackage, FiDollarSign, FiSettings, FiBookOpen, FiImage, FiEdit3, FiMessageSquare } from 'react-icons/fi';
 
 interface MenuItem {
   name: string;
