@@ -24,13 +24,9 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
     { name: 'Users', path: '/admin/users', icon: <FiUsers className="w-5 h-5" /> },
     { name: 'Products', path: '/admin/products', icon: <FiPackage className="w-5 h-5" /> },
     { name: 'Hero Slides', path: '/admin/hero-slides', icon: <FiImage className="w-5 h-5" /> },
-    { name: 'Packages', path: '/admin/packages', icon: <FiTag className="w-5 h-5" /> },
-    { name: 'Trainers', path: '/admin/trainers', icon: <FiUserCheck className="w-5 h-5" /> },
-    { name: 'Classes', path: '/admin/classes', icon: <FiActivity className="w-5 h-5" /> },
     { name: 'Blogs', path: '/admin/blogs', icon: <FiBookOpen className="w-5 h-5" /> },
     { name: 'Blog Settings', path: '/admin/blog-settings', icon: <FiEdit3 className="w-5 h-5" /> },
     { name: 'Orders', path: '/admin/orders', icon: <FiDollarSign className="w-5 h-5" /> },
-    { name: 'Package Orders', path: '/admin/package-orders', icon: <FiShoppingBag className="w-5 h-5" /> },
     { name: 'Settings', path: '/admin/settings', icon: <FiSettings className="w-5 h-5" /> },
   ];
 

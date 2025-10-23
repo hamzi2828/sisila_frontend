@@ -49,9 +49,11 @@ const MegaMenu: React.FC<MegaMenuProps> = ({ data, isOpen }) => {
 
         {data.image && (
           <Link href={data.image.href || '#'} className="group relative overflow-hidden rounded-lg">
-            <img
+            <Image
               src={data.image.src}
               alt={data.image.alt}
+              width={320}
+              height={160}
               className="h-40 w-full rounded-lg object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Search as SearchIcon, Heart, User, ShoppingCart, X, ChevronDown, ArrowRight } from 'lucide-react';
 import { NavItem, MegaMenu } from './headerData';
 
@@ -40,7 +41,7 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({ open, onClose, logoSrc, nav
       >
         {/* Header (fixed height) */}
         <div className="flex items-center justify-between border-b p-4 shrink-0">
-          <img src={logoSrc} alt="Silsila" className="h-10 w-auto" />
+          <Image src={logoSrc} alt="Silsila" width={125} height={40} className="h-10 w-auto" />
           <button
             aria-label="Close menu"
             className="rounded p-2 text-gray-800 hover:bg-gray-100 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-95 group"
