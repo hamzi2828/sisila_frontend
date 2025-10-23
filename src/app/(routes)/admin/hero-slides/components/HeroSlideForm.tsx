@@ -21,8 +21,7 @@ export default function HeroSlideForm({ slide, onSubmit, onCancel, loading = fal
     secondButtonLink: slide?.secondButtonLink || "",
     isActive: slide?.isActive ?? true,
     order: slide?.order || 1,
-    ariaLabel: slide?.ariaLabel || "",
-    platform: slide?.platform || "gymwear",
+    ariaLabel: slide?.ariaLabel || ""
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -95,12 +94,6 @@ export default function HeroSlideForm({ slide, onSubmit, onCancel, loading = fal
       newErrors.description = "Description is required";
     } else if (formData.description.length > 500) {
       newErrors.description = "Description cannot exceed 500 characters";
-    }
-
-    if (!formData.platform) {
-      newErrors.platform = "Platform is required";
-    } else if (!['gymwear', 'gymfolio'].includes(formData.platform)) {
-      newErrors.platform = "Invalid platform selected";
     }
 
     if (!imageFile && !slide) {
@@ -207,26 +200,6 @@ export default function HeroSlideForm({ slide, onSubmit, onCancel, loading = fal
                   placeholder="Enter slide description"
                 />
                 {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
-              </div>
-
-              {/* Platform */}
-              <div>
-                <label htmlFor="platform" className="block text-sm font-medium text-gray-700">
-                  Platform <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="platform"
-                  id="platform"
-                  value={formData.platform}
-                  onChange={handleInputChange}
-                  className={`mt-1 block w-full rounded-md border ${
-                    errors.platform ? 'border-red-300' : 'border-gray-300'
-                  } px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500`}
-                >
-                  <option value="gymwear">Gymwear</option>
-                  <option value="gymfolio">Gymfolio</option>
-                </select>
-                {errors.platform && <p className="mt-1 text-sm text-red-600">{errors.platform}</p>}
               </div>
 
               {/* Buttons */}

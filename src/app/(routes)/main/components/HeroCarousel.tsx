@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { heroService, HeroSlide } from "../services/heroService";
 
 export type CTA = { label: string; href: string };
 
@@ -25,41 +26,27 @@ export type HeroCarouselProps = {
   className?: string;
 };
 
-const DEFAULT_SLIDES: Slide[] = [
-  {
-    eyebrow: "Silsila — Culture in Motion",
-    title: "Stories you can wear",
-    description:
-      "A modern apparel house shaped by poetry, type, cinema, and street. Editorial design and everyday silhouettes — crafted for expression.",
-    menCta: { label: "Shop new arrivals", href: "/new-arrivals" },
-    womenCta: { label: "About Silsila", href: "/about" },
-   backgroundImage:
-      "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1800&q=80",
+// Helper function to convert HeroSlide from API to Slide format
+const mapHeroSlideToSlide = (heroSlide: HeroSlide): Slide => {
+  // Handle image URL - prepend backend URL if it's a relative path
+  const imageUrl = heroSlide.imageUrl.startsWith('http')
+    ? heroSlide.imageUrl
+    : `${process.env.NEXT_PUBLIC_BACKEND_URL}${heroSlide.imageUrl}`;
+
+  return {
+    eyebrow: "Silsila",
+    title: heroSlide.title,
+    description: heroSlide.description,
+    menCta: heroSlide.buttonText && heroSlide.buttonLink
+      ? { label: heroSlide.buttonText, href: heroSlide.buttonLink }
+      : undefined,
+    womenCta: heroSlide.secondButtonText && heroSlide.secondButtonLink
+      ? { label: heroSlide.secondButtonText, href: heroSlide.secondButtonLink }
+      : undefined,
+    backgroundImage: imageUrl,
     darkOverlay: true,
-  },
-  {
-    eyebrow: "Creative Direction",
-    title: "Explore Themes",
-    description:
-      "Four pillars define our brand language: Southeastern Hymns, Artistic Passion, Echoes of the Winds, and Uplifting Culture.",
-    menCta: { label: "View Themes", href: "/themes" },
-    womenCta: { label: "Shop the edit", href: "/shop" },
-    backgroundImage:
-      "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1800&q=80",
-    darkOverlay: true,
-  },
-  {
-    eyebrow: "Editorial Collections",
-    title: "Explore Categories",
-    description:
-      "Limited capsules that reinterpret language, motion, and character — graphic-first, culture-forward.",
-    menCta: { label: "Browse Series", href: "/series" },
-    womenCta: { label: " Categories", href: "/categories" },
-   backgroundImage:
-      "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1800&q=80",
-    darkOverlay: true,
-  },
-];
+  };
+};
 
 const HeroCarousel: React.FC<HeroCarouselProps> = ({
   slides,
@@ -70,7 +57,35 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
   showDots = true,
   className = "",
 }) => {
-  const slidesToUse = slides && slides.length > 0 ? slides : DEFAULT_SLIDES;
+  const [dynamicSlides, setDynamicSlides] = useState<Slide[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch slides from API on mount
+  useEffect(() => {
+    const fetchSlides = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const heroSlides = await heroService.getActiveSlides();
+
+        if (heroSlides && heroSlides.length > 0) {
+          const mappedSlides = heroSlides.map(mapHeroSlideToSlide);
+          setDynamicSlides(mappedSlides);
+        }
+      } catch (err) {
+        console.error('Error fetching hero slides:', err);
+        setError('Failed to load hero slides');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSlides();
+  }, []);
+
+  // Use provided slides or fetched dynamic slides
+  const slidesToUse = slides && slides.length > 0 ? slides : dynamicSlides;
   const [index, setIndex] = useState(0);
   const [isHover, setIsHover] = useState(false);
   const [isTouching, setIsTouching] = useState(false);
@@ -85,7 +100,52 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
     return () => clearInterval(id);
   }, [autoPlay, intervalMs, total, isHover, pauseOnHover, isTouching]);
 
-  if (total === 0) return null;
+  // Show loading state while fetching
+  if (isLoading) {
+    return (
+      <section className={`relative w-full isolate ${className}`}>
+        <div className="flex min-h-[80vh] sm:min-h-[85vh] lg:min-h-[90vh] w-full items-center justify-center bg-gradient-to-b from-stone-900 to-black">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-white"></div>
+            <p className="text-white/70 text-sm" style={{ fontFamily: "Poppins, sans-serif" }}>Loading slides...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Show error state if fetching failed
+  if (error) {
+    return (
+      <section className={`relative w-full isolate ${className}`}>
+        <div className="flex min-h-[80vh] sm:min-h-[85vh] lg:min-h-[90vh] w-full items-center justify-center bg-gradient-to-b from-stone-900 to-black">
+          <div className="flex flex-col items-center gap-4 text-center px-4">
+            <svg className="h-12 w-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-white/90 text-base font-medium" style={{ fontFamily: "Poppins, sans-serif" }}>{error}</p>
+            <p className="text-white/60 text-sm" style={{ fontFamily: "Poppins, sans-serif" }}>Please try refreshing the page</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Show message if no slides available
+  if (total === 0) {
+    return (
+      <section className={`relative w-full isolate ${className}`}>
+        <div className="flex min-h-[80vh] sm:min-h-[85vh] lg:min-h-[90vh] w-full items-center justify-center bg-gradient-to-b from-stone-900 to-black">
+          <div className="flex flex-col items-center gap-4 text-center px-4">
+            <svg className="h-12 w-12 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p className="text-white/70 text-base" style={{ fontFamily: "Poppins, sans-serif" }}>No hero slides available</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   const next = () => setIndex((i) => (i + 1) % total);
   const prev = () => setIndex((i) => (i - 1 + total) % total);
@@ -103,7 +163,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
   const onTouchEnd = () => {
     const threshold = 60;
     if (Math.abs(touchDeltaX) > threshold) {
-      touchDeltaX < 0 ? next() : prev();
+      if (touchDeltaX < 0) {
+        next();
+      } else {
+        prev();
+      }
     }
     setTouchStartX(null);
     setTouchDeltaX(0);

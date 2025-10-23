@@ -15,7 +15,6 @@ export interface HeroSlide {
   isActive: boolean;
   order: number;
   ariaLabel?: string;
-  platform: 'gymwear' | 'gymfolio';
   createdAt: string;
   updatedAt: string;
 }
@@ -30,7 +29,6 @@ export interface HeroSlideInput {
   isActive?: boolean;
   order?: number;
   ariaLabel?: string;
-  platform?: 'gymwear' | 'gymfolio';
 }
 
 interface ApiResponse<T> {
@@ -43,12 +41,9 @@ export const heroAdminService = {
   /**
    * Get all active hero slides
    */
-  async getActiveSlides(platform?: 'gymwear' | 'gymfolio'): Promise<HeroSlide[]> {
+  async getActiveSlides(): Promise<HeroSlide[]> {
     try {
-      const params = platform ? { platform } : {};
-      const response = await axios.get<ApiResponse<HeroSlide[]>>(`${API_BASE_URL}/hero-slides/active`, {
-        params
-      });
+      const response = await axios.get<ApiResponse<HeroSlide[]>>(`${API_BASE_URL}/hero-slides/active`);
 
       if (!response.data.success) {
         throw new Error(response.data.message || 'Failed to fetch hero slides');
@@ -77,27 +72,6 @@ export const heroAdminService = {
       return response.data.data;
     } catch (error) {
       console.error('Error fetching all hero slides:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get hero slides by platform (admin only)
-   */
-  async getSlidesByPlatform(platform: 'gymwear' | 'gymfolio'): Promise<HeroSlide[]> {
-    try {
-      const response = await axios.get<ApiResponse<HeroSlide[]>>(`${API_BASE_URL}/hero-slides`, {
-        params: { platform },
-        headers: getAuthHeader(),
-      });
-
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Failed to fetch hero slides');
-      }
-
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching hero slides by platform:', error);
       throw error;
     }
   },
