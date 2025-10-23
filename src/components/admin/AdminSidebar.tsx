@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { FiHome, FiUsers, FiPackage, FiDollarSign, FiSettings, FiBookOpen, FiImage, FiEdit3, FiMessageSquare, FiLayers } from 'react-icons/fi';
+import { FiHome, FiUsers, FiPackage, FiDollarSign, FiSettings, FiBookOpen, FiImage, FiEdit3, FiMessageSquare, FiLayers, FiGrid } from 'react-icons/fi';
 
 interface MenuItem {
   name: string;
@@ -25,6 +25,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
     { name: 'Products', path: '/admin/products', icon: <FiPackage className="w-5 h-5" /> },
     { name: 'Hero Slides', path: '/admin/hero-slides', icon: <FiImage className="w-5 h-5" /> },
     { name: 'Themes', path: '/admin/themes', icon: <FiLayers className="w-5 h-5" /> },
+    { name: 'Series', path: '/admin/series', icon: <FiGrid className="w-5 h-5" /> },
     { name: 'Blogs', path: '/admin/blogs', icon: <FiBookOpen className="w-5 h-5" /> },
     { name: 'Blog Settings', path: '/admin/blog-settings', icon: <FiEdit3 className="w-5 h-5" /> },
     { name: 'Orders', path: '/admin/orders', icon: <FiDollarSign className="w-5 h-5" /> },

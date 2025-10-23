@@ -14,12 +14,8 @@ export default function MainPage() {
       <HeroCarousel />
       <ExploreCategories />
       <ThemesSection/>
-        <SeriesSection />
+      <SeriesSection />
       <NewArrivalsSection />
-      
-    
-      
-     
       <BlogsSection />
       <InstagramFeedSection />
     </main>
