@@ -46,6 +46,9 @@ export interface Product {
     thumbnailUrl?: string;
     bannerUrls?: string[];
   }>;
+  // Collection fields
+  collectionType?: "theme" | "series" | "none";
+  collectionId?: string;
 }
 
 interface AllProductsProps {

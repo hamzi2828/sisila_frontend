@@ -7,6 +7,7 @@ import type { Product, ProductVariant } from "./AllProducts";
 import type { Category } from "./CategoriesTab";
 import { slugify, buildVariantCombos, syncVariants, type Variant } from "../services/productCreateService";
 import { productService } from "../services/productService";
+import { collectionService, type CollectionItem } from "../services/collectionService";
 
 // Extended Product type with SEO and description fields
 interface ExtendedProduct extends Product {
@@ -66,7 +67,9 @@ const initialFormData: ProductFormData = {
   metaSchema: "",
   description: "",
   shortDescription: "",
-  features: ""
+  features: "",
+  collectionType: "none",
+  collectionId: ""
 };
 
 export default function ProductForm({
@@ -80,42 +83,58 @@ export default function ProductForm({
   onSuccess,
   onManageAttributes
 }: ProductFormProps) {
-  const [form, setForm] = useState<ProductFormData>(initialData ? {
-    ...initialData,
-    // Add backend URL prefix to image URLs for display (if not already present)
-    thumbnailUrl: initialData.thumbnailUrl
-      ? (initialData.thumbnailUrl.startsWith('http')
-          ? initialData.thumbnailUrl
-          : `${process.env.NEXT_PUBLIC_BACKEND_URL}${initialData.thumbnailUrl}`)
-      : initialData.thumbnailUrl,
-    bannerUrls: Array.isArray(initialData.bannerUrls)
-      ? initialData.bannerUrls.map((url: string) =>
-          url.startsWith('http')
-            ? url
-            : `${process.env.NEXT_PUBLIC_BACKEND_URL}${url}`)
-      : initialData.bannerUrls,
-    metaTitle: (initialData as ExtendedProduct)?.metaTitle || "",
-    metaDescription: (initialData as ExtendedProduct)?.metaDescription || "",
-    metaKeywords: (initialData as ExtendedProduct)?.metaKeywords || "",
-    metaSchema: (initialData as ExtendedProduct)?.metaSchema || "",
-    description: (initialData as ExtendedProduct)?.description || "",
-    shortDescription: (initialData as ExtendedProduct)?.shortDescription || "",
-    features: (initialData as ExtendedProduct)?.features || ""
-  } : initialFormData);
+  const [form, setForm] = useState<ProductFormData>(() => {
+    if (initialData) {
+      console.log('ProductForm initialData:', initialData);
+      console.log('Collection data:', {
+        collectionType: initialData.collectionType,
+        collectionId: initialData.collectionId
+      });
+      return {
+        ...initialData,
+        // Add backend URL prefix to image URLs for display (if not already present)
+        thumbnailUrl: initialData.thumbnailUrl
+          ? (initialData.thumbnailUrl.startsWith('http')
+              ? initialData.thumbnailUrl
+              : `${process.env.NEXT_PUBLIC_BACKEND_URL}${initialData.thumbnailUrl}`)
+          : initialData.thumbnailUrl,
+        bannerUrls: Array.isArray(initialData.bannerUrls)
+          ? initialData.bannerUrls.map((url: string) =>
+              url.startsWith('http')
+                ? url
+                : `${process.env.NEXT_PUBLIC_BACKEND_URL}${url}`)
+          : initialData.bannerUrls,
+        metaTitle: (initialData as ExtendedProduct)?.metaTitle || "",
+        metaDescription: (initialData as ExtendedProduct)?.metaDescription || "",
+        metaKeywords: (initialData as ExtendedProduct)?.metaKeywords || "",
+        metaSchema: (initialData as ExtendedProduct)?.metaSchema || "",
+        description: (initialData as ExtendedProduct)?.description || "",
+        shortDescription: (initialData as ExtendedProduct)?.shortDescription || "",
+        features: (initialData as ExtendedProduct)?.features || "",
+        collectionType: initialData.collectionType || "none",
+        collectionId: initialData.collectionId || ""
+      };
+    }
+    return initialFormData;
+  });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<"content" | "description" | "seo">("content");
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // File handling state
   const [thumbFile, setThumbFile] = useState<File | null>(null);
   const [bannerFiles, setBannerFiles] = useState<File[]>([]);
   // Removed unused thumbName state
-  
+
   // Variant state
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [colorMedia, setColorMedia] = useState<Record<string, ColorMediaData>>({});
+
+  // Collection state
+  const [themes, setThemes] = useState<CollectionItem[]>([]);
+  const [series, setSeries] = useState<CollectionItem[]>([]);
   
   // Refs
   const thumbInputRef = useRef<HTMLInputElement>(null);
@@ -214,7 +233,24 @@ export default function ProductForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variantCombos, isVariant, mode]);
-  
+
+  // Load themes and series on mount
+  useEffect(() => {
+    const loadCollections = async () => {
+      try {
+        const [themesData, seriesData] = await Promise.all([
+          collectionService.getAllThemes(),
+          collectionService.getAllSeries()
+        ]);
+        setThemes(themesData);
+        setSeries(seriesData);
+      } catch (error) {
+        console.error('Error loading collections:', error);
+      }
+    };
+    loadCollections();
+  }, []);
+
   const safeRevoke = useCallback((url?: string) => {
     if (url && url.startsWith("blob:")) {
       try { URL.revokeObjectURL(url); } catch {}
@@ -447,7 +483,13 @@ export default function ProductForm({
       formData.append("metaDescription", form.metaDescription || "");
       formData.append("metaKeywords", form.metaKeywords || "");
       formData.append("metaSchema", form.metaSchema || "");
-      
+
+      // Collection fields
+      formData.append("collectionType", form.collectionType || "none");
+      if (form.collectionId && form.collectionType !== "none") {
+        formData.append("collectionId", form.collectionId);
+      }
+
       if (isVariant && form.variants) {
         // Handle variant products
         const variantStock = form.variants.reduce((sum, v) => sum + (Number((v as ProductVariant).stock) || 0), 0);
@@ -763,6 +805,79 @@ export default function ProductForm({
                     {errors.category}
                   </p>}
                 </div>
+
+                {/* Collection Type Dropdown */}
+                <div>
+                  <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">
+                    <span className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></span>
+                    Collection Type
+                    <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Optional</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      className="block w-full rounded-xl border-2 border-gray-200 shadow-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 px-5 py-4 text-lg font-medium text-gray-900 bg-white hover:border-gray-300 appearance-none"
+                      value={form.collectionType || "none"}
+                      onChange={(e) => {
+                        setField("collectionType", e.target.value as "theme" | "series" | "none");
+                        setField("collectionId", ""); // Reset collection ID when type changes
+                      }}
+                    >
+                      <option value="none">None</option>
+                      <option value="theme">Theme</option>
+                      <option value="series">Series</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                      <div className="bg-indigo-100 rounded-lg p-2">
+                        <svg className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm text-gray-600 flex items-center bg-gray-50 px-3 py-2 rounded-lg">
+                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    Associate this product with a theme or series
+                  </p>
+                </div>
+
+                {/* Collection Item Dropdown (Theme or Series) */}
+                {form.collectionType && form.collectionType !== "none" && (
+                  <div>
+                    <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">
+                      <span className="w-2 h-2 bg-pink-500 rounded-full mr-2"></span>
+                      Select {form.collectionType === "theme" ? "Theme" : "Series"}
+                    </label>
+                    <div className="relative">
+                      <select
+                        className="block w-full rounded-xl border-2 border-gray-200 shadow-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 px-5 py-4 text-lg font-medium text-gray-900 bg-white hover:border-gray-300 appearance-none"
+                        value={form.collectionId || ""}
+                        onChange={(e) => setField("collectionId", e.target.value)}
+                      >
+                        <option value="">Select a {form.collectionType}</option>
+                        {form.collectionType === "theme"
+                          ? themes.map((theme) => (
+                              <option key={theme._id} value={theme.id}>
+                                {theme.title}
+                              </option>
+                            ))
+                          : series.map((seriesItem) => (
+                              <option key={seriesItem._id} value={seriesItem.id}>
+                                {seriesItem.title}
+                              </option>
+                            ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                        <div className="bg-pink-100 rounded-lg p-2">
+                          <svg className="h-4 w-4 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">

@@ -40,6 +40,8 @@ export interface ProductDTO {
   metaDescription?: string;
   metaKeywords?: string;
   metaSchema?: string;
+  collectionType?: 'theme' | 'series' | 'none';
+  collectionId?: string;
 }
 
 export interface ProductUI {
@@ -64,6 +66,8 @@ export interface ProductUI {
   metaDescription?: string;
   metaKeywords?: string;
   metaSchema?: string;
+  collectionType?: 'theme' | 'series' | 'none';
+  collectionId?: string;
 }
 
 function mapToUI(dto: ProductDTO): ProductUI {
@@ -98,6 +102,8 @@ function mapToUI(dto: ProductDTO): ProductUI {
     metaDescription: dto.metaDescription,
     metaKeywords: dto.metaKeywords,
     metaSchema: dto.metaSchema,
+    collectionType: dto.collectionType,
+    collectionId: dto.collectionId,
   };
 }
 
