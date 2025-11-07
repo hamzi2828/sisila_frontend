@@ -18,7 +18,6 @@ export interface Blog {
   tags?: string[];
   createdAt?: string;
   updatedAt?: string;
-  platform?: "gymwear" | "gymfolio";
   author: {
     _id: string;
     name?: string;
@@ -60,7 +59,6 @@ export default function AllBlogs({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [platformFilter, setPlatformFilter] = useState<"all" | "gymwear" | "gymfolio">("all");
 
   // Get unique categories for filter dropdown
   const availableCategories = useMemo(() => {
@@ -79,11 +77,10 @@ export default function AllBlogs({
 
       const matchesStatus = statusFilter === "all" || blog.status === statusFilter;
       const matchesCategory = categoryFilter === "all" || blog.category === categoryFilter;
-      const matchesPlatform = platformFilter === "all" || blog.platform === platformFilter;
 
-      return matchesSearch && matchesStatus && matchesCategory && matchesPlatform;
+      return matchesSearch && matchesStatus && matchesCategory;
     });
-  }, [blogs, searchQuery, statusFilter, categoryFilter, platformFilter]);
+  }, [blogs, searchQuery, statusFilter, categoryFilter]);
 
   // Use pagination data from API if available
   const currentPage = pagination?.page || 1;
@@ -213,26 +210,6 @@ export default function AllBlogs({
               </select>
             </div>
 
-            {/* Platform Filter */}
-            <div>
-              <label htmlFor="platform-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                Platform
-              </label>
-              <select
-                id="platform-filter"
-                value={platformFilter}
-                onChange={(e) => {
-                  setPlatformFilter(e.target.value as "all" | "gymwear" | "gymfolio");
-                  onPageChange?.(1);
-                }}
-                className="h-10 w-full rounded-md border border-gray-300 bg-white text-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="all">All Platforms</option>
-                <option value="gymwear">Gymwear</option>
-                <option value="gymfolio">Gymfolio</option>
-              </select>
-            </div>
-
             {/* Category Filter */}
             <div>
               <label htmlFor="category-filter" className="block text-sm font-medium text-gray-700 mb-1">
@@ -271,9 +248,6 @@ export default function AllBlogs({
                     </th>
                     <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Category
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Platform
                     </th>
                     <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -318,15 +292,6 @@ export default function AllBlogs({
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{blog.category}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            blog.platform === 'gymfolio'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {blog.platform === 'gymfolio' ? 'Gymfolio' : 'Gymwear'}
-                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {onToggleStatus ? (
@@ -378,7 +343,7 @@ export default function AllBlogs({
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                      <td colSpan={5} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
                         No blogs found. Try adjusting your search.
                       </td>
                     </tr>

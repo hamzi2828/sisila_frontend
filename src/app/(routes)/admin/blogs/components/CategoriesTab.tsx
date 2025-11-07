@@ -17,7 +17,6 @@ export interface Category {
   description: string;
   active: boolean;
   featured?: boolean;
-  platform?: 'gymwear' | 'gymfolio';
   thumbnailUrl?: string;
   bannerUrl?: string;
 }
@@ -31,7 +30,6 @@ export default function CategoriesTab() {
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [platformFilter, setPlatformFilter] = useState<'all' | 'gymwear' | 'gymfolio'>('all');
 
   // Modal state
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -103,7 +101,6 @@ export default function CategoriesTab() {
           slug: categoryData.slug || blogCategoryService.slugify(categoryData.name),
           description: categoryData.description,
           active: categoryData.active,
-          platform: categoryData.platform || 'gymwear',
           thumbnail: categoryData.thumbnail,
           banner: categoryData.banner,
         });
@@ -114,7 +111,6 @@ export default function CategoriesTab() {
           slug: categoryData.slug || blogCategoryService.slugify(categoryData.name),
           description: categoryData.description,
           active: categoryData.active,
-          platform: categoryData.platform || 'gymwear',
           thumbnail: categoryData.thumbnail,
           banner: categoryData.banner,
         });
@@ -275,34 +271,18 @@ export default function CategoriesTab() {
     );
   }
 
-  // Filter categories based on platform
-  const filteredCategories = platformFilter === 'all'
-    ? categories
-    : categories.filter(cat => cat.platform === platformFilter);
-
   return (
     <>
       <div className="bg-white shadow sm:rounded-lg">
         <div className="px-4 py-5 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg leading-6 font-medium text-gray-900">Categories</h3>
-            <div className="w-48">
-              <select
-                value={platformFilter}
-                onChange={(e) => setPlatformFilter(e.target.value as 'all' | 'gymwear' | 'gymfolio')}
-                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="all">All Platforms</option>
-                <option value="gymwear">Gymwear</option>
-                <option value="gymfolio">Gymfolio</option>
-              </select>
-            </div>
           </div>
-          {filteredCategories.length === 0 ? (
+          {categories.length === 0 ? (
             <p className="text-sm text-gray-500">No categories found.</p>
           ) : (
             <ul role="list" className="divide-y divide-gray-200">
-              {filteredCategories.map((cat) => (
+              {categories.map((cat) => (
                 <li key={cat.id} className="py-4">
                   <div className="flex items-start gap-4">
                     {/* Thumbnail */}
@@ -337,13 +317,6 @@ export default function CategoriesTab() {
                         <div className="flex items-center gap-3 ml-4">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                             {cat.count} {cat.count === 1 ? "blog" : "blogs"}
-                          </span>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            cat.platform === 'gymfolio'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {cat.platform === 'gymfolio' ? 'Gymfolio' : 'Gymwear'}
                           </span>
                           <button
                             title={cat.featured ? "Remove from featured" : "Mark as featured"}
@@ -421,7 +394,6 @@ export default function CategoriesTab() {
                 name: editingCategory.name,
                 description: editingCategory.description,
                 active: editingCategory.active,
-                platform: editingCategory.platform,
                 thumbnailUrl: editingCategory.thumbnailUrl,
                 bannerUrl: editingCategory.bannerUrl
               }

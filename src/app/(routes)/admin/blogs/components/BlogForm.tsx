@@ -52,7 +52,6 @@ export type BlogFormData = {
   metaDescription?: string;
   metaKeywords?: string;
   metaSchema?: string;
-  platform?: "gymwear" | "gymfolio";
 };
 
 interface BlogFormProps {
@@ -84,8 +83,7 @@ export default function BlogForm({
     metaTitle: "",
     metaDescription: "",
     metaKeywords: "",
-    metaSchema: "",
-    platform: (initialData as any)?.platform || "gymwear",
+    metaSchema: ""
   });
 
   console.log("initialData", initialData);
@@ -257,7 +255,6 @@ export default function BlogForm({
       formData.append("categoryId", form.categoryId);
       formData.append("authorId", form.authorId || "");
       formData.append("status", form.status);
-      formData.append("platform", form.platform || "gymwear");
 
       // Handle tags
       if (form.tags && form.tags.length > 0) {
@@ -484,20 +481,6 @@ export default function BlogForm({
                   Current author ID: {form.authorId || "None selected"}
                 </div>
               )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Platform</label>
-              <select
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                value={form.platform}
-                onChange={(e) => setField("platform", e.target.value as "gymwear" | "gymfolio")}
-                required
-              >
-                <option value="gymwear">Gymwear</option>
-                <option value="gymfolio">Gymfolio</option>
-              </select>
-              {errors.platform && <p className="mt-1 text-sm text-red-600">{errors.platform}</p>}
             </div>
 
             <div>

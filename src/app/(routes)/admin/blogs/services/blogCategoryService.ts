@@ -10,7 +10,6 @@ interface BackendBlogCategory {
   description: string;
   active: boolean;
   featured?: boolean;
-  platform?: 'gymwear' | 'gymfolio';
   count?: number; // Added count property
   thumbnailUrl?: string;
   bannerUrl?: string;
@@ -26,7 +25,6 @@ export interface BlogCategory {
   description: string;
   active: boolean;
   featured?: boolean;
-  platform?: 'gymwear' | 'gymfolio';
   thumbnailUrl?: string;
   bannerUrl?: string;
 }
@@ -36,7 +34,6 @@ export interface BlogCategoryInput {
   slug?: string;
   description: string;
   active: boolean;
-  platform?: 'gymwear' | 'gymfolio';
   thumbnail?: File;
   banner?: File;
 }
@@ -86,8 +83,7 @@ const blogCategoryService: BlogCategoryService = {
         name: category.name,
         slug: category.slug,
         description: category.description,
-        active: category.active,
-        platform: category.platform || 'gymwear'
+        active: category.active
       }));
     } catch (error) {
       console.error('Error fetching blog categories:', error);
@@ -113,7 +109,6 @@ const blogCategoryService: BlogCategoryService = {
         description: category.description,
         active: category.active,
         featured: category.featured || false,
-        platform: category.platform || 'gymwear',
         thumbnailUrl: category.thumbnailUrl,
         bannerUrl: category.bannerUrl,
         count: category.count || 0 // Ensure count is always a number
@@ -158,7 +153,6 @@ const blogCategoryService: BlogCategoryService = {
       formData.append('slug', category.slug || '');
       formData.append('description', category.description);
       formData.append('active', category.active.toString());
-      formData.append('platform', category.platform || 'gymwear');
 
       if (category.thumbnail) {
         formData.append('thumbnail', category.thumbnail);
@@ -193,7 +187,6 @@ const blogCategoryService: BlogCategoryService = {
       formData.append('slug', category.slug || '');
       formData.append('description', category.description);
       formData.append('active', category.active.toString());
-      formData.append('platform', category.platform || 'gymwear');
 
       if (category.thumbnail) {
         formData.append('thumbnail', category.thumbnail);

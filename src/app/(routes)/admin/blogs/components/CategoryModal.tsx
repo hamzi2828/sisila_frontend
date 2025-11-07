@@ -7,7 +7,6 @@ export interface CategoryInput {
   slug: string;
   description: string;
   active: boolean;
-  platform?: 'gymwear' | 'gymfolio';
   thumbnail?: File;
   banner?: File;
 }
@@ -32,7 +31,6 @@ export default function CategoryModal({ open, mode, initial, onClose, onSubmit }
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [active, setActive] = useState(initial?.active ?? true);
-  const [platform, setPlatform] = useState<'gymwear' | 'gymfolio'>((initial as any)?.platform ?? 'gymwear');
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
 
@@ -41,7 +39,6 @@ export default function CategoryModal({ open, mode, initial, onClose, onSubmit }
       setName(initial?.name ?? "");
       setDescription(initial?.description ?? "");
       setActive(initial?.active ?? true);
-      setPlatform((initial as any)?.platform ?? 'gymwear');
       setThumbnail(null);
       setBanner(null);
     }
@@ -68,7 +65,6 @@ export default function CategoryModal({ open, mode, initial, onClose, onSubmit }
               slug,
               description: description.trim(),
               active,
-              platform,
               thumbnail: thumbnail || undefined,
               banner: banner || undefined
             });
@@ -95,19 +91,6 @@ export default function CategoryModal({ open, mode, initial, onClose, onSubmit }
                 value={slug}
                 readOnly
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Platform</label>
-              <select
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value as 'gymwear' | 'gymfolio')}
-                required
-              >
-                <option value="gymwear">Gymwear</option>
-                <option value="gymfolio">Gymfolio</option>
-              </select>
             </div>
 
             <div>

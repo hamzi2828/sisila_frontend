@@ -21,7 +21,6 @@ interface BackendBlog {
   tags?: string[];
   createdAt?: string;
   updatedAt?: string;
-  platform?: 'gymwear' | 'gymfolio';
   author?: {
     _id: string;
     name?: string;
@@ -44,7 +43,6 @@ export interface Blog {
   tags?: string[];
   createdAt?: string;
   updatedAt?: string;
-  platform?: 'gymwear' | 'gymfolio';
   author: {
     _id: string;
     name?: string;
@@ -128,7 +126,6 @@ const blogService: BlogService = {
         tags: blog.tags,
         createdAt: blog.createdAt,
         updatedAt: blog.updatedAt,
-        platform: blog.platform || 'gymwear',
         author: {
           _id: blog.author?._id || '',
           name: blog.author?.name || ''
@@ -182,7 +179,6 @@ const blogService: BlogService = {
         tags: blog.tags,
         createdAt: blog.createdAt,
         updatedAt: blog.updatedAt,
-        platform: blog.platform || 'gymwear',
         author: {
           _id: blog.author?._id || '',
           name: blog.author?.name || ''
