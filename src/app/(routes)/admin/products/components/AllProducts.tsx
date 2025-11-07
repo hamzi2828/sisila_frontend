@@ -73,6 +73,7 @@ export default function AllProducts({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft" | "out_of_stock">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [collectionFilter, setCollectionFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [togglingStatus, setTogglingStatus] = useState<Set<string>>(new Set());
   const productsPerPage = 10;
@@ -88,13 +89,19 @@ export default function AllProducts({
       const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            product.slug?.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       const matchesStatus = statusFilter === "all" || product.status === statusFilter;
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
-      
-      return matchesSearch && matchesStatus && matchesCategory;
+
+      const matchesCollection =
+        collectionFilter === "all" ||
+        (collectionFilter === "none" && (!product.collectionType || product.collectionType === "none")) ||
+        (collectionFilter === "theme" && product.collectionType === "theme") ||
+        (collectionFilter === "series" && product.collectionType === "series");
+
+      return matchesSearch && matchesStatus && matchesCategory && matchesCollection;
     });
-  }, [products, searchQuery, statusFilter, categoryFilter]);
+  }, [products, searchQuery, statusFilter, categoryFilter, collectionFilter]);
 
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
@@ -157,6 +164,8 @@ export default function AllProducts({
         categoryFilter={categoryFilter}
         setCategoryFilter={setCategoryFilter}
         availableCategories={availableCategories}
+        collectionFilter={collectionFilter}
+        setCollectionFilter={setCollectionFilter}
         onCurrentPageReset={resetCurrentPage}
       />
 
@@ -168,14 +177,11 @@ export default function AllProducts({
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0 w-1/3">
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0 w-2/5">
                       Product
                     </th>
                     <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                       Variants
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
-                      Category
                     </th>
                     <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                       Status

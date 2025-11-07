@@ -74,7 +74,7 @@ export default function ProductCard({
             })()}
           </div>
           <div className="ml-3 min-w-0 flex-1">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 mb-1">
               <div className="text-sm font-medium text-gray-900 truncate" title={product.name}>{product.name}</div>
               {product.featured && (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
@@ -83,8 +83,26 @@ export default function ProductCard({
               )}
             </div>
             {product.slug && (
-              <div className="text-xs text-gray-500 truncate">/{product.slug}</div>
+              <div className="text-xs text-gray-500 truncate mb-1">/{product.slug}</div>
             )}
+            {/* Category and Collection */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+              {/* Category Badge */}
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                {product.category}
+              </span>
+
+              {/* Collection Badge */}
+              {product.collectionType && product.collectionType !== 'none' && (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                  product.collectionType === 'theme'
+                    ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                    : 'bg-pink-100 text-pink-700 border border-pink-200'
+                }`} title={`${product.collectionType === 'theme' ? 'Theme' : 'Series'}: ${product.collectionId}`}>
+                  {product.collectionType === 'theme' ? '🎨 Theme' : '📚 Series'}: {product.collectionId}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </td>
@@ -121,11 +139,6 @@ export default function ProductCard({
             </span>
           )}
         </div>
-      </td>
-
-      {/* Category */}
-      <td className="px-3 py-4 whitespace-nowrap">
-        <div className="text-sm text-gray-900">{product.category}</div>
       </td>
 
       {/* Status */}

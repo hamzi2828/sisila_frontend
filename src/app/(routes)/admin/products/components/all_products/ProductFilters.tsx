@@ -10,6 +10,8 @@ interface ProductFiltersProps {
   categoryFilter: string;
   setCategoryFilter: (filter: string) => void;
   availableCategories: string[];
+  collectionFilter: string;
+  setCollectionFilter: (filter: string) => void;
   onCurrentPageReset: () => void;
 }
 
@@ -21,6 +23,8 @@ export default function ProductFilters({
   categoryFilter,
   setCategoryFilter,
   availableCategories,
+  collectionFilter,
+  setCollectionFilter,
   onCurrentPageReset
 }: ProductFiltersProps) {
   const handleSearchChange = (value: string) => {
@@ -38,6 +42,11 @@ export default function ProductFilters({
     onCurrentPageReset();
   };
 
+  const handleCollectionChange = (value: string) => {
+    setCollectionFilter(value);
+    onCurrentPageReset();
+  };
+
   const clearSearch = () => {
     setSearchQuery("");
     onCurrentPageReset();
@@ -47,7 +56,7 @@ export default function ProductFilters({
     <div className="bg-white shadow overflow-hidden sm:rounded-lg">
       <div className="px-4 py-5 sm:p-6">
         {/* Search and Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {/* Search */}
           <div className="md:col-span-2">
             <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
@@ -113,6 +122,24 @@ export default function ProductFilters({
                   {category}
                 </option>
               ))}
+            </select>
+          </div>
+
+          {/* Collection Filter */}
+          <div>
+            <label htmlFor="collection-filter" className="block text-sm font-medium text-gray-700 mb-1">
+              Collection
+            </label>
+            <select
+              id="collection-filter"
+              value={collectionFilter}
+              onChange={(e) => handleCollectionChange(e.target.value)}
+              className="h-10 w-full rounded-md border border-gray-300 bg-white text-sm focus:border-indigo-500 focus:ring-indigo-500"
+            >
+              <option value="all">All Collections</option>
+              <option value="theme">Theme</option>
+              <option value="series">Series</option>
+              <option value="none">No Collection</option>
             </select>
           </div>
         </div>

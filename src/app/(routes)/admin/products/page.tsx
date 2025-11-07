@@ -2,24 +2,20 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { FiPlus } from 'react-icons/fi';
 import Tabs from './components/Tabs';
 import AllProducts, { type Product } from './components/AllProducts';
 import CategoriesTab, { type Category, type CategoryWithCount } from './components/CategoriesTab';
-import CreateProduct from './components/CreateProduct';
-import EditProduct from './components/EditProduct';
 import ColorsSizesTab from './components/ColorsSizesTab';
 import CategoryModal, { type CategoryInput } from './components/CategoryModal';
 import { categoryService } from './services/categoryService';
-import { loadCreateTabData } from './services/productOptionsService';
 import { slugify } from './services/productCreateService';
 import { productService } from './services/productService';
 
-// slugify now provided by productCreateService
-
 const ProductsPage = () => {
-  const [activeTab, setActiveTab] = useState<'all' | 'categories' | 'attributes' | 'create' | 'edit'>('all');
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'all' | 'categories' | 'attributes'>('all');
 
   // Products state
   const [products, setProducts] = useState<Product[]>([]);
@@ -30,10 +26,6 @@ const ProductsPage = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [catLoading, setCatLoading] = useState(false);
   const [catError, setCatError] = useState<string | null>(null);
-
-  // Attribute options for Create form
-  const [colorOptions, setColorOptions] = useState<string[]>([]);
-  const [sizeOptions, setSizeOptions] = useState<string[]>([]);
 
   // Toast state
   const [toast, setToast] = useState<{ show: boolean; msg: string; type: 'success' | 'error' | 'info' }>({
@@ -119,25 +111,6 @@ const ProductsPage = () => {
       }
     };
     loadCategories();
-  }, [activeTab]);
-
-  // Ensure categories are loaded when switching to the Create tab
-  useEffect(() => {
-    const loadForCreate = async () => {
-      if (activeTab !== 'create') return;
-      try {
-        setCatLoading(true);
-        const { categories: cats, colorOptions: co, sizeOptions: so } = await loadCreateTabData();
-        setCategories(cats as unknown as Category[]);
-        setColorOptions(co);
-        setSizeOptions(so);
-      } catch (e) {
-        console.error('Failed to load Create tab data', e);
-      } finally {
-        setCatLoading(false);
-      }
-    };
-    loadForCreate();
   }, [activeTab]);
 
   const categoriesWithCount: CategoryWithCount[] = useMemo(
@@ -244,8 +217,7 @@ const ProductsPage = () => {
 
   // Edit product handler
   const handleEditProduct = (id: string) => {
-    setEditingProductId(id);
-    setActiveTab('edit');
+    router.push(`/admin/products/edit/${id}`);
   };
 
   // Delete product with confirm, optimistic UI, and refetch
@@ -331,7 +303,7 @@ const ProductsPage = () => {
           </button>
         ) : (
           <button
-            onClick={() => setActiveTab('create')}
+            onClick={() => router.push('/admin/products/create')}
             className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
             <FiPlus className="-ml-1 mr-2 h-5 w-5" />
@@ -342,18 +314,17 @@ const ProductsPage = () => {
 
       <Tabs
         tabs={[
-          { 
-            key: 'all', 
-            label: 'All Products', 
+          {
+            key: 'all',
+            label: 'All Products',
             count: productCounts.total,
             additionalInfo: `${productCounts.active} Active • ${productCounts.inactive} Inactive`
           },
           { key: 'categories', label: 'Categories', count: categories.length },
           { key: 'attributes', label: 'Colors & Sizes' },
-          { key: 'create', label: 'Create Product' },
         ]}
         activeKey={activeTab}
-        onChange={(key) => setActiveTab(key as 'all' | 'categories' | 'attributes' | 'create')}
+        onChange={(key) => setActiveTab(key as 'all' | 'categories' | 'attributes')}
       />
 
       {catError && (
@@ -388,39 +359,6 @@ const ProductsPage = () => {
       )}
       {activeTab === 'attributes' && (
         <ColorsSizesTab />
-      )}
-      {activeTab === 'create' && (
-        <CreateProduct
-          categories={categories.filter((c) => c.active)}
-          colorOptions={colorOptions}
-          sizeOptions={sizeOptions}
-          onManageAttributes={() => setActiveTab('attributes')}
-          onSuccess={() => {
-            setActiveTab('all');
-            loadProducts();
-            showToast('Product created successfully', 'success');
-          }}
-        />
-      )}
-      
-      {activeTab === 'edit' && editingProductId && (
-        <EditProduct
-          productId={editingProductId}
-          categories={categories.filter((c) => c.active)}
-          colorOptions={colorOptions}
-          sizeOptions={sizeOptions}
-          onManageAttributes={() => setActiveTab('attributes')}
-          onCancel={() => {
-            setActiveTab('all');
-            setEditingProductId(null);
-          }}
-          onSuccess={() => {
-            setActiveTab('all');
-            setEditingProductId(null);
-            loadProducts();
-            showToast('Product updated successfully', 'success');
-          }}
-        />
       )}
 
       <CategoryModal
