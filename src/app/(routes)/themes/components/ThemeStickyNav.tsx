@@ -22,18 +22,6 @@ export default function ThemeStickyNav({ sections }: { sections: Section[] }) {
           ))}
         </nav>
       </div>
-      <div>
-        <p className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-500">Moodboards</p>
-        <nav className="grid gap-2">
-          <Link
-            href="#moodboards"
-            className="inline-flex items-center justify-between rounded-xl border border-stone-200/70 bg-white px-3 py-2 text-sm hover:bg-stone-50 transition"
-          >
-            <span>All Moodboards</span>
-            <span>↓</span>
-          </Link>
-        </nav>
-      </div>
     </div>
   );
 }

@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { themeService, type Theme } from '../main/services/themeService';
 import ThemeHero from './components/ThemeHero';
 import ThemeStickyNav from './components/ThemeStickyNav';
-import ThemeFeatureStripe from './components/ThemeFeatureStripe';
-import ThemeScroller from './components/ThemeScroller';
+import ThemeProducts from './components/ThemeProducts';
 
 export default function ThemesPage() {
   const [themes, setThemes] = useState<Theme[]>([]);
@@ -82,26 +81,11 @@ export default function ThemesPage() {
           </aside>
 
           <section className="lg:col-span-9 space-y-16">
-            {themes.map((section, idx) => (
-              <ThemeFeatureStripe key={section._id} section={section} flipped={idx % 2 === 1} />
-            ))}
-
-            <div id="moodboards" className="scroll-mt-28">
-              <h2
-                className="text-2xl md:text-3xl font-semibold uppercase"
-                style={{ fontFamily: 'Poppins, sans-serif' }}
-              >
-                Moodboards
-              </h2>
-              <p className="mt-2 text-stone-600">
-                Visual rails for each theme — textures, palettes, and compositions.
-              </p>
-            </div>
-
             {themes.map((section) => (
-              <ThemeScroller key={`${section._id}-scroll`} section={section} />
+              <ThemeProducts key={section._id} section={section} />
             ))}
 
+          
             <div className="pt-8">
               <Link
                 href="#top"

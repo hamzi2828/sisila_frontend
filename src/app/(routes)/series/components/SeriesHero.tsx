@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import type { SeriesSection } from '../../main/components/SeriesSection';
+import type { Series } from '../../main/services/seriesService';
 
-export default function SeriesHero({ sections }: { sections: SeriesSection[] }) {
+export default function SeriesHero({ sections }: { sections: Series[] }) {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-stone-200/60 bg-gradient-to-br from-black via-stone-900 to-stone-800 text-white">
       <div

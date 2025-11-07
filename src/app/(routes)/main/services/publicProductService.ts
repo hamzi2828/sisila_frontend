@@ -30,6 +30,8 @@ export interface PublicProduct {
   createdAt?: string;
   updatedAt?: string;
   slug?: string;
+  collectionType?: 'theme' | 'series' | 'none';
+  collectionId?: string;
 }
 
 export interface ProductsResponse {
@@ -183,6 +185,29 @@ export const publicProductService = {
 
     if (!response.ok) {
       throw new Error(`Failed to search products: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async getProductsByCollection(
+    collectionType: 'theme' | 'series',
+    collectionId: string,
+    limit: number = 20,
+    page: number = 1
+  ): Promise<ProductsResponse> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/public/products/collection/${collectionType}/${encodeURIComponent(collectionId)}?limit=${limit}&page=${page}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch products by collection: ${response.status}`);
     }
 
     return response.json();
