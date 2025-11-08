@@ -126,6 +126,17 @@ export default function NewArrivalsSection({
     else console.log('add to cart', p);
   };
 
+  // If no products, don't render the section
+  if (!products || products.length === 0) {
+    return null;
+  }
+
+  // Ensure we have at least the minimum required products by filling with defaults
+  const displayProducts = [...products];
+  while (displayProducts.length < 11) {
+    displayProducts.push(...DEFAULT_PRODUCTS.slice(0, 11 - displayProducts.length));
+  }
+
   return (
     <section className={`px-6 md:px-10 lg:px-20 py-12 ${className}`}>
       <div className="mx-auto ">
@@ -154,46 +165,57 @@ export default function NewArrivalsSection({
 
         {/* First Row - Featured + 2 Products */}
         <div className="mt-6 grid gap-5 md:grid-cols-4">
-          <ProductCard
-            product={products[0]}
-            onAdd={() => handleAdd(products[0])}
-            large
-            className="md:col-span-2"
-          />
-          <ProductCard
-            product={products[1]}
-            onAdd={() => handleAdd(products[1])}
-          />
-          <ProductCard
-            product={products[2]}
-            onAdd={() => handleAdd(products[2])}
-          />
+          {displayProducts[0] && (
+            <ProductCard
+              product={displayProducts[0]}
+              onAdd={() => handleAdd(displayProducts[0])}
+              large
+              className="md:col-span-2"
+            />
+          )}
+          {displayProducts[1] && (
+            <ProductCard
+              product={displayProducts[1]}
+              onAdd={() => handleAdd(displayProducts[1])}
+            />
+          )}
+          {displayProducts[2] && (
+            <ProductCard
+              product={displayProducts[2]}
+              onAdd={() => handleAdd(displayProducts[2])}
+            />
+          )}
         </div>
 
          {/* Second Row - 4 Products */}
         <div className="mt-5 grid gap-5 grid-cols-1 md:grid-cols-4">
-          {products.slice(3, 7).map((p) => (
+          {displayProducts.slice(3, 7).filter(Boolean).map((p) => (
             <ProductCard key={p.id} product={p} onAdd={() => handleAdd(p)} />
           ))}
         </div>
 
-     
+
          <div className="mt-6 grid gap-5 md:grid-cols-4">
-          <ProductCard
-            product={products[8]}
-            onAdd={() => handleAdd(products[0])}
-           
-          />
-          <ProductCard
-            product={products[9]}
-            onAdd={() => handleAdd(products[1])}
-          />
-          <ProductCard
-            product={products[10]}
-            onAdd={() => handleAdd(products[2])}
-             large
-            className="md:col-span-2"
-          />
+          {displayProducts[8] && (
+            <ProductCard
+              product={displayProducts[8]}
+              onAdd={() => handleAdd(displayProducts[0])}
+            />
+          )}
+          {displayProducts[9] && (
+            <ProductCard
+              product={displayProducts[9]}
+              onAdd={() => handleAdd(displayProducts[1])}
+            />
+          )}
+          {displayProducts[10] && (
+            <ProductCard
+              product={displayProducts[10]}
+              onAdd={() => handleAdd(displayProducts[2])}
+              large
+              className="md:col-span-2"
+            />
+          )}
         </div>
       </div>
     </section>
@@ -211,6 +233,11 @@ function ProductCard({
   large?: boolean;
   className?: string;
 }) {
+  // Safety check - if product is undefined or missing required fields, return null
+  if (!product || !product.href || !product.title || !product.image) {
+    return null;
+  }
+
   return (
     <div
       className={[

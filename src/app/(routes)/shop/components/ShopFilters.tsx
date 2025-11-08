@@ -2,10 +2,10 @@
 
 import { SlidersHorizontal, X, Search } from 'lucide-react';
 
+type PriceRange = 'All' | 'Under $40' | '$40–$60' | '$60–$80' | '$80+';
+type SortKey = 'Featured' | 'Price ↑' | 'Price ↓';
+
 export default function ShopFilters({
-  tags,
-  activeTag,
-  setActiveTag,
   drawerOpen,
   setDrawerOpen,
   q,
@@ -17,65 +17,51 @@ export default function ShopFilters({
   count,
   clearAll,
 }: {
-  tags: string[];
-  activeTag: string;
-  setActiveTag: (v: string) => void;
   drawerOpen: boolean;
   setDrawerOpen: (v: boolean) => void;
   q: string;
   setQ: (v: string) => void;
-  price: string;
-  setPrice: (v: any) => void;
-  sort: string;
-  setSort: (v: any) => void;
+  price: PriceRange;
+  setPrice: (v: PriceRange) => void;
+  sort: SortKey;
+  setSort: (v: SortKey) => void;
   count: number;
   clearAll: () => void;
 }) {
-  const PRICE_RANGES = ['All', 'Under $40', '$40–$60', '$60–$80', '$80+'];
-  const SORTS = ['Featured', 'Price ↑', 'Price ↓'];
+  const PRICE_RANGES: PriceRange[] = ['All', 'Under $40', '$40–$60', '$60–$80', '$80+'];
+  const SORTS: SortKey[] = ['Featured', 'Price ↑', 'Price ↓'];
 
   return (
     <>
       {/* Row */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {tags.map((t) => (
-            <button key={t} onClick={() => setActiveTag(t)} className={chip(t === activeTag)}>
-              {t}
-            </button>
+      <div className="flex items-center justify-end gap-2">
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className="inline-flex items-center gap-2 rounded-full border border-stone-300/80 bg-white px-3 py-2 text-sm hover:bg-stone-50"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          Filters
+        </button>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+          className="rounded-full border border-stone-300/80 bg-white px-3 py-2 text-sm outline-none"
+          aria-label="Sort by"
+        >
+          {SORTS.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="inline-flex items-center gap-2 rounded-full border border-stone-300/80 bg-white px-3 py-2 text-sm hover:bg-stone-50"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters
-          </button>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            className="rounded-full border border-stone-300/80 bg-white px-3 py-2 text-sm outline-none"
-            aria-label="Sort by"
-          >
-            {SORTS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
+        </select>
       </div>
 
       {/* Active summary */}
-      {(activeTag !== 'All' || price !== 'All' || q) && (
+      {(price !== 'All' || q) && (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
           <span className="text-stone-600">Filters:</span>
-          {activeTag !== 'All' && <Badge onClear={() => setActiveTag('All')}>{activeTag}</Badge>}
           {price !== 'All' && <Badge onClear={() => setPrice('All')}>{price}</Badge>}
-          {q && <Badge onClear={() => setQ('')}>“{q}”</Badge>}
+          {q && <Badge onClear={() => setQ('')}>{q}</Badge>}
           <button
             onClick={clearAll}
             className="ml-1 inline-flex items-center rounded-full border border-stone-300/80 bg-white px-3 py-1 hover:bg-stone-50"
@@ -117,18 +103,6 @@ export default function ShopFilters({
                 </div>
               </div>
 
-              {/* Tag */}
-              <div>
-                <p className="text-sm font-medium">Tag</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {tags.map((t) => (
-                    <button key={t} onClick={() => setActiveTag(t)} className={chip(t === activeTag)}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Price */}
               <div>
                 <p className="text-sm font-medium">Price</p>
@@ -153,7 +127,7 @@ export default function ShopFilters({
                 <p className="text-sm font-medium">Sort</p>
                 <select
                   value={sort}
-                  onChange={(e) => setSort(e.target.value)}
+                  onChange={(e) => setSort(e.target.value as SortKey)}
                   className="mt-2 w-full rounded-xl border border-stone-300/80 bg-white px-3 py-2 text-sm outline-none"
                 >
                   {SORTS.map((s) => (
@@ -184,13 +158,6 @@ export default function ShopFilters({
       )}
     </>
   );
-}
-
-function chip(active: boolean) {
-  return [
-    'inline-flex items-center rounded-full px-3 py-1 text-sm transition',
-    active ? 'bg-black text-white' : 'border border-stone-300/80 bg-white text-stone-800 hover:bg-stone-50',
-  ].join(' ');
 }
 
 function Badge({ children, onClear }: { children: React.ReactNode; onClear: () => void }) {

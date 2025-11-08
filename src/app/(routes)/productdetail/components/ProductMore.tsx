@@ -2,19 +2,94 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { publicProductService, type PublicProduct } from '../../main/services/publicProductService';
+
+type RelatedProduct = {
+  id: string;
+  title: string;
+  price: number;
+  image: string;
+  href: string;
+};
+
+type ProductDetails = {
+  description: string;
+  materials?: string;
+  care?: string;
+};
 
 export default function ProductMore({
   product,
   money,
-  relatedSeries = [],
-  relatedCategory = [],
+  collectionType,
+  currentProductId,
 }: {
-  product: any;
+  product: ProductDetails;
   money: (v: number) => string;
-  relatedSeries?: any[];
-  relatedCategory?: any[];
+  collectionType?: 'theme' | 'series' | null;
+  currentProductId: string;
 }) {
+  const [relatedProducts, setRelatedProducts] = useState<RelatedProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchRelatedProducts = async () => {
+      if (!collectionType) return;
+
+      try {
+        setIsLoading(true);
+        // Fetch all products and filter by collectionType
+        const response = await publicProductService.getAllProducts(50, 1, 'createdAt', 'desc');
+
+        if (response.success && response.data) {
+          // Filter by collectionType and exclude current product
+          const filtered = response.data.filter(
+            (p: PublicProduct) =>
+              p.collectionType === collectionType &&
+              p._id !== currentProductId
+          );
+          const productsToShow = filtered.slice(0, 6);
+
+          const mapped = productsToShow.map((p: PublicProduct) => {
+            let image = '';
+
+            // Handle variant products with colorMedia
+            if (p.productType === 'variant' && p.colorMedia) {
+              const firstColor = Object.keys(p.colorMedia)[0];
+              if (firstColor && p.colorMedia[firstColor]?.thumbnailUrl) {
+                const url = p.colorMedia[firstColor].thumbnailUrl;
+                image = url.startsWith('http')
+                  ? url
+                  : `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}${url}`;
+              }
+            } else if (p.thumbnailUrl) {
+              image = p.thumbnailUrl.startsWith('http')
+                ? p.thumbnailUrl
+                : `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}${p.thumbnailUrl}`;
+            }
+
+            return {
+              id: p._id,
+              title: p.name,
+              price: p.discountedPrice || p.price,
+              image: image || 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
+              href: `/productdetail/${p._id}`,
+            };
+          });
+
+          setRelatedProducts(mapped);
+        }
+      } catch (error) {
+        console.error('Error fetching related products:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRelatedProducts();
+  }, [collectionType, currentProductId]);
+
   return (
     <div className="mt-12">
       <div className="grid gap-6 lg:grid-cols-3">
@@ -36,13 +111,13 @@ export default function ProductMore({
         </Accordion>
       </div>
 
-      {product.seriesId && relatedSeries.length ? (
-        <RelatedRail heading={`More from ${pretty(product.seriesId)} Series`} items={relatedSeries} money={money} />
-      ) : null}
-
-      {relatedCategory.length ? (
-        <RelatedRail heading={`Related in ${pretty(product.categoryId)}`} items={relatedCategory} money={money} />
-      ) : null}
+      {!isLoading && relatedProducts.length > 0 && collectionType && (
+        <RelatedRail
+          heading={`More from ${collectionType === 'series' ? 'Series' : 'Themes'}`}
+          items={relatedProducts}
+          money={money}
+        />
+      )}
     </div>
   );
 }
@@ -62,7 +137,7 @@ function Accordion({ title, defaultOpen, children }: { title: string; defaultOpe
   );
 }
 
-function RelatedRail({ heading, items = [], money }: { heading: string; items?: any[]; money: (v: number) => string }) {
+function RelatedRail({ heading, items = [], money }: { heading: string; items?: RelatedProduct[]; money: (v: number) => string }) {
   return (
     <section className="mt-12">
       <div className="flex items-end justify-between gap-3">
@@ -78,10 +153,10 @@ function RelatedRail({ heading, items = [], money }: { heading: string; items?: 
       </div>
 
       <div className="my-4 no-scrollbar flex gap-5 overflow-x-auto px-1 py-4">
-        {items.map((p: any, idx: number) => (
+        {items.map((p, idx: number) => (
           <Link
-            href="/productdetail"
-            key={`${p.title}-${idx}`}
+            href={p.href || '/productdetail'}
+            key={p.id || `${p.title}-${idx}`}
             className="group relative h-[320px] w-[240px] shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 hover:shadow-md transition"
           >
             <Image src={p.image} alt={p.title} fill sizes="240px" className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
@@ -105,8 +180,4 @@ function RelatedRail({ heading, items = [], money }: { heading: string; items?: 
       `}</style>
     </section>
   );
-}
-
-function pretty(id: string) {
-  return id.split('-').map((s) => s[0].toUpperCase() + s.slice(1)).join(' ');
 }

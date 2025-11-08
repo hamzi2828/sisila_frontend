@@ -1,6 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { publicProductService, type PublicProduct } from '../main/services/publicProductService';
 import ShopHero from './components/ShopHero';
 import ShopValueBar from './components/ShopValueBar';
 import ShopFilters from './components/ShopFilters';
@@ -15,49 +18,92 @@ type Product = {
   tag?: string;
 };
 
-const ALL_PRODUCTS: Product[] = [
-  { id: 'verses-tee', title: 'Verses Tee', price: 38, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Poetry' },
-  { id: 'quip-hoodie', title: 'Quip Hoodie', price: 72, image: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Witty' },
-  { id: 'canvas-tee', title: 'Canvas Tee', price: 42, image: 'https://images.unsplash.com/photo-1496317899792-9d7dbcd928a1?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Artistic' },
-  { id: 'neon-alley-hoodie', title: 'Neon Alley Hoodie', price: 78, image: 'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Street' },
-  { id: 'forest-tee', title: 'Forest Tee', price: 40, image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Nature' },
-  { id: 'varsity-tee', title: 'Varsity Tee', price: 44, image: 'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Retro' },
-  { id: 'palette-crew', title: 'Palette Crew', price: 66, image: 'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Artistic' },
-  { id: 'city-ls', title: 'City LS', price: 58, image: 'https://images.unsplash.com/photo-1503342217505-b0a15cf704d9?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Street' },
-  { id: 'grotesk-tee', title: 'Grotesk Tee', price: 40, image: 'https://images.unsplash.com/photo-1548883354-94bcfe3213e7?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Typography' },
-  { id: 'block-hoodie', title: 'Block Hoodie', price: 74, image: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Street' },
-  { id: 'palette-hoodie', title: 'Palette Hoodie', price: 76, image: 'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Artistic' },
-  { id: 'city-ls-2', title: 'City LS', price: 58, image: 'https://images.unsplash.com/photo-1503342217505-b0a15cf704d9?auto=format&fit=crop&w=1400&q=80', href: '/productdetail', tag: 'Street' },
-];
-
-const PRICE_RANGES = ['All', 'Under $40', '$40–$60', '$60–$80', '$80+'] as const;
-type PriceRange = (typeof PRICE_RANGES)[number];
-
-const SORTS = ['Featured', 'Price ↑', 'Price ↓'] as const;
-type SortKey = (typeof SORTS)[number];
+type PriceRange = 'All' | 'Under $40' | '$40–$60' | '$60–$80' | '$80+';
+type SortKey = 'Featured' | 'Price ↑' | 'Price ↓';
 
 export default function ShopPage() {
-  const [activeTag, setActiveTag] = useState<string>('All');
+  const searchParams = useSearchParams();
+  const collection = searchParams.get('collection') as 'theme' | 'series' | null;
+  const collectionId = searchParams.get('collectionId');
+
+  const [allProducts, setAllProducts] = useState<PublicProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [collectionTitle, setCollectionTitle] = useState<string>('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [q, setQ] = useState('');
   const [price, setPrice] = useState<PriceRange>('All');
   const [sort, setSort] = useState<SortKey>('Featured');
 
-  const tags = useMemo(
-    () => ['All', ...Array.from(new Set(ALL_PRODUCTS.map((p) => p.tag).filter(Boolean))) as string[]],
-    []
-  );
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        let response;
+
+        // If collection params exist, fetch products for that collection
+        if (collection && collectionId && (collection === 'theme' || collection === 'series')) {
+          response = await publicProductService.getProductsByCollection(collection, collectionId, 100, 1);
+          // Set collection title for display
+          const formattedTitle = collectionId
+            .split('-')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          setCollectionTitle(formattedTitle);
+        } else {
+          // Otherwise fetch all products
+          response = await publicProductService.getAllProducts(100, 1, 'createdAt', 'desc');
+          setCollectionTitle('');
+        }
+
+        setAllProducts(response.data);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        setError('Failed to load products');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [collection, collectionId]);
 
   const products = useMemo(() => {
-    let rows = [...ALL_PRODUCTS];
+    // Map PublicProduct to Product type for ShopGrid
+    let rows: Product[] = allProducts.map((p) => {
+      // Handle image for variant products
+      let imageUrl = p.thumbnailUrl || (p.bannerUrls && p.bannerUrls[0]) || '/images/placeholder.png';
+
+      if (p.productType === 'variant' && p.variants && p.variants.length > 0) {
+        const firstVariantColor = p.variants[0].color;
+        if (firstVariantColor && p.colorMedia?.[firstVariantColor]?.thumbnailUrl) {
+          imageUrl = p.colorMedia[firstVariantColor].thumbnailUrl;
+        }
+      }
+
+      // Add backend URL prefix if not already present
+      if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/images/')) {
+        imageUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}${imageUrl}`;
+      }
+
+      return {
+        id: p._id,
+        title: p.name,
+        price: p.discountedPrice || p.price,
+        image: imageUrl,
+        href: `/productdetail/${p._id}`,
+        tag: p.category
+      };
+    });
 
     const query = q.trim().toLowerCase();
     if (query) {
       rows = rows.filter(
-        (p) => p.title.toLowerCase().includes(query) || (p.tag || '').toLowerCase().includes(query)
+        (p) => p.title.toLowerCase().includes(query)
       );
     }
-    if (activeTag !== 'All') rows = rows.filter((p) => p.tag === activeTag);
 
     rows = rows.filter((p) => {
       switch (price) {
@@ -78,14 +124,47 @@ export default function ShopPage() {
     if (sort === 'Price ↓') rows.sort((a, b) => b.price - a.price);
 
     return rows;
-  }, [activeTag, price, q, sort]);
+  }, [allProducts, price, q, sort]);
 
   const clearAll = () => {
-    setActiveTag('All');
     setPrice('All');
     setQ('');
     setSort('Featured');
   };
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-stone-50 to-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-stone-300 border-t-stone-600"></div>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-stone-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 text-lg">{error}</p>
+          <Link href="/" className="mt-4 inline-block text-stone-600 hover:text-stone-900 underline">
+            Return to homepage
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (allProducts.length === 0) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-stone-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-stone-600 text-lg">No products available at the moment.</p>
+          <Link href="/" className="mt-4 inline-block text-stone-600 hover:text-stone-900 underline">
+            Return to homepage
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-stone-50 to-white text-stone-900">
@@ -99,10 +178,33 @@ export default function ShopPage() {
 
       <section className="px-6 md:px-10 lg:px-20 pb-20">
         <div className="mx-auto ">
+          {/* Collection Breadcrumb */}
+          {collectionTitle && (
+            <div className="mb-6">
+              <nav className="flex items-center gap-2 text-sm text-stone-600">
+                <Link href="/shop" className="hover:text-stone-900 underline underline-offset-4">
+                  All Products
+                </Link>
+                <span>/</span>
+                <Link
+                  href={collection === 'theme' ? '/themes' : '/series'}
+                  className="hover:text-stone-900 underline underline-offset-4"
+                >
+                  {collection === 'theme' ? 'Themes' : 'Series'}
+                </Link>
+                <span>/</span>
+                <span className="font-medium text-stone-900">{collectionTitle}</span>
+              </nav>
+              <h1 className="mt-4 text-3xl md:text-4xl font-bold">
+                {collectionTitle} Collection
+              </h1>
+              <p className="mt-2 text-stone-600">
+                {products.length} {products.length === 1 ? 'product' : 'products'} available
+              </p>
+            </div>
+          )}
+
           <ShopFilters
-            tags={tags}
-            activeTag={activeTag}
-            setActiveTag={setActiveTag}
             drawerOpen={drawerOpen}
             setDrawerOpen={setDrawerOpen}
             q={q}
@@ -115,7 +217,11 @@ export default function ShopPage() {
             clearAll={clearAll}
           />
 
-          <ShopGrid products={products} />
+          <ShopGrid
+            products={products}
+            collectionType={collection}
+            collectionTitle={collectionTitle}
+          />
         </div>
       </section>
     </main>

@@ -122,9 +122,12 @@ export default function ProductBuyBox({
       <div className="mt-6 border-t pt-4">
         <p className="text-xs uppercase tracking-[0.18em] text-stone-500">Part of</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <PillLink label={`Category: ${pretty(product.categoryId)}`} href={`/categories`} />
-          <PillLink label={`Theme: ${pretty(product.themeId)}`} href={`/themes`} />
-          {product.seriesId ? <PillLink label={`Series: ${pretty(product.seriesId)}`} href={`/series`} /> : null}
+          <Pill label={`Category: ${pretty(product.categoryId)}`} />
+          {product.seriesId ? (
+            <Pill label={`Series: ${pretty(product.seriesId)}`} />
+          ) : product.themeId && product.themeId !== 'general' ? (
+            <Pill label={`Theme: ${pretty(product.themeId)}`} />
+          ) : null}
         </div>
       </div>
     </div>
@@ -136,6 +139,14 @@ function PillLink({ label, href }: { label: string; href: string }) {
     <a href={href} className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-3 py-1 text-sm hover:bg-stone-50">
       {label}
     </a>
+  );
+}
+
+function Pill({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-3 py-1 text-sm">
+      {label}
+    </span>
   );
 }
 
