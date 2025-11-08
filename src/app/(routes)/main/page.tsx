@@ -17,7 +17,7 @@ export default function MainPage() {
   useEffect(() => {
     const fetchLatestProducts = async () => {
       try {
-        const response = await publicProductService.getLatestProducts(11);
+        const response = await publicProductService.getLatestProducts(6);
 
         // Map PublicProduct to Product type
         const mappedProducts: Product[] = response.data.map((p: PublicProduct) => {
@@ -33,7 +33,7 @@ export default function MainPage() {
 
           // Add backend URL prefix if not already present
           if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/images/')) {
-            imageUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}${imageUrl}`;
+            imageUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}${imageUrl}`;
           }
 
           return {

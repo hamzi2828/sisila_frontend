@@ -15,127 +15,21 @@ export type Product = {
 
 type Props = {
   className?: string;
-  products?: Product[];
-  onAddToCart?: (p: Product) => void;
+  products: Product[];
 };
-
-const DEFAULT_PRODUCTS: Product[] = [
-  {
-    id: 'verses-tee',
-    title: 'Verses Tee',
-    price: 38,
-    image:
-      'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
-    href: '/productdetail',
-    badge: 'New',
-    tags: ['Poets', 'Unisex'],
-  },
-  {
-    id: 'quip-hoodie',
-    title: 'Quip Hoodie',
-    price: 72,
-    image:
-   'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
-    href: '/productdetail',
-    badge: 'Drop',
-    tags: ['Witty', 'Hoodie'],
-  },
-  {
-    id: 'canvas-tee',
-    title: 'Canvas Tee',
-    price: 42,
-    image:
-      'https://images.unsplash.com/photo-1496317899792-9d7dbcd928a1?auto=format&fit=crop&w=1200&q=80',
-    href: '/productdetail',
-  },
-  {
-    id: 'neon-alley-hoodie',
-    title: 'Neon Alley Hoodie',
-    price: 78,
-    image:
-      'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1200&q=80',
-    href: '/productdetail',
-    badge: 'Limited',
-  },
-  {
-    id: 'forest-tee',
-    title: 'Forest Tee',
-    price: 40,
-    image:
-      'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=80',
-    href: '/productdetail',
-  },
-  {
-    id: 'varsity-tee',
-    title: 'Varsity Tee',
-    price: 44,
-    image:
-      'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1200&q=80',
-    href: '/productdetail',
-  },
-  {
-    id: 'palette-crew',
-    title: 'Palette Crew',
-    price: 66,
-    image:
-      'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1200&q=80',
-    href: '/productdetail',
-  },
-   {
-    id: 'neon-alley-hoodie-2',
-    title: 'Neon Alley Hoodie',
-    price: 78,
-    image:
-      'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1200&q=80',
-    href: '/productdetail',
-    badge: 'Limited',
-  },
-  {
-    id: 'forest-tee-2',
-    title: 'Forest Tee',
-    price: 40,
-    image:
-      'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=80',
-    href: '/productdetail',
-  },
-  {
-    id: 'varsity-tee-2',
-    title: 'Varsity Tee',
-    price: 44,
-    image:
-      'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1200&q=80',
-    href: '/productdetail',
-  },
-  {
-    id: 'palette-crew-2',
-    title: 'Palette Crew',
-    price: 66,
-    image:
-      'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1200&q=80',
-    href: '/productdetail',
-  },
-];
 
 export default function NewArrivalsSection({
   className = '',
-  products = DEFAULT_PRODUCTS,
-  onAddToCart,
+  products,
 }: Props) {
-  const handleAdd = (p: Product) => {
-    if (onAddToCart) onAddToCart(p);
-    else console.log('add to cart', p);
-  };
 
   // If no products, don't render the section
   if (!products || products.length === 0) {
     return null;
   }
 
-  // Ensure we have at least the minimum required products by filling with defaults
-  const displayProducts = [...products];
-  while (displayProducts.length < 11) {
-    displayProducts.push(...DEFAULT_PRODUCTS.slice(0, 11 - displayProducts.length));
-  }
+  // Take only the first 6 products
+  const displayProducts = products.slice(0, 6);
 
   return (
     <section className={`px-6 md:px-10 lg:px-20 py-12 ${className}`}>
@@ -163,59 +57,11 @@ export default function NewArrivalsSection({
           </Link>
         </div>
 
-        {/* First Row - Featured + 2 Products */}
-        <div className="mt-6 grid gap-5 md:grid-cols-4">
-          {displayProducts[0] && (
-            <ProductCard
-              product={displayProducts[0]}
-              onAdd={() => handleAdd(displayProducts[0])}
-              large
-              className="md:col-span-2"
-            />
-          )}
-          {displayProducts[1] && (
-            <ProductCard
-              product={displayProducts[1]}
-              onAdd={() => handleAdd(displayProducts[1])}
-            />
-          )}
-          {displayProducts[2] && (
-            <ProductCard
-              product={displayProducts[2]}
-              onAdd={() => handleAdd(displayProducts[2])}
-            />
-          )}
-        </div>
-
-         {/* Second Row - 4 Products */}
-        <div className="mt-5 grid gap-5 grid-cols-1 md:grid-cols-4">
-          {displayProducts.slice(3, 7).filter(Boolean).map((p) => (
-            <ProductCard key={p.id} product={p} onAdd={() => handleAdd(p)} />
+        {/* Grid - 6 Products */}
+        <div className="mt-6 grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {displayProducts.map((p) => (
+            <ProductCard key={p.id} product={p} />
           ))}
-        </div>
-
-
-         <div className="mt-6 grid gap-5 md:grid-cols-4">
-          {displayProducts[8] && (
-            <ProductCard
-              product={displayProducts[8]}
-              onAdd={() => handleAdd(displayProducts[0])}
-            />
-          )}
-          {displayProducts[9] && (
-            <ProductCard
-              product={displayProducts[9]}
-              onAdd={() => handleAdd(displayProducts[1])}
-            />
-          )}
-          {displayProducts[10] && (
-            <ProductCard
-              product={displayProducts[10]}
-              onAdd={() => handleAdd(displayProducts[2])}
-              large
-              className="md:col-span-2"
-            />
-          )}
         </div>
       </div>
     </section>
@@ -224,14 +70,8 @@ export default function NewArrivalsSection({
 
 function ProductCard({
   product,
-  onAdd,
-  large = false,
-  className = '',
 }: {
   product: Product;
-  onAdd: () => void;
-  large?: boolean;
-  className?: string;
 }) {
   // Safety check - if product is undefined or missing required fields, return null
   if (!product || !product.href || !product.title || !product.image) {
@@ -239,13 +79,7 @@ function ProductCard({
   }
 
   return (
-    <div
-      className={[
-        'group relative overflow-hidden rounded-2xl ring-1 ring-stone-200/80 bg-white',
-        large ? 'h-[500px] md:h-[400px]' : 'h-[400px]',
-        className,
-      ].join(' ')}
-    >
+    <div className="group relative overflow-hidden rounded-2xl ring-1 ring-stone-200/80 bg-white h-[400px]">
       {/* Image */}
       <Link href={product.href} className="block h-full">
         <div className="relative w-full h-full overflow-hidden">
@@ -253,9 +87,8 @@ function ProductCard({
             src={product.image}
             alt={product.title}
             fill
-            sizes={large ? '(max-width: 1024px) 100vw, 50vw' : '(max-width: 1024px) 50vw, 25vw'}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-            priority={large}
           />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-70" />
           {product.badge && (
