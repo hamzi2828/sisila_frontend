@@ -11,13 +11,14 @@ export type BlogPost = {
   date: string;
   read: string;
   image: string;
+  slug: string;
 };
 
 export default function BlogFeatured({ post }: { post: BlogPost }) {
   if (!post) return null;
   return (
     <Link
-      href="/blogdetail"
+      href={`/blogdetail?slug=${post.slug}`}
       className="group relative overflow-hidden rounded-3xl bg-white ring-1 ring-stone-200"
     >
       <div className="relative w-full pt-[45%]">

@@ -1,35 +1,75 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import SearchHero from './components/SearchHero';
 import SearchResults from './components/SearchResults';
 import SearchEmpty from './components/SearchEmpty';
 import SearchChips from './components/SearchChips';
+import { publicProductService, type PublicProduct } from '../main/services/publicProductService';
 
 type Item = { id: string; title: string; price: number; tag?: string; image: string; href: string };
-
-const CATALOG: Item[] = [
-  { id: 'verses-tee', title: 'Verses Tee', price: 38, tag: 'Poetry', image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1400&q=80', href: '/productdetail' },
-  { id: 'palette-crew', title: 'Palette Crew', price: 66, tag: 'Artistic', image: 'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1400&q=80', href: '/productdetail' },
-  { id: 'neon-alley-hoodie', title: 'Neon Alley Hoodie', price: 78, tag: 'Street', image: 'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1400&q=80', href: '/productdetail' },
-  { id: 'forest-tee', title: 'Forest Tee', price: 40, tag: 'Nature', image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1400&q=80', href: '/productdetail' },
-  { id: 'grotesk-tee', title: 'Grotesk Tee', price: 40, tag: 'Typography', image: 'https://images.unsplash.com/photo-1548883354-94bcfe3213e7?auto=format&fit=crop&w=1400&q=80', href: '/productdetail' },
-  { id: 'block-hoodie', title: 'Block Hoodie', price: 74, tag: 'Street', image: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=1400&q=80', href: '/productdetail' },
-  { id: 'city-ls', title: 'City LS', price: 58, tag: 'Street', image: 'https://images.unsplash.com/photo-1503342217505-b0a15cf704d9?auto=format&fit=crop&w=1400&q=80', href: '/productdetail' },
-  { id: 'varsity-tee', title: 'Varsity Tee', price: 44, tag: 'Retro', image: 'https://images.unsplash.com/photo-1491553895911-0055eca6402d?auto=format&fit=crop&w=1400&q=80', href: '/productdetail' },
-];
 
 export default function SearchPage() {
   const params = useSearchParams();
   const q = (params.get('q') || '').trim();
 
-  const results = useMemo(() => {
-    if (!q) return CATALOG;
-    const term = q.toLowerCase();
-    return CATALOG.filter(
-      (i) => i.title.toLowerCase().includes(term) || (i.tag || '').toLowerCase().includes(term)
-    );
+  const [results, setResults] = useState<Item[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSearchResults = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        let response;
+        if (q) {
+          // Search with query
+          response = await publicProductService.searchProducts(q, 50);
+        } else {
+          // No query - show all products
+          response = await publicProductService.getAllProducts(50);
+        }
+
+        // Transform API products to Item format
+        const transformedResults: Item[] = response.data.map((product: PublicProduct) => {
+          // Handle image for variant products
+          let imageUrl = product.thumbnailUrl || (product.bannerUrls && product.bannerUrls[0]) || '/images/placeholder.png';
+
+          if (product.productType === 'variant' && product.variants && product.variants.length > 0) {
+            const firstVariantColor = product.variants[0].color;
+            if (firstVariantColor && product.colorMedia?.[firstVariantColor]?.thumbnailUrl) {
+              imageUrl = product.colorMedia[firstVariantColor].thumbnailUrl;
+            }
+          }
+
+          // Add backend URL prefix if not already present
+          if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/images/')) {
+            imageUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}${imageUrl}`;
+          }
+
+          return {
+            id: product._id,
+            title: product.name,
+            price: product.discountedPrice || product.price,
+            tag: product.category,
+            image: imageUrl,
+            href: `/productdetail/${product._id}`,
+          };
+        });
+
+        setResults(transformedResults);
+      } catch (error) {
+        console.error('Error fetching search results:', error);
+        setError('Failed to load products');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSearchResults();
   }, [q]);
 
   return (
@@ -37,16 +77,33 @@ export default function SearchPage() {
       {/* Hero */}
       <section className="px-6 md:px-10 lg:px-20 pt-16 pb-8">
         <div className="mx-auto max-w-7xl">
-          <SearchHero query={q} count={results.length} />
+          <SearchHero query={q} count={isLoading ? 0 : results.length} />
         </div>
       </section>
 
       {/* Body */}
       <section className="px-6 md:px-10 lg:px-20 pb-20">
         <div className="mx-auto max-w-7xl">
-          {results.length === 0 ? (
+          {isLoading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-stone-900 mx-auto"></div>
+                <p className="mt-4 text-stone-600">Searching products...</p>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="text-center py-20">
+              <p className="text-red-600 text-lg">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-stone-900 hover:bg-stone-800"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : results.length === 0 ? (
             <SearchEmpty query={q}>
-              <SearchChips chips={['tee', 'hoodie', 'Poetry', 'Street']} />
+              <SearchChips chips={['tee', 'hoodie', 'shirt', 'pants']} />
             </SearchEmpty>
           ) : (
             <SearchResults items={results} />

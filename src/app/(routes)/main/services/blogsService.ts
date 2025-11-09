@@ -26,34 +26,156 @@ export interface BlogsResponse {
   success: boolean;
   message: string;
   data: FeaturedBlog[];
+  pagination?: {
+    total: number;
+    page: number;
+    pages: number;
+    limit: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
 }
 
 export const blogsService = {
+  /**
+   * Get all blogs with pagination
+   */
+  async getAllBlogs(page: number = 1, limit: number = 10): Promise<{ blogs: FeaturedBlog[]; pagination: any }> {
+    try {
+      const response = await axios.get<BlogsResponse>(`${API_BASE_URL}/blogs?page=${page}&limit=${limit}&status=published`);
+
+      if (!response.data.success || !response.data.data) {
+        throw new Error(response.data.message || 'Failed to fetch blogs');
+      }
+
+      // Transform the data to ensure consistent format
+      const blogs = response.data.data.map(blog => ({
+        _id: blog._id,
+        title: blog.title,
+        slug: blog.slug || `blog-${blog._id}`,
+        content: blog.content,
+        excerpt: blog.excerpt,
+        status: blog.status,
+        categoryId: blog.categoryId,
+        category: blog.categoryId?.name || blog.category || '',
+        image: this.getAbsoluteImageUrl(blog.image),
+        thumbnail: this.getAbsoluteImageUrl(blog.thumbnail),
+        createdAt: blog.createdAt,
+        updatedAt: blog.updatedAt
+      }));
+
+      return {
+        blogs,
+        pagination: response.data.pagination || {
+          total: blogs.length,
+          page: 1,
+          pages: 1,
+          limit: limit,
+          hasNextPage: false,
+          hasPreviousPage: false
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching blogs:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get latest blogs with limit
+   */
+  async getLatestBlogs(limit: number = 4): Promise<FeaturedBlog[]> {
+    try {
+      const response = await axios.get<BlogsResponse>(`${API_BASE_URL}/blogs?limit=${limit}&status=published&sort=-createdAt`);
+
+      if (!response.data.success || !response.data.data) {
+        throw new Error(response.data.message || 'Failed to fetch latest blogs');
+      }
+
+      // Transform the data to ensure consistent format
+      return response.data.data.map(blog => ({
+        _id: blog._id,
+        title: blog.title,
+        slug: blog.slug || `blog-${blog._id}`,
+        content: blog.content,
+        excerpt: blog.excerpt,
+        status: blog.status,
+        categoryId: blog.categoryId,
+        category: blog.categoryId?.name || blog.category || '',
+        image: this.getAbsoluteImageUrl(blog.image),
+        thumbnail: this.getAbsoluteImageUrl(blog.thumbnail),
+        createdAt: blog.createdAt,
+        updatedAt: blog.updatedAt
+      }));
+    } catch (error) {
+      console.error('Error fetching latest blogs:', error);
+      throw error;
+    }
+  },
+
   /**
    * Get featured blogs (latest 3 published blogs) for BlogsSection
    */
   async getFeaturedBlogs(): Promise<FeaturedBlog[]> {
     try {
       const response = await axios.get<BlogsResponse>(`${API_BASE_URL}/blogs/featured?limit=3`);
-      
+
       if (!response.data.success || !response.data.data) {
         throw new Error(response.data.message || 'Failed to fetch featured blogs');
       }
-      
+
       // Transform the data to ensure consistent format
       return response.data.data.map(blog => ({
-        ...blog,
-        // Extract category name from populated categoryId or use existing category field
+        _id: blog._id,
+        title: blog.title,
+        slug: blog.slug || `blog-${blog._id}`,
+        content: blog.content,
+        excerpt: blog.excerpt,
+        status: blog.status,
+        categoryId: blog.categoryId,
         category: blog.categoryId?.name || blog.category || '',
-        // Ensure image URL is absolute
         image: this.getAbsoluteImageUrl(blog.image),
-        thumbnail: this.getAbsoluteImageUrl(blog.thumbnail)
+        thumbnail: this.getAbsoluteImageUrl(blog.thumbnail),
+        createdAt: blog.createdAt,
+        updatedAt: blog.updatedAt
       }));
     } catch (error) {
       console.error('Error fetching featured blogs:', error);
-      
-      // Return fallback blogs if API fails
-      return this.getFallbackBlogs();
+      throw error;
+    }
+  },
+
+  /**
+   * Get blog by slug
+   */
+  async getBlogBySlug(slug: string): Promise<FeaturedBlog> {
+    try {
+      const response = await axios.get<BlogsResponse>(`${API_BASE_URL}/blogs/slug/${slug}`);
+
+      if (!response.data.success || !response.data.data) {
+        throw new Error(response.data.message || 'Failed to fetch blog');
+      }
+
+      const blog = Array.isArray(response.data.data) ? response.data.data[0] : response.data.data;
+
+      // Transform the data to ensure consistent format
+      return {
+        _id: blog._id,
+        title: blog.title,
+        slug: blog.slug || `blog-${blog._id}`,
+        content: blog.content,
+        excerpt: blog.excerpt,
+        status: blog.status,
+        categoryId: blog.categoryId,
+        category: blog.categoryId?.name || blog.category || '',
+        image: this.getAbsoluteImageUrl(blog.image),
+        thumbnail: this.getAbsoluteImageUrl(blog.thumbnail),
+        createdAt: blog.createdAt,
+        updatedAt: blog.updatedAt
+      };
+    } catch (error) {
+      console.error('Error fetching blog by slug:', error);
+      throw error;
     }
   },
 
@@ -62,56 +184,12 @@ export const blogsService = {
    */
   getAbsoluteImageUrl(imagePath?: string): string | undefined {
     if (!imagePath) return undefined;
-    
+
     // If already absolute URL, return as is
     if (imagePath.startsWith('http')) return imagePath;
-    
+
     // Convert relative to absolute
     return `${API_BASE_URL}${imagePath.startsWith('/') ? imagePath : `/${imagePath}`}`;
-  },
-
-  /**
-   * Fallback blogs when API is not available
-   */
-  getFallbackBlogs(): FeaturedBlog[] {
-    return [
-      {
-        _id: '1',
-        title: 'Essential Gym Equipment for Home Workouts',
-        slug: 'essential-gym-equipment-home-workouts',
-        content: 'Discover the must-have gym equipment that will transform your home into a personal fitness studio. From resistance bands to adjustable dumbbells, we cover everything you need to get started.',
-        excerpt: 'Transform your home into a personal fitness studio with these essential pieces of equipment.',
-        image: '/images/gym-2.svg',
-        status: 'published',
-        category: 'Equipment Guide',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        _id: '2',
-        title: 'Top 10 High-Protein Snacks for Athletes',
-        slug: 'top-10-high-protein-snacks-athletes',
-        content: 'Fuel your workouts and recovery with these delicious, protein-packed snacks. Perfect for pre and post-workout nutrition to maximize your fitness results.',
-        excerpt: 'Discover protein-rich snacks that will fuel your workouts and aid recovery.',
-        image: '/images/gym-4.svg',
-        status: 'published',
-        category: 'Nutrition',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        _id: '3',
-        title: 'Beginner\'s Guide to Strength Training',
-        slug: 'beginners-guide-strength-training',
-        content: 'Start your strength training journey with confidence. Learn proper form, essential exercises, and progressive techniques to build muscle safely and effectively.',
-        excerpt: 'Master the basics of strength training with our comprehensive beginner guide.',
-        image: '/images/gym-6.svg',
-        status: 'published',
-        category: 'Training',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
   }
 };
 

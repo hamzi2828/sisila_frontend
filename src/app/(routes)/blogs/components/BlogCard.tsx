@@ -11,12 +11,13 @@ export type BlogCardPost = {
   date: string;
   read: string;
   image: string;
+  slug: string;
 };
 
 export default function BlogCard({ post }: { post: BlogCardPost }) {
   return (
     <Link
-      href="/blogdetail"
+      href={`/blogdetail?slug=${post.slug}`}
       className="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 hover:shadow-md transition"
     >
       <div className="relative w-full pt-[66%] bg-stone-100">

@@ -1,79 +1,85 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import blogsService, { FeaturedBlog } from '../services/blogsService';
 
 export type BlogPost = {
-  id: string; // kept for future use, not used in href
+  id: string;
   title: string;
   excerpt: string;
   tag: string;
   date: string;
   read: string;
   image: string;
+  slug: string;
 };
 
-export const HOMEPAGE_POSTS: BlogPost[] = [
-  {
-    id: 'poets-behind-prints',
-    title: 'The Poets Behind the Prints: Ghalib to Elia',
-    excerpt:
-      'Tracing verses into visuals — how couplets evolve into composition, texture, and type for the Poets Series.',
-    tag: 'Poets Series',
-    date: 'May 12, 2025',
-    read: '6 min read',
-    image:
-      'https://images.unsplash.com/photo-1493236296276-d17357e28875?auto=format&fit=crop&w=1600&q=80',
-  },
-  {
-    id: 'designing-echoes',
-    title: 'Designing Echoes of the Winds: Palette + Texture',
-    excerpt:
-      'From dunes and ocean breath to fabric drape — crafting the airy motion behind Echoes of the Winds.',
-    tag: 'Theme — Echoes',
-    date: 'May 4, 2025',
-    read: '4 min read',
-    image:
-      'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1600&q=80',
-  },
-  {
-    id: 'street-to-studio',
-    title: 'From Street to Studio: Building the Core Collection',
-    excerpt:
-      'Loose fits, graphic hits — the editorial process behind our attitude-forward street pieces.',
-    tag: 'Category — Street',
-    date: 'Apr 28, 2025',
-    read: '5 min read',
-    image:
-      'https://images.unsplash.com/photo-1547448415-e9f5b28e570d?auto=format&fit=crop&w=1600&q=80',
-  },
-  {
-    id: 'type-as-identity',
-    title: 'Typography as Identity: Type-Led Graphics',
-    excerpt:
-      'Why letters carry culture — composing hierarchy, rhythm, and contrast in type-first designs.',
-    tag: 'Category — Typography',
-    date: 'Apr 20, 2025',
-    read: '7 min read',
-    image:
-      'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1600&q=80',
-  },
-];
+// Helper function to transform backend blog to BlogPost format
+const transformBlogToPost = (blog: FeaturedBlog): BlogPost => {
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const calculateReadTime = (content?: string) => {
+    if (!content) return '5 min read';
+    const wordsPerMinute = 200;
+    const wordCount = content.split(/\s+/).length;
+    const minutes = Math.ceil(wordCount / wordsPerMinute);
+    return `${minutes} min read`;
+  };
+
+  return {
+    id: blog._id,
+    title: blog.title,
+    excerpt: blog.excerpt || blog.content?.substring(0, 150) + '...' || '',
+    tag: blog.category || 'Uncategorized',
+    date: formatDate(blog.createdAt),
+    read: calculateReadTime(blog.content),
+    image: blog.image || blog.thumbnail || 'https://images.unsplash.com/photo-1493236296276-d17357e28875?auto=format&fit=crop&w=1600&q=80',
+    slug: blog.slug || '',
+  };
+};
 
 export default function BlogsSection({
-  posts = HOMEPAGE_POSTS,
   className = '',
   title = 'Stories',
   subtitle = 'Culture, craft, and the making of Silsila — behind the prints, palettes, and fits.',
 }: {
-  posts?: BlogPost[];
   className?: string;
   title?: string;
   subtitle?: string;
 }) {
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchBlogs = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const blogs = await blogsService.getLatestBlogs(4);
+        console.log('Fetched blogs:', blogs); // Debug log
+        const transformedPosts = blogs.map(transformBlogToPost);
+        console.log('Transformed posts:', transformedPosts); // Debug log
+        setPosts(transformedPosts);
+      } catch (error) {
+        console.error('Error fetching blogs:', error);
+        setError('Failed to load blogs');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBlogs();
+  }, []);
+
   return (
     <section id="stories" className={`px-6 md:px-10 lg:px-20 py-12 ${className}`}>
-      <div className="mx-auto  ">
+      <div className="mx-auto">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -98,12 +104,29 @@ export default function BlogsSection({
           </div>
         </div>
 
-        {/* Grid */}
-        <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {posts.map((post, i) => (
-            <StoryCard key={post.id} post={post} priority={i < 2} />
-          ))}
-        </div>
+        {/* Content */}
+        {isLoading ? (
+          <div className="mt-6 flex justify-center items-center py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-stone-900 mx-auto"></div>
+              <p className="mt-4 text-stone-600">Loading blogs...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="mt-6 text-center py-20">
+            <p className="text-red-600">{error}</p>
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="mt-6 text-center py-20">
+            <p className="text-stone-600">No blogs available at the moment.</p>
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {posts.map((post, i) => (
+              <StoryCard key={post.id} post={post} priority={i < 2} />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -112,7 +135,7 @@ export default function BlogsSection({
 function StoryCard({ post, priority = false }: { post: BlogPost; priority?: boolean }) {
   return (
     <Link
-      href="/blogdetail"
+      href={`/blogdetail?slug=${post.slug}`}
       className="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 hover:shadow-md transition"
     >
       <div className="relative w-full pt-[66%] bg-stone-100">
