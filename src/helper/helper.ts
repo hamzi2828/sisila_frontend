@@ -12,6 +12,8 @@ export interface JwtBasePayload {
     email: string;
     firstName: string;
     lastName: string;
+    phone?: string;
+    phoneNumber?: string;
   }
   
   const TOKEN_KEY = 'auth_token';
