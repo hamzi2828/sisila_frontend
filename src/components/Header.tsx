@@ -11,13 +11,13 @@ import HeaderActions from './components/HeaderActions';
 import MobileDrawer from './components/MobileDrawer';
 import { navItems, megaMenuData } from './components/headerData';
 import { useOnClickOutside, useKey, useLockBody } from './components/useHeaderHooks';
+import { cartHelper } from '@/helper/cartHelper';
 
 type HeaderProps = {
-  cartCount?: number;
   logoSrc?: string;
 };
 
-const Header: React.FC<HeaderProps> = ({ cartCount = 2, logoSrc = '/images/silsila-logo.png' }) => {
+const Header: React.FC<HeaderProps> = ({ logoSrc = '/images/silsila-logo.png' }) => {
   const router = useRouter();
 
   const [announceOpen, setAnnounceOpen] = useState(true);
@@ -25,6 +25,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount = 2, logoSrc = '/images/silsi
   const [searchOpen, setSearchOpen] = useState(false);
   const [desktopOpen, setDesktopOpen] = useState<number | null>(null);
   const [hasScrolled, setHasScrolled] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
 
   const navWrapRef = useRef<HTMLDivElement>(null);
 
@@ -35,6 +36,34 @@ const Header: React.FC<HeaderProps> = ({ cartCount = 2, logoSrc = '/images/silsi
     setDesktopOpen(null);
   });
   useLockBody(mobileOpen || searchOpen);
+
+  // Initialize cart count on mount
+  useEffect(() => {
+    const updateCartCount = () => {
+      const count = cartHelper.getCartItemsCount();
+      setCartCount(count);
+    };
+
+    // Initial load
+    updateCartCount();
+
+    // Listen for cart updates
+    const handleCartUpdate = () => {
+      updateCartCount();
+    };
+
+    const handleCartCleared = () => {
+      setCartCount(0);
+    };
+
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    window.addEventListener('cartCleared', handleCartCleared);
+
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdate);
+      window.removeEventListener('cartCleared', handleCartCleared);
+    };
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setHasScrolled(window.scrollY > 4);

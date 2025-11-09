@@ -1,9 +1,14 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { addToCart } from '@/helper/cartHelper';
+import { toggleWishlist, isInWishlist } from '@/helper/wishlistHelper';
 
 export default function ProductBuyBox({
   product,
+  productId,
+  rawProduct,
   money,
   color,
   setColor,
@@ -11,6 +16,8 @@ export default function ProductBuyBox({
   setSize,
 }: {
   product: any;
+  productId: string;
+  rawProduct: any;
   money: (v: number) => string;
   color: string | undefined;
   setColor: (v: string) => void;
@@ -18,6 +25,97 @@ export default function ProductBuyBox({
   setSize: (v: string) => void;
 }) {
   const inStock = product.stock !== 'out';
+  const [isInWishlistState, setIsInWishlistState] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isTogglingWishlist, setIsTogglingWishlist] = useState(false);
+
+  // Check if product is in wishlist on mount
+  useEffect(() => {
+    setIsInWishlistState(isInWishlist(productId));
+  }, [productId]);
+
+  // Listen for wishlist updates
+  useEffect(() => {
+    const handleWishlistUpdate = (event: CustomEvent) => {
+      const { productId: updatedProductId, isAdded } = event.detail;
+      if (updatedProductId === productId) {
+        setIsInWishlistState(isAdded);
+      }
+    };
+
+    window.addEventListener('wishlistUpdated', handleWishlistUpdate as EventListener);
+    return () => {
+      window.removeEventListener('wishlistUpdated', handleWishlistUpdate as EventListener);
+    };
+  }, [productId]);
+
+  const handleAddToCart = async () => {
+    if (product.stock === 'out') return;
+
+    setIsAddingToCart(true);
+    try {
+      // Find the selected variant if product has variants
+      let variant = undefined;
+      if (rawProduct?.productType === 'variant' && rawProduct?.variants && (color || size)) {
+        const matchingVariant = rawProduct.variants.find((v: any) =>
+          (!color || v.color === color) && (!size || v.size === size)
+        );
+
+        if (matchingVariant) {
+          variant = {
+            variantId: matchingVariant._id || `${color}-${size}`,
+            color: matchingVariant.color,
+            size: matchingVariant.size,
+            price: matchingVariant.price,
+            variantSku: matchingVariant.sku,
+            originalVariantStock: matchingVariant.stock
+          };
+        }
+      }
+
+      // Get the thumbnail URL
+      let thumbnailUrl = product.images[0];
+      if (color && rawProduct?.colorMedia?.[color]?.thumbnailUrl) {
+        thumbnailUrl = rawProduct.colorMedia[color].thumbnailUrl.startsWith('http')
+          ? rawProduct.colorMedia[color].thumbnailUrl
+          : `${process.env.NEXT_PUBLIC_BACKEND_URL}${rawProduct.colorMedia[color].thumbnailUrl}`;
+      }
+
+      await addToCart({
+        productId: productId,
+        productName: product.title,
+        price: product.price,
+        discountedPrice: rawProduct?.discountedPrice,
+        quantity: 1,
+        variant,
+        thumbnailUrl,
+        stock: rawProduct?.stock
+      });
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
+
+  const handleToggleWishlist = async () => {
+    setIsTogglingWishlist(true);
+    try {
+      const result = await toggleWishlist({
+        productId: productId,
+        productName: product.title,
+        price: product.price,
+        discountedPrice: rawProduct?.discountedPrice,
+        thumbnailUrl: product.images[0],
+        category: rawProduct?.category
+      });
+      setIsInWishlistState(result);
+    } catch (error) {
+      console.error('Error toggling wishlist:', error);
+    } finally {
+      setIsTogglingWishlist(false);
+    }
+  };
 
   const pretty = (id: string) =>
     id.split('-').map((s) => s[0].toUpperCase() + s.slice(1)).join(' ');
@@ -103,18 +201,53 @@ export default function ProductBuyBox({
       ) : null}
 
       <div className="mt-6 flex items-center gap-3">
-        <Link href="/cart" className="flex-1">
-          <button
-            disabled={product.stock === 'out'}
-            className={['inline-flex w-full items-center justify-center rounded-full bg-black px-5 py-3 text-sm font-medium text-white transition', product.stock === 'out' ? 'opacity-60' : 'hover:bg-stone-800'].join(' ')}
-          >
-            Add to bag
-          </button>
-        </Link>
-        <button aria-label="Wishlist" className="inline-flex items-center justify-center rounded-full border border-stone-300/80 bg-white p-3 hover:bg-stone-50" title="Add to wishlist">
-          <i className="fa-regular fa-heart" aria-hidden="true" />
+        <button
+          onClick={handleAddToCart}
+          disabled={product.stock === 'out' || isAddingToCart}
+          className={[
+            'flex-1 inline-flex items-center justify-center rounded-full bg-black px-5 py-3 text-sm font-medium text-white transition',
+            product.stock === 'out' || isAddingToCart ? 'opacity-60 cursor-not-allowed' : 'hover:bg-stone-800'
+          ].join(' ')}
+        >
+          {isAddingToCart ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Adding...
+            </>
+          ) : (
+            'Add to bag'
+          )}
         </button>
-        <button aria-label="Share" className="inline-flex items-center justify-center rounded-full border border-stone-300/80 bg-white p-3 hover:bg-stone-50" onClick={async () => { try { await navigator.clipboard.writeText(window.location.href); } catch {} }} title="Share">
+        <button
+          onClick={handleToggleWishlist}
+          disabled={isTogglingWishlist}
+          aria-label={isInWishlistState ? "Remove from wishlist" : "Add to wishlist"}
+          className="inline-flex items-center justify-center rounded-full border border-stone-300/80 bg-white p-3 hover:bg-stone-50 transition disabled:opacity-60"
+          title={isInWishlistState ? "Remove from wishlist" : "Add to wishlist"}
+        >
+          {isTogglingWishlist ? (
+            <svg className="animate-spin h-5 w-5 text-stone-600" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : (
+            <i className={isInWishlistState ? "fa-solid fa-heart text-red-500" : "fa-regular fa-heart"} aria-hidden="true" />
+          )}
+        </button>
+        <button
+          aria-label="Share"
+          className="inline-flex items-center justify-center rounded-full border border-stone-300/80 bg-white p-3 hover:bg-stone-50"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(window.location.href);
+              // Optional: Show toast notification
+            } catch {}
+          }}
+          title="Share"
+        >
           <i className="fa-solid fa-share-nodes" aria-hidden="true" />
         </button>
       </div>

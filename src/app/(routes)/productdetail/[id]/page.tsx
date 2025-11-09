@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { publicProductService, type PublicProduct } from '../../main/services/publicProductService';
+import { addToCart } from '@/helper/cartHelper';
 import ProductHeader from '../components/ProductHeader';
 import ProductGallery from '../components/ProductGallery';
 import ProductBuyBox from '../components/ProductBuyBox';
@@ -254,6 +255,8 @@ export default function ProductDetailPage() {
             <aside className="lg:col-span-5">
               <ProductBuyBox
                 product={product}
+                productId={productId}
+                rawProduct={rawProduct}
                 money={money}
                 color={color}
                 setColor={setColor}
@@ -279,11 +282,48 @@ export default function ProductDetailPage() {
             <p className="text-sm font-medium">{product.title}</p>
             <p className="text-xs text-stone-600">{money(product.price)}</p>
           </div>
-          <Link href="/cart">
-            <button className="inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white">
-              Add to bag
-            </button>
-          </Link>
+          <button
+            onClick={async () => {
+              if (product.stock === 'out') return;
+              try {
+                let variant = undefined;
+                if (rawProduct?.productType === 'variant' && rawProduct?.variants && (color || size)) {
+                  const matchingVariant = rawProduct.variants.find((v: any) =>
+                    (!color || v.color === color) && (!size || v.size === size)
+                  );
+                  if (matchingVariant) {
+                    variant = {
+                      variantId: matchingVariant._id || `${color}-${size}`,
+                      color: matchingVariant.color,
+                      size: matchingVariant.size,
+                      price: matchingVariant.price,
+                      variantSku: matchingVariant.sku,
+                      originalVariantStock: matchingVariant.stock
+                    };
+                  }
+                }
+                await addToCart({
+                  productId: productId,
+                  productName: product.title,
+                  price: product.price,
+                  discountedPrice: rawProduct?.discountedPrice,
+                  quantity: 1,
+                  variant,
+                  thumbnailUrl: product.images[0],
+                  stock: rawProduct?.stock
+                });
+              } catch (error) {
+                console.error('Error adding to cart:', error);
+              }
+            }}
+            disabled={product.stock === 'out'}
+            className={[
+              'inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white',
+              product.stock === 'out' ? 'opacity-60 cursor-not-allowed' : 'hover:bg-stone-800'
+            ].join(' ')}
+          >
+            Add to bag
+          </button>
         </div>
       </div>
     </main>
