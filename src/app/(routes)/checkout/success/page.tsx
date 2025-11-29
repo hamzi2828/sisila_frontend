@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircle, Printer, Truck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { checkoutService } from '../services/checkoutService';
 import { getAuthToken, isAuthenticated } from '@/helper/helper';
 import { toast } from 'react-hot-toast';
@@ -12,7 +12,7 @@ import { toast } from 'react-hot-toast';
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 const money = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
 
-export default function SuccessPage() {
+function SuccessPageContent() {
   const params = useSearchParams();
   const router = useRouter();
   const sessionId = params.get('session_id');
@@ -285,5 +285,22 @@ function Row({ label, value }: { label: React.ReactNode; value: React.ReactNode 
       <span className="text-stone-600">{label}</span>
       <span className="text-stone-800">{value}</span>
     </div>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-gradient-to-b from-stone-50 to-white text-stone-900">
+        <section className="px-6 md:px-10 lg:px-20 pt-16 pb-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-stone-900 mx-auto"></div>
+            <p className="mt-4 text-stone-600">Loading...</p>
+          </div>
+        </section>
+      </main>
+    }>
+      <SuccessPageContent />
+    </Suspense>
   );
 }

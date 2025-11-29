@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Instagram, Youtube, Twitter, ArrowUp, ArrowRight, Mail, MapPin, Phone } from 'lucide-react';
+import { Instagram, Youtube, Twitter, ArrowUp, Mail, MapPin, Phone } from 'lucide-react';
 import { fetchNavbarData, type Category, type Theme, type Series } from './components/navbarService';
 
 export default function Footer() {

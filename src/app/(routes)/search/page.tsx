@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import SearchHero from './components/SearchHero';
 import SearchResults from './components/SearchResults';
@@ -10,7 +10,7 @@ import { publicProductService, type PublicProduct } from '../main/services/publi
 
 type Item = { id: string; title: string; price: number; tag?: string; image: string; href: string };
 
-export default function SearchPage() {
+function SearchPageContent() {
   const params = useSearchParams();
   const q = (params.get('q') || '').trim();
 
@@ -111,5 +111,20 @@ export default function SearchPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-stone-900 mx-auto"></div>
+          <p className="mt-4 text-stone-600">Loading search...</p>
+        </div>
+      </div>
+    }>
+      <SearchPageContent />
+    </Suspense>
   );
 }

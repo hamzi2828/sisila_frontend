@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { publicProductService, type PublicProduct } from '../main/services/publicProductService';
@@ -21,7 +21,7 @@ type Product = {
 type PriceRange = 'All' | 'Under $40' | '$40–$60' | '$60–$80' | '$80+';
 type SortKey = 'Featured' | 'Price ↑' | 'Price ↓';
 
-export default function ShopPage() {
+function ShopPageContent() {
   const searchParams = useSearchParams();
   const collection = searchParams.get('collection') as 'theme' | 'series' | null;
   const collectionId = searchParams.get('collectionId');
@@ -225,5 +225,17 @@ export default function ShopPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function ShopPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-gradient-to-b from-stone-50 to-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-stone-300 border-t-stone-600"></div>
+      </main>
+    }>
+      <ShopPageContent />
+    </Suspense>
   );
 }

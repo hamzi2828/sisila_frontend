@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import DetailHeader from './components/DetailHeader';
 import DetailCover from './components/DetailCover';
@@ -17,7 +17,7 @@ interface RelatedBlogItem {
   href: string;
 }
 
-export default function BlogDetailPage() {
+function BlogDetailContent() {
   const searchParams = useSearchParams();
   const slug = searchParams.get('slug');
 
@@ -147,5 +147,20 @@ export default function BlogDetailPage() {
 
       {relatedBlogs.length > 0 && <DetailRelated items={relatedBlogs} />}
     </>
+  );
+}
+
+export default function BlogDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-stone-900 mx-auto"></div>
+          <p className="mt-4 text-stone-600">Loading blog...</p>
+        </div>
+      </div>
+    }>
+      <BlogDetailContent />
+    </Suspense>
   );
 }

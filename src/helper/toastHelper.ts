@@ -30,9 +30,8 @@ class SimpleToast {
     document.body.appendChild(this.container);
   }
 
-  private createToast(message: string, type: 'success' | 'error' | 'loading', options: ToastOptions = {}): HTMLElement {
+  private createToast(message: string, type: 'success' | 'error' | 'loading'): HTMLElement {
     const toast = document.createElement('div');
-    const { duration = 3000 } = options;
 
     const bgColor = {
       success: '#10b981',
@@ -86,7 +85,7 @@ class SimpleToast {
     }
 
     this.createContainer();
-    const toast = this.createToast(message, type, options);
+    const toast = this.createToast(message, type);
     
     if (this.container) {
       this.container.appendChild(toast);
