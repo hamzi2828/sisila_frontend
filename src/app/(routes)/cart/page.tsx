@@ -544,7 +544,6 @@ export default function CartPage() {
           >
             Your Bag
           </h1>
-          <p className="mt-2 text-stone-600">Free shipping on orders $75+.</p>
 
           {error && (
             <div className="mt-4 rounded-lg bg-yellow-50 border border-yellow-200 p-4">

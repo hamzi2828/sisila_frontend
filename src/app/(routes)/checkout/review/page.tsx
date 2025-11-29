@@ -241,10 +241,6 @@ export default function ReviewPage() {
                 {placing ? 'Placing order…' : 'Place order'}
               </button>
 
-              {/* Guarantee */}
-              <div className="mt-3 text-center text-xs text-stone-600">
-                Secure checkout. Free shipping on orders $75+. 30‑day returns.
-              </div>
             </div>
           </div>
         </div>

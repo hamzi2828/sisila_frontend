@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Instagram, Youtube, Twitter, ArrowUp, ArrowRight, Mail, MapPin, Phone } from 'lucide-react';
+import { fetchNavbarData, type Category, type Theme, type Series } from './components/navbarService';
 
 export default function Footer() {
   const year = new Date().getFullYear();
@@ -106,6 +107,24 @@ function Newsletter() {
 
 /* Links + brand */
 function LinksAndBrand() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [series, setSeries] = useState<Series[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const data = await fetchNavbarData();
+        setCategories(data.categories.slice(0, 4));
+        setThemes(data.themes.slice(0, 4));
+        setSeries(data.series.slice(0, 4));
+      } catch (error) {
+        console.error('Error loading footer data:', error);
+      }
+    };
+    loadData();
+  }, []);
+
   const cols = [
     { title: 'Shop', links: [
       { label: 'All Products', href: '/shop' },
@@ -115,24 +134,24 @@ function LinksAndBrand() {
       { label: 'Wishlist', href: '/wishlist' },
     ]},
     { title: 'Categories', links: [
-      { label: 'Poetry', href: '/categories#poetry' },
-      { label: 'Witty', href: '/categories#witty' },
-      { label: 'Artistic', href: '/categories#artistic' },
-      { label: 'Street', href: '/categories#street' },
-      { label: 'All Categories →', href: '/categories', subtle: true },
+      ...categories.map((cat) => ({
+        label: cat.name,
+        href: `/shop?category=${encodeURIComponent(cat.name)}`,
+      })),
+      { label: 'All Categories →', href: '/shop', subtle: true },
     ]},
     { title: 'Themes', links: [
-      { label: 'Southeastern Hymns', href: '/themes#southeastern-hymns' },
-      { label: 'Artistic Passion', href: '/themes#artistic-passion' },
-      { label: 'Echoes of the Winds', href: '/themes#echoes-of-the-winds' },
-      { label: 'Uplifting Culture', href: '/themes#uplifting-culture' },
+      ...themes.map((theme) => ({
+        label: theme.title,
+        href: `/themes#${theme.id}`,
+      })),
       { label: 'All Themes →', href: '/themes', subtle: true },
     ]},
     { title: 'Series', links: [
-      { label: 'Poets', href: '/series#poets' },
-      { label: 'Alphabets', href: '/series#alphabets' },
-      { label: 'Cinema', href: '/series#cinema' },
-      { label: 'Anime', href: '/series#anime' },
+      ...series.map((s) => ({
+        label: s.title,
+        href: `/series#${s.id}`,
+      })),
       { label: 'All Series →', href: '/series', subtle: true },
     ]},
     { title: 'Company', links: [
@@ -195,7 +214,6 @@ function LinksAndBrand() {
         </div>
 
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Pill>Free shipping on orders $75+</Pill>
           <Pill>30‑day returns & exchanges</Pill>
           <Pill>Secure payments (Visa • MasterCard • PayPal)</Pill>
         </div>
