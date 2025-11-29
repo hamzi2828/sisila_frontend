@@ -21,7 +21,7 @@ export type MegaMenu = {
 };
 
 export const navItems: NavItem[] = [
-  { label: 'Shop', hasDropdown: true },
+  { label: 'Shop', href: '/shop' },
   { label: 'Categories', hasDropdown: true },
   { label: 'Themes', hasDropdown: true },
   { label: 'Series', hasDropdown: true },
@@ -96,13 +96,6 @@ export const megaMenuData: Record<string, MegaMenu> = {
           { label: 'Uplifting Culture', href: '/themes#uplifting-culture' },
         ],
       },
-      {
-        heading: 'Quick Links',
-        links: [
-          { label: 'Explore Themes', href: '/themes' },
-          { label: 'Lookbook', href: '/lookbook' },
-        ],
-      },
     ],
     image: {
       src: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&q=80',
@@ -120,16 +113,6 @@ export const megaMenuData: Record<string, MegaMenu> = {
           { label: 'Alphabets', href: '/series#alphabets' },
           { label: 'Cinema', href: '/series#cinema' },
           { label: 'Anime', href: '/series#anime' },
-        ],
-      },
-      {
-        heading: 'Poets — Featured',
-        links: [
-          { label: 'Ghalib', href: '/series#poets' },
-          { label: 'Faiz Ahmed Faiz', href: '/series#poets' },
-          { label: 'John Elia', href: '/series#poets' },
-          { label: 'Habib Jalib', href: '/series#poets' },
-          { label: 'Muneer Niazi', href: '/series#poets' },
         ],
       },
     ],

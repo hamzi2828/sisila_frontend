@@ -92,7 +92,6 @@ function Newsletter() {
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs text-neutral-200">
-                  <Badge>Free shipping $75+</Badge>
                   <Badge>30‑day returns</Badge>
                   <Badge>Secure checkout</Badge>
                 </div>

@@ -9,10 +9,11 @@ import SearchOverlay from './components/SearchOverlay';
 import Navigation from './components/Navigation';
 import HeaderActions from './components/HeaderActions';
 import MobileDrawer from './components/MobileDrawer';
-import { navItems, megaMenuData } from './components/headerData';
+import { navItems, megaMenuData, MegaMenu } from './components/headerData';
 import { useOnClickOutside, useKey, useLockBody } from './components/useHeaderHooks';
 import { cartHelper } from '@/helper/cartHelper';
 import { wishlistHelper } from '@/helper/wishlistHelper';
+import { fetchNavbarData, buildDynamicMegaMenus } from './components/navbarService';
 
 type HeaderProps = {
   logoSrc?: string;
@@ -28,6 +29,7 @@ const Header: React.FC<HeaderProps> = ({ logoSrc = '/images/silsila-logo.png' })
   const [hasScrolled, setHasScrolled] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
+  const [dynamicMega, setDynamicMega] = useState<Record<string, MegaMenu>>(megaMenuData);
 
   const navWrapRef = useRef<HTMLDivElement>(null);
 
@@ -107,6 +109,27 @@ const Header: React.FC<HeaderProps> = ({ logoSrc = '/images/silsila-logo.png' })
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Fetch dynamic navbar data (Categories, Themes, Series)
+  useEffect(() => {
+    const loadNavbarData = async () => {
+      try {
+        const data = await fetchNavbarData();
+        const dynamicMenus = buildDynamicMegaMenus(data);
+
+        // Merge static Shop menu with dynamic Categories, Themes, Series
+        setDynamicMega({
+          ...megaMenuData, // Keep static Shop menu
+          ...dynamicMenus, // Override with dynamic data
+        });
+      } catch (error) {
+        console.error('Error loading navbar data:', error);
+        // Keep using static data on error
+      }
+    };
+
+    loadNavbarData();
+  }, []);
+
   const handleSearchSubmit = (query: string) => {
     const q = query.trim();
     if (!q) return;
@@ -133,7 +156,7 @@ const Header: React.FC<HeaderProps> = ({ logoSrc = '/images/silsila-logo.png' })
 
           {/* Center: Desktop nav */}
           <div className="hidden lg:block" ref={navWrapRef}>
-            <Navigation items={navItems} desktopOpen={desktopOpen} setDesktopOpen={setDesktopOpen} />
+            <Navigation items={navItems} mega={dynamicMega} desktopOpen={desktopOpen} setDesktopOpen={setDesktopOpen} />
           </div>
 
           {/* Right: actions */}
@@ -145,7 +168,7 @@ const Header: React.FC<HeaderProps> = ({ logoSrc = '/images/silsila-logo.png' })
       <SearchOverlay isOpen={searchOpen} onClose={() => setSearchOpen(false)} onSubmit={handleSearchSubmit} />
 
       {/* Mobile drawer */}
-      <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} logoSrc={logoSrc} navItems={navItems} mega={megaMenuData} cartCount={cartCount} wishlistCount={wishlistCount} onSubmitSearch={handleSearchSubmit} />
+      <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} logoSrc={logoSrc} navItems={navItems} mega={dynamicMega} cartCount={cartCount} wishlistCount={wishlistCount} onSubmitSearch={handleSearchSubmit} />
     </header>
   );
 };

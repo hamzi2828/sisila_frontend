@@ -12,18 +12,22 @@ type MegaMenuProps = {
 };
 
 const MegaMenu: React.FC<MegaMenuProps> = ({ data, isOpen }) => {
+  // Use narrower width when only 1 section
+  const isSingleSection = data.sections.length === 1;
+  const menuWidth = isSingleSection ? 'w-[480px]' : 'w-[720px]';
+
   return (
     <div
       className={[
-        'absolute left-1/2 top-full z-40 mt-4 w-[720px] -translate-x-1/2 rounded-xl border border-gray-200 bg-white p-6 shadow-2xl',
+        `absolute left-1/2 top-full z-40 mt-4 ${menuWidth} -translate-x-1/2 rounded-xl border border-gray-200 bg-white p-6 shadow-2xl`,
         isOpen ? 'visible opacity-100' : 'invisible opacity-0',
         'transition-opacity',
         "before:content-[''] before:absolute before:-top-4 before:left-0 before:h-4 before:w-full",
       ].join(' ')}
       role="menu"
     >
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 grid grid-cols-2 gap-6">
+      <div className={`grid ${isSingleSection ? 'grid-cols-2' : 'grid-cols-3'} gap-6`}>
+        <div className={isSingleSection ? '' : 'col-span-2 grid grid-cols-2 gap-6'}>
           {data.sections.map((section) => (
             <div key={section.heading}>
               <p className="mb-2 text-xs uppercase tracking-wider text-gray-500">{section.heading}</p>

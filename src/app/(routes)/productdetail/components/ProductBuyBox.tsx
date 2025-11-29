@@ -150,9 +150,7 @@ export default function ProductBuyBox({
           <i className="fa-solid fa-wand-magic-sparkles" aria-hidden="true" />
           {product.stock === 'low' ? 'Low stock' : product.stock === 'out' ? 'Out of stock' : 'In stock'}
         </span>
-        <span className="inline-flex items-center gap-2 rounded-full bg-stone-50 px-3 py-1 text-stone-700 ring-1 ring-stone-200">
-          <i className="fa-solid fa-truck" aria-hidden="true" /> Free shipping $75+
-        </span>
+
         <span className="inline-flex items-center gap-2 rounded-full bg-stone-50 px-3 py-1 text-stone-700 ring-1 ring-stone-200">
           <i className="fa-solid fa-shield-halved" aria-hidden="true" /> 30-day returns
         </span>

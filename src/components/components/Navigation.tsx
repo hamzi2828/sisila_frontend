@@ -3,16 +3,17 @@
 import React, { useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
-import { NavItem, megaMenuData } from './headerData';
+import { NavItem, MegaMenu as MegaMenuType } from './headerData';
 import MegaMenu from './MegaMenu';
 
 type NavigationProps = {
   items: NavItem[];
+  mega: Record<string, MegaMenuType>;
   desktopOpen: number | null;
   setDesktopOpen: (index: number | null) => void;
 };
 
-const Navigation: React.FC<NavigationProps> = ({ items, desktopOpen, setDesktopOpen }) => {
+const Navigation: React.FC<NavigationProps> = ({ items, mega, desktopOpen, setDesktopOpen }) => {
   const closeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -70,8 +71,8 @@ const Navigation: React.FC<NavigationProps> = ({ items, desktopOpen, setDesktopO
                 </button>
               )}
 
-              {item.hasDropdown && megaMenuData[item.label] && (
-                <MegaMenu data={megaMenuData[item.label]} isOpen={isOpen} />
+              {item.hasDropdown && mega[item.label] && (
+                <MegaMenu data={mega[item.label]} isOpen={isOpen} />
               )}
             </li>
           );
