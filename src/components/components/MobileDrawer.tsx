@@ -13,10 +13,11 @@ type MobileDrawerProps = {
   navItems: NavItem[];
   mega: Record<string, MegaMenu>;
   cartCount: number;
+  wishlistCount: number;
   onSubmitSearch: (q: string) => void;
 };
 
-const MobileDrawer: React.FC<MobileDrawerProps> = ({ open, onClose, logoSrc, navItems, mega, cartCount, onSubmitSearch }) => {
+const MobileDrawer: React.FC<MobileDrawerProps> = ({ open, onClose, logoSrc, navItems, mega, cartCount, wishlistCount, onSubmitSearch }) => {
   const [openMobile, setOpenMobile] = useState<number[]>([]);
   const [q, setQ] = useState('');
 
@@ -142,10 +143,15 @@ const MobileDrawer: React.FC<MobileDrawerProps> = ({ open, onClose, logoSrc, nav
               <Link
                 href="/wishlist"
                 aria-label="Wishlist"
-                className="rounded p-2 hover:bg-gray-100 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-95 group"
+                className="relative rounded p-2 hover:bg-gray-100 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-95 group"
                 onClick={onClose}
               >
                 <Heart className="h-[20px] w-[20px] transition-transform duration-200 group-hover:scale-110" aria-hidden="true" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold text-white">
+                    {wishlistCount > 99 ? '99+' : wishlistCount}
+                  </span>
+                )}
               </Link>
               <Link
                 href="/cart"

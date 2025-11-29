@@ -12,6 +12,7 @@ import MobileDrawer from './components/MobileDrawer';
 import { navItems, megaMenuData } from './components/headerData';
 import { useOnClickOutside, useKey, useLockBody } from './components/useHeaderHooks';
 import { cartHelper } from '@/helper/cartHelper';
+import { wishlistHelper } from '@/helper/wishlistHelper';
 
 type HeaderProps = {
   logoSrc?: string;
@@ -26,6 +27,7 @@ const Header: React.FC<HeaderProps> = ({ logoSrc = '/images/silsila-logo.png' })
   const [desktopOpen, setDesktopOpen] = useState<number | null>(null);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [cartCount, setCartCount] = useState(0);
+  const [wishlistCount, setWishlistCount] = useState(0);
 
   const navWrapRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +64,39 @@ const Header: React.FC<HeaderProps> = ({ logoSrc = '/images/silsila-logo.png' })
     return () => {
       window.removeEventListener('cartUpdated', handleCartUpdate);
       window.removeEventListener('cartCleared', handleCartCleared);
+    };
+  }, []);
+
+  // Initialize wishlist count on mount
+  useEffect(() => {
+    const updateWishlistCount = () => {
+      const count = wishlistHelper.getWishlistItemsCount();
+      setWishlistCount(count);
+    };
+
+    // Sync wishlist from database first, then update count
+    const initWishlist = async () => {
+      await wishlistHelper.syncWishlistFromDatabase();
+      updateWishlistCount();
+    };
+
+    initWishlist();
+
+    // Listen for wishlist updates
+    const handleWishlistUpdate = () => {
+      updateWishlistCount();
+    };
+
+    const handleWishlistCleared = () => {
+      setWishlistCount(0);
+    };
+
+    window.addEventListener('wishlistUpdated', handleWishlistUpdate);
+    window.addEventListener('wishlistCleared', handleWishlistCleared);
+
+    return () => {
+      window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
+      window.removeEventListener('wishlistCleared', handleWishlistCleared);
     };
   }, []);
 
@@ -102,7 +137,7 @@ const Header: React.FC<HeaderProps> = ({ logoSrc = '/images/silsila-logo.png' })
           </div>
 
           {/* Right: actions */}
-          <HeaderActions cartCount={cartCount} onSearchClick={() => setSearchOpen(true)} onMobileMenuClick={() => setMobileOpen(true)} />
+          <HeaderActions cartCount={cartCount} wishlistCount={wishlistCount} onSearchClick={() => setSearchOpen(true)} onMobileMenuClick={() => setMobileOpen(true)} />
         </div>
       </div>
 
@@ -110,7 +145,7 @@ const Header: React.FC<HeaderProps> = ({ logoSrc = '/images/silsila-logo.png' })
       <SearchOverlay isOpen={searchOpen} onClose={() => setSearchOpen(false)} onSubmit={handleSearchSubmit} />
 
       {/* Mobile drawer */}
-      <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} logoSrc={logoSrc} navItems={navItems} mega={megaMenuData} cartCount={cartCount} onSubmitSearch={handleSearchSubmit} />
+      <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} logoSrc={logoSrc} navItems={navItems} mega={megaMenuData} cartCount={cartCount} wishlistCount={wishlistCount} onSubmitSearch={handleSearchSubmit} />
     </header>
   );
 };

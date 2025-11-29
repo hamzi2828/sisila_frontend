@@ -380,6 +380,59 @@ class WishlistHelper {
     }
   }
 
+  // Sync wishlist from database to localStorage
+  public async syncWishlistFromDatabase(): Promise<void> {
+    if (!this.isUserLoggedIn()) {
+      // Clear local wishlist if not logged in
+      localStorage.removeItem('wishlist');
+      window.dispatchEvent(new CustomEvent('wishlistUpdated', { detail: { synced: true } }));
+      return;
+    }
+
+    try {
+      const token = getAuthToken();
+      const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/wishlist`;
+
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.error('Failed to sync wishlist from database');
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data && data.data.products) {
+        // Map backend products to WishlistItem format
+        const wishlistItems: WishlistItem[] = data.data.products.map((item: any) => ({
+          productId: item.productId?._id || item.productId,
+          productName: item.productId?.name || item.productName || '',
+          price: item.productId?.price || item.price || 0,
+          discountedPrice: item.productId?.discountedPrice || item.discountedPrice,
+          thumbnailUrl: item.productId?.thumbnailUrl || item.thumbnailUrl,
+          category: item.productId?.category || item.category,
+          addedAt: item.addedAt,
+        }));
+
+        localStorage.setItem('wishlist', JSON.stringify(wishlistItems));
+      } else {
+        // Empty wishlist from backend
+        localStorage.setItem('wishlist', JSON.stringify([]));
+      }
+
+      // Trigger update event
+      window.dispatchEvent(new CustomEvent('wishlistUpdated', { detail: { synced: true } }));
+    } catch (error) {
+      console.error('Error syncing wishlist from database:', error);
+    }
+  }
+
   // Clear wishlist
   public clearWishlist(): void {
     try {

@@ -6,11 +6,12 @@ import { Search as SearchIcon, Heart, User, ShoppingCart, Menu } from 'lucide-re
 
 type HeaderActionsProps = {
   cartCount: number;
+  wishlistCount: number;
   onSearchClick: () => void;
   onMobileMenuClick: () => void;
 };
 
-const HeaderActions: React.FC<HeaderActionsProps> = ({ cartCount, onSearchClick, onMobileMenuClick }) => {
+const HeaderActions: React.FC<HeaderActionsProps> = ({ cartCount, wishlistCount, onSearchClick, onMobileMenuClick }) => {
   return (
     <div className="flex items-center gap-2 sm:gap-3">
       <button
@@ -24,9 +25,14 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({ cartCount, onSearchClick,
       <Link
         href="/wishlist"
         aria-label="Wishlist"
-        className="hidden rounded p-2 text-gray-800 hover:bg-gray-100 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-95 group sm:inline-flex"
+        className="relative hidden rounded p-2 text-gray-800 hover:bg-gray-100 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-95 group sm:inline-flex"
       >
         <Heart className="h-[20px] w-[20px] leading-none transition-transform duration-200 group-hover:scale-110" aria-hidden="true" />
+        {wishlistCount > 0 && (
+          <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold text-white">
+            {wishlistCount > 99 ? '99+' : wishlistCount}
+          </span>
+        )}
       </Link>
 
       <Link
