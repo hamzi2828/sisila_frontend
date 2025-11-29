@@ -28,8 +28,8 @@ type Product = {
   themeId: ThemeId;
   seriesId?: SeriesId;
   description: string;
-  materials?: string;
-  care?: string;
+  shortDescription?: string;
+  features?: string;
 };
 
 const money = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
@@ -129,9 +129,9 @@ function mapPublicProductToProduct(p: PublicProduct): Product {
     categoryId,
     themeId,
     seriesId,
-    description: p.description || 'Premium quality product',
-    materials: p.metaDescription,
-    care: 'Machine wash cold with like colors. Tumble dry low.',
+    description: p.description || '',
+    shortDescription: p.shortDescription || '',
+    features: p.features || '',
   };
 }
 

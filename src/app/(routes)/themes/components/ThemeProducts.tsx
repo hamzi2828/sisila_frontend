@@ -106,7 +106,7 @@ export default function ThemeProducts({
                   return (
                     <Link
                       key={product._id}
-                      href={`/productdetail?id=${product._id}`}
+                      href={`/productdetail/${product._id}`}
                       className="group relative overflow-hidden rounded-xl ring-1 ring-stone-200/70 bg-white hover:ring-stone-300 transition-all duration-300"
                     >
                       {/* Product Image */}

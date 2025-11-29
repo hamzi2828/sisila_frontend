@@ -15,8 +15,8 @@ type RelatedProduct = {
 
 type ProductDetails = {
   description: string;
-  materials?: string;
-  care?: string;
+  shortDescription?: string;
+  features?: string;
 };
 
 export default function ProductMore({
@@ -92,22 +92,19 @@ export default function ProductMore({
 
   return (
     <div className="mt-12">
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Accordion title="Description" defaultOpen>
-          <p className="text-stone-700">{product.description}</p>
+      {/* Row 1: Short Description (50%) + Key Features & Benefits (50%) */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Accordion title="Short Description" defaultOpen>
+          <p className="text-stone-700">{product.shortDescription || 'No short description available.'}</p>
         </Accordion>
-        <Accordion title="Fabric & Care">
-          <ul className="list-disc pl-4 text-stone-700">
-            <li>{product.materials || 'Premium cotton blend'}</li>
-            <li>{product.care || 'Machine wash cold. Tumble dry low.'}</li>
-          </ul>
+        <Accordion title="Key Features & Benefits" defaultOpen>
+          <p className="text-stone-700 whitespace-pre-line">{product.features || 'No features listed.'}</p>
         </Accordion>
-        <Accordion title="Shipping & Returns">
-          <ul className="list-disc pl-4 text-stone-700">
-            <li>Free shipping on orders $75+</li>
-            <li>30-day returns and exchanges</li>
-            <li>Ships within 1–2 business days</li>
-          </ul>
+      </div>
+      {/* Row 2: Full Description (100% width) */}
+      <div className="mt-6">
+        <Accordion title="Full Description">
+          <p className="text-stone-700 whitespace-pre-line">{product.description || 'No description available.'}</p>
         </Accordion>
       </div>
 

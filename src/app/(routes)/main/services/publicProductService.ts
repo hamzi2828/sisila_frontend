@@ -2,6 +2,8 @@ export interface PublicProduct {
   _id: string;
   name: string;
   description?: string;
+  shortDescription?: string;
+  features?: string;
   category: string;
   price: number;
   discountedPrice?: number;
