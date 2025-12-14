@@ -264,7 +264,7 @@ export default function ProductDetailPage() {
                 setSize={(v: string) => setSize(v as 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL')}
               />
             </aside>
-          </div>
+          </div> 
 
           <ProductMore
             product={product}
