@@ -43,8 +43,8 @@ const Header: React.FC<HeaderProps> = ({ logoSrc = '/images/silsila-logo.png' })
 
   // Initialize cart count on mount
   useEffect(() => {
-    const updateCartCount = () => {
-      const count = cartHelper.getCartItemsCount();
+    const updateCartCount = async () => {
+      const count = await cartHelper.fetchCartCount();
       setCartCount(count);
     };
 
@@ -71,18 +71,13 @@ const Header: React.FC<HeaderProps> = ({ logoSrc = '/images/silsila-logo.png' })
 
   // Initialize wishlist count on mount
   useEffect(() => {
-    const updateWishlistCount = () => {
-      const count = wishlistHelper.getWishlistItemsCount();
+    const updateWishlistCount = async () => {
+      const count = await wishlistHelper.fetchWishlistCount();
       setWishlistCount(count);
     };
 
-    // Sync wishlist from database first, then update count
-    const initWishlist = async () => {
-      await wishlistHelper.syncWishlistFromDatabase();
-      updateWishlistCount();
-    };
-
-    initWishlist();
+    // Initial load
+    updateWishlistCount();
 
     // Listen for wishlist updates
     const handleWishlistUpdate = () => {

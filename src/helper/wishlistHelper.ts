@@ -369,7 +369,7 @@ class WishlistHelper {
     return this.isInLocalWishlist(productId);
   }
 
-  // Get wishlist items count
+  // Get wishlist items count (local storage only - use fetchWishlistCount for accurate count)
   public getWishlistItemsCount(): number {
     try {
       const wishlist = this.getLocalWishlist();
@@ -377,6 +377,48 @@ class WishlistHelper {
     } catch (error) {
       console.error('Error getting wishlist items count:', error);
       return 0;
+    }
+  }
+
+  // Fetch wishlist count from database for logged-in users
+  public async fetchWishlistCount(): Promise<number> {
+    try {
+      const isLoggedIn = this.isUserLoggedIn();
+
+      if (!isLoggedIn) {
+        // Guest user - use local storage
+        return this.getWishlistItemsCount();
+      }
+
+      const token = getAuthToken();
+      if (!token) {
+        return this.getWishlistItemsCount();
+      }
+
+      const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/wishlist`;
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch wishlist from API');
+        return this.getWishlistItemsCount();
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data && data.data.products) {
+        return data.data.products.length;
+      }
+
+      return 0;
+    } catch (error) {
+      console.error('Error fetching wishlist count:', error);
+      return this.getWishlistItemsCount();
     }
   }
 
