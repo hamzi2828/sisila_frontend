@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Poppins, Manrope } from 'next/font/google';
 import ClientLayout from '@/components/ClientLayout';
 import './globals.css';
@@ -46,7 +46,6 @@ export const metadata: Metadata = {
   alternates: {
     canonical: '/',
   },
-  themeColor: '#0a0a0a',
   openGraph: {
     title: 'Silsila — Culturally‑inspired apparel',
     description:
@@ -74,6 +73,10 @@ export const metadata: Metadata = {
   icons: {
     icon: '/favicon.ico',
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#0a0a0a',
 };
 
 export default function RootLayout({
