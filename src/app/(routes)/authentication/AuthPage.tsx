@@ -126,8 +126,10 @@ const AuthPage: React.FC = () => {
             setRole(res.data.role);
           }
         } catch {}
+        // Notify components about auth change
+        window.dispatchEvent(new Event('authChanged'));
         alert("Signed in successfully");
-        router.replace("/");
+        router.replace("/user-detail");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Request failed";

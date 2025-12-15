@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Search as SearchIcon, Heart, User, ShoppingCart, Menu } from 'lucide-react';
+import { isAuthenticated } from '@/helper/helper';
 
 type HeaderActionsProps = {
   cartCount: number;
@@ -12,6 +13,22 @@ type HeaderActionsProps = {
 };
 
 const HeaderActions: React.FC<HeaderActionsProps> = ({ cartCount, wishlistCount, onSearchClick, onMobileMenuClick }) => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    // Check auth status on mount
+    setIsLoggedIn(isAuthenticated());
+
+    // Listen for auth changes (login/logout)
+    const handleAuthChange = () => setIsLoggedIn(isAuthenticated());
+    window.addEventListener('authChanged', handleAuthChange);
+    window.addEventListener('storage', handleAuthChange);
+
+    return () => {
+      window.removeEventListener('authChanged', handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
+    };
+  }, []);
   return (
     <div className="flex items-center gap-2 sm:gap-3">
       <button
@@ -48,13 +65,13 @@ const HeaderActions: React.FC<HeaderActionsProps> = ({ cartCount, wishlistCount,
         )}
       </Link>
 
-      <a
-        href="/authentication"
-        aria-label="Account"
+      <Link
+        href={isLoggedIn ? '/user-detail' : '/authentication'}
+        aria-label={isLoggedIn ? 'My Account' : 'Sign In'}
         className="hidden rounded p-2 text-gray-800 hover:bg-gray-100 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 active:scale-95 group sm:inline-flex"
       >
         <User className="h-[20px] w-[20px] leading-none transition-transform duration-200 group-hover:scale-110" aria-hidden="true" />
-      </a>
+      </Link>
 
       {/* Mobile menu button */}
       <button

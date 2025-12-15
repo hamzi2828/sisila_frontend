@@ -2,6 +2,9 @@
 
 import React, { useState, useMemo } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
+import { removeToken } from "@/helper/helper";
 
 export interface HeaderProps {
   userProfile: {
@@ -17,6 +20,7 @@ export interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ userProfile }) => {
+  const router = useRouter();
   const initial = (userProfile.firstName?.[0] || userProfile.email?.[0] || "?").toUpperCase();
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -33,9 +37,16 @@ export const Header: React.FC<HeaderProps> = ({ userProfile }) => {
     return !imgError;
   }, [imageSrc, imgError]);
   const showImage = hasValidImage && imgLoaded && !imgError;
+
+  const handleLogout = () => {
+    removeToken();
+    window.dispatchEvent(new Event('authChanged'));
+    router.replace('/authentication');
+  };
+
   return (
     <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8">
-      <div className="flex items-start gap-5 w-full">
+      <div className="flex items-start gap-5 flex-1">
         <div className="relative shrink-0">
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-4 border-primary relative">
             {/* Fallback shown until image loads successfully */}
@@ -100,6 +111,15 @@ export const Header: React.FC<HeaderProps> = ({ userProfile }) => {
           </div>
         </div>
       </div>
+
+      {/* Logout Button */}
+      <button
+        onClick={handleLogout}
+        className="mt-4 lg:mt-0 flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 rounded-lg transition-colors duration-200 font-medium"
+      >
+        <LogOut className="w-4 h-4" />
+        <span>Logout</span>
+      </button>
     </div>
   );
 };
