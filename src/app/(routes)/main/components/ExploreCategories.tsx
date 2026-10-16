@@ -169,7 +169,7 @@ const ExploreCategories: React.FC = () => {
         >
           {categories.map((category) => {
             const categoryImage = popularCategoriesService.getCategoryImage(category);
-            const categoryHref = `/categories/${category.slug}`;
+            const categoryHref = `/categories#${category.slug}`;
 
             return (
               <Link

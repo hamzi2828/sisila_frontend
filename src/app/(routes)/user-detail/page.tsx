@@ -47,7 +47,7 @@ const UserProfilePageContent: React.FC = () => {
 
   // Safely coerce incoming date to YYYY-MM-DD
   const toDateInput = (d?: string | null) => {
-    if (!d) return new Date().toISOString().slice(0, 10);
+    if (!d) return "";
     if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
     const iso = new Date(d).toISOString();
     return iso.slice(0, 10);
@@ -97,7 +97,7 @@ const UserProfilePageContent: React.FC = () => {
             phone: "",
             dateOfBirth: toDateInput(),
             gender: "other",
-            profileImage: "/default-avatar.png",
+            profileImage: "", // empty -> Header shows an initials avatar
             joinedDate: new Date().toISOString(),
             totalOrders: 0,
             totalSpent: 0,
@@ -150,7 +150,7 @@ const UserProfilePageContent: React.FC = () => {
       phone: "",
       dateOfBirth: "",
       gender: "other",
-      profileImage: "/images/gym1.svg",
+      profileImage: "", // empty -> Header shows an initials avatar
       joinedDate: new Date().toISOString().slice(0, 10),
       totalOrders: 0,
       totalSpent: 0,
@@ -202,7 +202,7 @@ const UserProfilePageContent: React.FC = () => {
     <main className="pt-20 bg-white">
       <style jsx global>{`
         :root {
-          --color-primary: #bee304;
+          --color-primary: #1c1917;
         }
         .text-primary {
           color: var(--color-primary);

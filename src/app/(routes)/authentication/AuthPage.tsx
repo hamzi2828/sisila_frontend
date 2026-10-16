@@ -6,6 +6,7 @@ import { LeftSide } from "./components/LeftSide";
 import { RightSide } from "./components/RightSide";
 import { signUp, login } from "./service/authService";
 import { setToken, setRole } from "@/helper/helper";
+import { toast } from "react-hot-toast";
 
 const AuthPage: React.FC = () => {
   const router = useRouter();
@@ -104,20 +105,17 @@ const AuthPage: React.FC = () => {
           email: formData.email,
           password: formData.password,
         };
-        const res = await signUp(payload);
-        console.log("Sign Up Response:", res);
-        alert("Account created successfully. Please sign in.");
+        await signUp(payload);
+        toast.success("Account created. Please sign in.");
         updateMode("signin");
         return;
       }
 
-      const action = isForgot ? "Reset Password" : "Sign In";
-      console.log(`${action} Form Data:`, formData);
       if (isForgot) {
-        alert("Password reset successful. Please sign in with your new password.");
+        // There is no self-service reset yet; point the customer to support instead of pretending.
+        toast("Password reset isn't available online yet. Email hello@silsilla.pk and we'll help you get back in.", { duration: 6000 });
         updateMode("signin");
       } else {
-        // Sign In flow
         const res = await login({ email: formData.email, password: formData.password });
         setToken(res.token);
         try {
@@ -128,12 +126,14 @@ const AuthPage: React.FC = () => {
         } catch {}
         // Notify components about auth change
         window.dispatchEvent(new Event('authChanged'));
-        alert("Signed in successfully");
-        router.replace("/user-detail");
+        toast.success("Signed in successfully");
+        const redirect = searchParams.get("redirect");
+        const safeRedirect = redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : null;
+        router.replace(safeRedirect || (res?.data?.role === "admin" ? "/admin" : "/user-detail"));
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Request failed";
-      alert(msg);
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }

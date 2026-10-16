@@ -3,62 +3,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getCurrentUser, getAuthToken, isAuthenticated } from '@/helper/helper';
+import { getCurrentUser } from '@/helper/helper';
+import { formatPrice } from '@/lib/formatPrice';
+import {
+  loadCheckoutCart,
+  calcShipping,
+  standardShippingFee,
+  EXPRESS_SHIPPING_FEE,
+  type CheckoutCartItem,
+} from './utils/checkoutCart';
 
-type CartItem = {
-  id: string;
-  title: string;
-  price: number;
-  image: string;
-  qty: number;
-  variant?: {
-    color?: string;
-    size?: string;
-  };
-};
+type CartItem = CheckoutCartItem;
 type Contact = { email: string; phone?: string };
 type Address = { name: string; line1: string; line2?: string; city: string; region: string; postal: string; country: string };
 type CheckoutState = { contact?: Contact; address?: Address; shipping?: 'standard' | 'express'; discount?: number };
 
-// Backend cart types
-type BackendCartItem = {
-  productId: {
-    _id: string;
-    name: string;
-    price: number;
-    discountedPrice?: number;
-    thumbnailUrl?: string;
-    bannerUrls?: string[];
-    productType?: string;
-    colorMedia?: {
-      [color: string]: {
-        thumbnailUrl: string;
-        bannerUrls: string[];
-      };
-    };
-    variants?: Array<{
-      variantId: string;
-      color: string;
-      size: string;
-      price: number;
-      stock: number;
-      sku: string;
-    }>;
-  };
-  quantity: number;
-  variant?: {
-    variantId?: string;
-    color?: string;
-    size?: string;
-    price?: number;
-    variantSku?: string;
-  };
-  _id?: string; // Cart item ID
-};
-
 const CHECKOUT_KEY = 'silsila_checkout';
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
-const money = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+const money = (v: number) => formatPrice(v);
 
 export default function CheckoutShippingPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -94,102 +55,13 @@ export default function CheckoutShippingPage() {
     }
   }, []);
 
-  // Fetch cart from backend
+  // Load cart (logged in: GET /api/cart, guest: localStorage)
   const fetchCart = async () => {
     try {
       setIsLoadingCart(true);
-
-      if (!isAuthenticated()) {
-        console.log('User not authenticated, skipping cart fetch');
-        setCart([]);
-        setIsLoadingCart(false);
-        return;
-      }
-
-      const token = getAuthToken();
-      const response = await fetch(`${API_BASE_URL}/api/cart`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Cart data from backend:', data);
-
-        if (data.success && data.data?.items) {
-          // Transform backend cart items to checkout format
-          const transformedCart: CartItem[] = data.data.items.map((item: BackendCartItem) => {
-            const product = item.productId;
-
-            // Get image - handle variant products with colorMedia
-            let image = '';
-
-            if (product.colorMedia && Object.keys(product.colorMedia).length > 0) {
-              // For variant products, try to get image based on selected variant color
-              if (item.variant?.variantId && product.variants) {
-                const selectedVariant = product.variants.find(v => v.variantId === item.variant?.variantId);
-                if (selectedVariant?.color && product.colorMedia[selectedVariant.color]) {
-                  image = product.colorMedia[selectedVariant.color].thumbnailUrl;
-                }
-              }
-
-              // Fallback to first available color if variant color not found
-              if (!image) {
-                const firstColor = Object.keys(product.colorMedia)[0];
-                image = product.colorMedia[firstColor]?.thumbnailUrl || '';
-              }
-            } else {
-              // For regular products, use thumbnailUrl or first banner
-              image = product.thumbnailUrl || product.bannerUrls?.[0] || '';
-            }
-
-            const fullImage = image && !image.startsWith('http') ? `${API_BASE_URL}${image}` : image;
-
-            // Get variant details
-            let variantInfo = undefined;
-            if (item.variant?.variantId && product.variants) {
-              const selectedVariant = product.variants.find(v => v.variantId === item.variant?.variantId);
-              if (selectedVariant) {
-                variantInfo = {
-                  color: selectedVariant.color,
-                  size: selectedVariant.size
-                };
-              }
-            }
-
-            console.log('Cart item image extraction:', {
-              productName: product.name,
-              hasColorMedia: !!product.colorMedia,
-              variantId: item.variant?.variantId,
-              variantInfo,
-              extractedImage: image,
-              fullImageUrl: fullImage
-            });
-
-            return {
-              id: item._id || product._id, // Use cart item ID for uniqueness
-              title: product.name,
-              price: item.variant?.price || product.discountedPrice || product.price,
-              image: fullImage,
-              qty: item.quantity,
-              variant: variantInfo,
-            };
-          });
-
-          console.log('Transformed cart:', transformedCart);
-          setCart(transformedCart);
-        } else {
-          setCart([]);
-        }
-      } else {
-        console.error('Failed to fetch cart:', response.status);
-        setCart([]);
-      }
+      setCart(await loadCheckoutCart());
     } catch (error) {
-      console.error('Error fetching cart:', error);
+      console.error('Error loading cart:', error);
       setCart([]);
     } finally {
       setIsLoadingCart(false);
@@ -209,7 +81,7 @@ export default function CheckoutShippingPage() {
   }, []);
 
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart]);
-  const shipCost = shipping === 'standard' ? (subtotal >= 75 ? 0 : 6.95) : 14.95;
+  const shipCost = calcShipping(subtotal, shipping);
   const total = subtotal + shipCost;
 
   const saveAndNext = () => {
@@ -250,7 +122,9 @@ export default function CheckoutShippingPage() {
                   autoFilled={isAutoFilled && !!contact.email}
                 />
                 <Input
-                  label="Phone (optional)"
+                  label="Phone"
+                  required
+                  type="tel"
                   value={contact.phone || ''}
                   onChange={(v) => setContact({ ...contact, phone: v })}
                   autoFilled={isAutoFilled && !!contact.phone}
@@ -281,14 +155,14 @@ export default function CheckoutShippingPage() {
                 <Radio
                   name="ship"
                   label="Standard (3–5 days)"
-                  sub={subtotal >= 75 ? 'Free' : money(6.95)}
+                  sub={standardShippingFee(subtotal) === 0 ? 'Free' : money(standardShippingFee(subtotal))}
                   checked={shipping === 'standard'}
                   onChange={() => setShipping('standard')}
                 />
                 <Radio
                   name="ship"
                   label="Express (1–2 days)"
-                  sub={money(14.95)}
+                  sub={money(EXPRESS_SHIPPING_FEE)}
                   checked={shipping === 'express'}
                   onChange={() => setShipping('express')}
                 />
@@ -369,12 +243,11 @@ export default function CheckoutShippingPage() {
               {/* Price Summary */}
               <div className="mt-3 space-y-2 text-sm">
                 <Row label="Subtotal" value={money(subtotal)} />
-                <Row label="Shipping" value={money(shipCost)} />
+                <Row label="Shipping" value={shipCost === 0 ? 'Free' : money(shipCost)} />
                 <div className="border-t pt-2">
                   <Row label="Total" value={money(total)} bold />
                 </div>
               </div>
-              <p className="mt-2 text-xs text-stone-500">Taxes calculated at payment.</p>
             </aside>
           </div>
         </div>

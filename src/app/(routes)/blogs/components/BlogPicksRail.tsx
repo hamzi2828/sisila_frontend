@@ -8,6 +8,7 @@ type BlogPost = {
   title: string;
   read: string;
   image: string;
+  slug: string;
 };
 
 export default function BlogPicksRail({
@@ -39,11 +40,11 @@ export default function BlogPicksRail({
           {posts.map((p, idx) => (
             <Link
               key={`pick-${p.id}-${idx}`}
-              href="/blogdetail"
+              href={p.slug ? `/blogdetail?slug=${encodeURIComponent(p.slug)}` : '/blogs'}
               className="group relative h-[280px] w-[220px] shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 transition hover:shadow-md"
             >
               <Image
-                src={p.image}
+                src={p.image || '/images/image.png'}
                 alt={p.title}
                 fill
                 sizes="220px"

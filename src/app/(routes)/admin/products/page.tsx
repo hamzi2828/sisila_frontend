@@ -12,6 +12,7 @@ import CategoryModal, { type CategoryInput } from './components/CategoryModal';
 import { categoryService } from './services/categoryService';
 import { slugify } from './services/productCreateService';
 import { productService } from './services/productService';
+import { toast } from 'react-hot-toast';
 
 const ProductsPage = () => {
   const router = useRouter();
@@ -167,7 +168,7 @@ const ProductsPage = () => {
       }
     } catch (e) {
       console.error('Failed to save category', e);
-      alert('Failed to save category');
+      toast.error('Failed to save category');
     } finally {
       setCategoryModalOpen(false);
     }
@@ -181,7 +182,7 @@ const ProductsPage = () => {
     } catch (e) {
       console.error('Failed to delete category', e);
       setCategories(prev);
-      alert('Failed to delete category');
+      toast.error('Failed to delete category');
     }
   };
 
@@ -196,7 +197,7 @@ const ProductsPage = () => {
       console.error('Failed to update category status', e);
       // revert on error
       setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, active: !nextActive } : c)));
-      alert('Failed to update category');
+      toast.error('Failed to update category');
     }
   };
 
@@ -211,7 +212,7 @@ const ProductsPage = () => {
       console.error('Failed to update category featured status', e);
       // revert on error
       setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, featured: !nextFeatured } : c)));
-      alert('Failed to update category featured status');
+      toast.error('Failed to update category featured status');
     }
   };
 
@@ -233,7 +234,7 @@ const ProductsPage = () => {
       console.error('Failed to delete product', e);
       setProducts(prev);
       showToast('Failed to delete product', 'error');
-      alert('Failed to delete product');
+      toast.error('Failed to delete product');
     }
   };
 

@@ -32,7 +32,7 @@ export const SocialLogin: React.FC<SocialLoginProps> = ({ isForgot }) => {
       <div className="grid grid-cols-1 gap-4">
         <button
           type="button"
-          className="flex items-center justify-center px-4 py-4 border-2 border-gray-200 rounded-2xl text-sm font-bold text-gray-900 bg-white hover:bg-gray-50 hover:border-lime-300 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
+          className="flex items-center justify-center px-4 py-4 border-2 border-gray-200 rounded-2xl text-sm font-bold text-gray-900 bg-white hover:bg-gray-50 hover:border-stone-300 hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
           onClick={handleGoogleLogin}
           aria-label="Continue with Google"
         >

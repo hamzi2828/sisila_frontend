@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { publicProductService, type PublicProduct } from '../../main/services/publicProductService';
+import { formatPrice } from '@/lib/formatPrice';
+import { resolveImage } from '@/lib/productMedia';
 
 type Section = {
   id: string;
@@ -87,7 +89,7 @@ export default function ThemeProducts({
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                 {products.map((product) => {
                   // For variant products, get the first variant's color thumbnail
-                  let imageUrl = product.thumbnailUrl || product.bannerUrls?.[0] || '/images/placeholder.png';
+                  let imageUrl = product.thumbnailUrl || product.bannerUrls?.[0] || '';
 
                   if (product.productType === 'variant' && product.variants && product.variants.length > 0) {
                     const firstVariantColor = product.variants[0].color;
@@ -96,10 +98,7 @@ export default function ThemeProducts({
                     }
                   }
 
-                  // Add backend URL prefix if not already present
-                  if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/images/')) {
-                    imageUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}${imageUrl}`;
-                  }
+                  imageUrl = resolveImage(imageUrl);
 
                   const hasDiscount = product.discountedPrice && product.discountedPrice < product.price;
 
@@ -134,15 +133,15 @@ export default function ThemeProducts({
                           {hasDiscount ? (
                             <>
                               <span className="text-sm font-bold text-red-600">
-                                £{product.discountedPrice!.toFixed(2)}
+                                {formatPrice(product.discountedPrice)}
                               </span>
                               <span className="text-xs text-stone-500 line-through">
-                                £{product.price.toFixed(2)}
+                                {formatPrice(product.price)}
                               </span>
                             </>
                           ) : (
                             <span className="text-sm font-bold text-stone-900">
-                              £{product.price.toFixed(2)}
+                              {formatPrice(product.price)}
                             </span>
                           )}
                         </div>

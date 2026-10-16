@@ -25,11 +25,11 @@ const transformBlogToPost = (blog: FeaturedBlog): BlogPost => {
   return {
     id: blog._id,
     title: blog.title,
-    excerpt: blog.excerpt || blog.content?.substring(0, 150) + '...' || '',
+    excerpt: blog.excerpt || (blog.content ? `${blog.content.substring(0, 150)}...` : ''),
     tag: blog.category || 'Uncategorized',
     date: formatDate(blog.createdAt),
     read: calculateReadTime(blog.content),
-    image: blog.image || blog.thumbnail || '',
+    image: blog.image || blog.thumbnail || '/images/image.png',
     slug: blog.slug || '',
   };
 };
@@ -113,7 +113,7 @@ export default function BlogsPage() {
         </div>
       </section>
       {!isLoading && !error && posts.length > 0 && (
-        <BlogPicksRail posts={posts.slice(0, 6).map(({ id, title, read, image }) => ({ id, title, read, image }))} />
+        <BlogPicksRail posts={posts.slice(0, 6).map(({ id, title, read, image, slug }) => ({ id, title, read, image, slug }))} />
       )}
     
 

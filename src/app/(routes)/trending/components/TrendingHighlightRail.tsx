@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { formatPrice } from '@/lib/formatPrice';
+import type { TrendingItem } from '../types';
 
-export default function TrendingHighlightRail({ items = [] }: { items?: any[] }) {
+export default function TrendingHighlightRail({ items = [] }: { items?: TrendingItem[] }) {
   return (
     <div className="no-scrollbar flex gap-5 overflow-x-auto">
       {items.map((p, i) => (
         <Link
           key={p.id}
-          href="/productdetail"
+          href={p.href}
           className="group relative h-[320px] w-[240px] shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200 hover:shadow-md transition"
         >
           <Image
@@ -24,7 +26,7 @@ export default function TrendingHighlightRail({ items = [] }: { items?: any[] })
           <div className="absolute inset-x-0 bottom-0 p-3">
             <p className="text-white text-sm font-medium">{p.title}</p>
             <p className="text-white/85 text-xs">
-              ${p.price} • {p.tag}
+              {formatPrice(p.price)}{p.tag ? ` • ${p.tag}` : ''}
             </p>
           </div>
         </Link>

@@ -1,79 +1,124 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Check, CreditCard, MapPin, Mail, PackageCheck, Pencil, Truck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { formatPrice } from '@/lib/formatPrice';
+import { loadCheckoutCart, calcShipping, type CheckoutCartItem } from '../utils/checkoutCart';
+import { getAuthToken, isAuthenticated } from '@/helper/helper';
+import { toast } from 'react-hot-toast';
 
-type CartItem = {
-  id: string;
-  title: string;
-  price: number;
-  qty: number;
-  image: string;
-  color?: string;
-  size?: string;
+type CheckoutState = {
+  contact?: { email: string; phone?: string };
+  address?: { name: string; line1: string; line2?: string; city: string; region: string; postal: string; country: string };
+  shipping?: 'standard' | 'express';
+  payment?: { method: 'stripe' | 'card' | 'cod'; last4?: string; name?: string };
 };
 
-const CART_ITEMS: CartItem[] = [
-  {
-    id: 'verses-tee',
-    title: 'Verses Tee',
-    price: 38,
-    qty: 1,
-    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
-    color: 'Black',
-    size: 'M',
-  },
-  {
-    id: 'palette-crew',
-    title: 'Palette Crew',
-    price: 66,
-    qty: 1,
-    image: 'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1200&q=80',
-    color: 'Stone',
-    size: 'L',
-  },
-];
-
-const money = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+const CHECKOUT_KEY = 'silsila_checkout';
+const LAST_ORDER_KEY = 'silsila_last_order';
+const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+const money = (v: number) => formatPrice(v);
 
 export default function ReviewPage() {
   const router = useRouter();
   const [agree, setAgree] = useState(true);
-  const [promo, setPromo] = useState('');
-  const [applied, setApplied] = useState<{ code: string; amount: number } | null>(null);
   const [placing, setPlacing] = useState(false);
+  const [cart, setCart] = useState<CheckoutCartItem[]>([]);
+  const [isLoadingCart, setIsLoadingCart] = useState(true);
+  const [checkout, setCheckout] = useState<CheckoutState>({});
 
-  const subtotal = useMemo(
-    () => CART_ITEMS.reduce((sum, i) => sum + i.price * i.qty, 0),
-    []
-  );
-
-  const promoDiscount = applied?.amount ?? 0;
-  const shipping = subtotal - promoDiscount >= 75 ? 0 : 6.5;
-  const tax = Math.round(((subtotal - promoDiscount) * 0.08) * 100) / 100;
-  const total = Math.max(0, subtotal - promoDiscount) + shipping + tax;
-
-  const handleApply = () => {
-    const code = promo.trim().toUpperCase();
-    if (!code) return;
-    if (code === 'SIL10') {
-      setApplied({ code, amount: Math.round(subtotal * 0.1 * 100) / 100 });
-    } else {
-      setApplied({ code, amount: 0 });
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CHECKOUT_KEY);
+      if (raw) setCheckout(JSON.parse(raw));
+    } catch {
+      // ignore malformed saved checkout state
     }
-  };
+
+    let cancelled = false;
+    loadCheckoutCart()
+      .then((items) => {
+        if (!cancelled) setCart(items);
+      })
+      .catch(() => {
+        if (!cancelled) setCart([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingCart(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const subtotal = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.qty, 0), [cart]);
+  const itemCount = useMemo(() => cart.reduce((sum, i) => sum + i.qty, 0), [cart]);
+  const shippingMethod = checkout.shipping || 'standard';
+  const shipping = calcShipping(subtotal, shippingMethod);
+  const total = subtotal + shipping;
+
+  const address = checkout.address;
+  const contact = checkout.contact;
+  const payment = checkout.payment;
+  const paymentLabel =
+    payment?.method === 'cod'
+      ? 'Cash on Delivery'
+      : payment?.method === 'card'
+      ? `Card${payment.last4 ? ` •••• ${payment.last4}` : ''}`
+      : payment?.method === 'stripe'
+      ? 'Card via Stripe'
+      : 'Not selected';
 
   const placeOrder = async () => {
-    if (!agree || placing) return;
+    if (!agree || placing || cart.length === 0) return;
+    if (!isAuthenticated()) {
+      toast.error('Please sign in to place your order');
+      router.push('/authentication?redirect=/checkout/review');
+      return;
+    }
+    if (payment?.method !== 'cod') {
+      // Card payments are completed on Stripe from the payment step.
+      router.push('/checkout/payment');
+      return;
+    }
+    if (!address || !contact) {
+      toast.error('Please complete your delivery details first');
+      router.push('/checkout');
+      return;
+    }
     setPlacing(true);
-    // Simulate processing then go to success page with a mock order id
-    const id = `SO-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`;
-    setTimeout(() => {
-      router.push(`/checkout/success?order=${encodeURIComponent(id)}`);
-    }, 900);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/payment/cod-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAuthToken()}` },
+        body: JSON.stringify({
+          shippingMethod,
+          shippingAddress: {
+            fullName: address.name,
+            email: contact.email,
+            phone: contact.phone || '',
+            address: [address.line1, address.line2].filter(Boolean).join(', '),
+            city: address.city,
+            state: address.region,
+            zipCode: address.postal,
+            country: address.country || 'Pakistan',
+          },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.message || 'Could not place your order');
+
+      sessionStorage.setItem(LAST_ORDER_KEY, JSON.stringify(data.order));
+      localStorage.removeItem('cart');
+      localStorage.removeItem(CHECKOUT_KEY);
+      router.push(`/checkout/success?order=${encodeURIComponent(data.order.orderNumber)}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not place your order');
+      setPlacing(false);
+    }
   };
 
   return (
@@ -113,13 +158,23 @@ export default function ReviewPage() {
                 action={<Link href="/checkout" className="text-sm text-stone-700 hover:underline inline-flex items-center gap-1"><Pencil className="h-3.5 w-3.5" /> Edit</Link>}
               />
               <div className="mt-2 text-sm text-stone-700">
-                <p>Ali Raza</p>
-                <p>House 12, Street 8, DHA Phase 6</p>
-                <p>Karachi, Sindh 75500</p>
-                <p>Pakistan</p>
+                {address ? (
+                  <>
+                    <p>{address.name}</p>
+                    <p>{address.line1}</p>
+                    {address.line2 ? <p>{address.line2}</p> : null}
+                    <p>
+                      {[address.city, address.region].filter(Boolean).join(', ')} {address.postal}
+                    </p>
+                    <p>{address.country}</p>
+                  </>
+                ) : (
+                  <p className="text-stone-500">No shipping address yet.</p>
+                )}
               </div>
               <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-stone-50 px-3 py-1 text-xs text-stone-700 ring-1 ring-stone-200">
-                <Truck className="h-3.5 w-3.5" /> Standard — 3–5 business days
+                <Truck className="h-3.5 w-3.5" />{' '}
+                {shippingMethod === 'express' ? 'Express — 1–2 business days' : 'Standard — 3–5 business days'}
               </div>
             </Card>
 
@@ -132,8 +187,8 @@ export default function ReviewPage() {
                   action={<Link href="/checkout" className="text-sm text-stone-700 hover:underline inline-flex items-center gap-1"><Pencil className="h-3.5 w-3.5" /> Edit</Link>}
                 />
                 <div className="mt-2 text-sm text-stone-700">
-                  <p>Email: ali@silsila.co</p>
-                  <p>Phone: +92 300 0000000</p>
+                  {contact?.email ? <p>Email: {contact.email}</p> : <p className="text-stone-500">No email yet.</p>}
+                  {contact?.phone ? <p>Phone: {contact.phone}</p> : null}
                 </div>
               </Card>
 
@@ -144,7 +199,7 @@ export default function ReviewPage() {
                   action={<Link href="/checkout/payment" className="text-sm text-stone-700 hover:underline inline-flex items-center gap-1"><Pencil className="h-3.5 w-3.5" /> Edit</Link>}
                 />
                 <div className="mt-2 text-sm text-stone-700">
-                  <p>Visa •••• 1234 — exp 08/28</p>
+                  <p>{paymentLabel}</p>
                   <p>Billing same as shipping</p>
                 </div>
               </Card>
@@ -154,24 +209,39 @@ export default function ReviewPage() {
             <Card>
               <Header
                 icon={<PackageCheck className="h-4 w-4" />}
-                title={`Items (${CART_ITEMS.reduce((s, i) => s + i.qty, 0)})`}
-                action={<Link href="/shop" className="text-sm text-stone-700 hover:underline inline-flex items-center gap-1"><Pencil className="h-3.5 w-3.5" /> Edit cart</Link>}
+                title={`Items (${itemCount})`}
+                action={<Link href="/cart" className="text-sm text-stone-700 hover:underline inline-flex items-center gap-1"><Pencil className="h-3.5 w-3.5" /> Edit cart</Link>}
               />
               <div className="mt-3 space-y-4">
-                {CART_ITEMS.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3">
-                    <div className="relative h-20 w-16 overflow-hidden rounded-xl ring-1 ring-stone-200">
-                      <Image src={p.image} alt={p.title} fill sizes="64px" className="object-cover" />
+                {isLoadingCart ? (
+                  <p className="text-sm text-stone-500">Loading your items…</p>
+                ) : cart.length === 0 ? (
+                  <p className="text-sm text-stone-500">
+                    Your cart is empty.{' '}
+                    <Link href="/shop" className="underline underline-offset-4">Continue shopping</Link>
+                  </p>
+                ) : (
+                  cart.map((p) => (
+                    <div key={p.id} className="flex items-center gap-3">
+                      <div className="relative h-20 w-16 overflow-hidden rounded-xl ring-1 ring-stone-200 bg-stone-100">
+                        <Image src={p.image || '/images/image.png'} alt={p.title} fill sizes="64px" className="object-cover" />
+                      </div>
+                      <div className="flex-1">
+                        <Link href={`/productdetail/${p.productId}`} className="text-sm font-medium hover:underline">{p.title}</Link>
+                        <p className="text-xs text-stone-600">
+                          {[
+                            p.variant?.color ? `Color: ${p.variant.color}` : '',
+                            p.variant?.size ? `Size: ${p.variant.size}` : '',
+                            `Qty ${p.qty}`,
+                          ]
+                            .filter(Boolean)
+                            .join(' • ')}
+                        </p>
+                      </div>
+                      <div className="text-sm">{money(p.price * p.qty)}</div>
                     </div>
-                    <div className="flex-1">
-                      <Link href="/productdetail" className="text-sm font-medium hover:underline">{p.title}</Link>
-                      <p className="text-xs text-stone-600">
-                        {p.color ? `Color: ${p.color}` : ''} {p.size ? `• Size: ${p.size}` : ''} • Qty {p.qty}
-                      </p>
-                    </div>
-                    <div className="text-sm">{money(p.price * p.qty)}</div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </Card>
 
@@ -198,33 +268,10 @@ export default function ReviewPage() {
             <div className="rounded-3xl border border-stone-200 bg-white p-6 sticky top-24">
               <h3 className="text-lg font-semibold">Order summary</h3>
 
-              {/* Promo */}
-              <div className="mt-3 flex gap-2">
-                <input
-                  value={promo}
-                  onChange={(e) => setPromo(e.target.value)}
-                  placeholder="Promo code (e.g., SIL10)"
-                  className="flex-1 rounded-xl border border-stone-300/80 px-3 py-2 text-sm outline-none placeholder:text-stone-400 focus:border-stone-400"
-                />
-                <button
-                  onClick={handleApply}
-                  className="inline-flex items-center rounded-xl border border-stone-300/80 bg-white px-3 py-2 text-sm hover:bg-stone-50"
-                >
-                  Apply
-                </button>
-              </div>
-              {applied ? (
-                <p className={`mt-1 text-xs ${applied.amount > 0 ? 'text-emerald-700' : 'text-stone-600'}`}>
-                  Code {applied.code} {applied.amount > 0 ? `applied — ${money(applied.amount)} off` : 'is not valid for this order'}
-                </p>
-              ) : null}
-
               {/* Totals */}
               <div className="mt-4 space-y-2 text-sm">
                 <Row label="Subtotal" value={money(subtotal)} />
-                {promoDiscount > 0 ? <Row label="Discount" value={`- ${money(promoDiscount)}`} /> : null}
                 <Row label="Shipping" value={shipping === 0 ? 'Free' : money(shipping)} />
-                <Row label="Tax (8%)" value={money(tax)} />
                 <div className="my-2 border-t border-stone-200" />
                 <Row label={<span className="font-semibold">Total</span>} value={<span className="font-semibold">{money(total)}</span>} />
               </div>
@@ -232,10 +279,10 @@ export default function ReviewPage() {
               {/* CTA */}
               <button
                 onClick={placeOrder}
-                disabled={!agree || placing}
+                disabled={!agree || placing || cart.length === 0}
                 className={[
                   'mt-6 inline-flex w-full items-center justify-center rounded-full bg-black px-5 py-3 text-sm font-medium text-white transition',
-                  !agree || placing ? 'opacity-60' : 'hover:bg-stone-800',
+                  !agree || placing || cart.length === 0 ? 'opacity-60' : 'hover:bg-stone-800',
                 ].join(' ')}
               >
                 {placing ? 'Placing order…' : 'Place order'}

@@ -1,8 +1,10 @@
 import React from 'react';
 import Link from 'next/link';
+import { formatPrice } from '@/lib/formatPrice';
 
 interface Order {
   id: string;
+  orderNumber?: string;
   customerId: string;
   customerName: string;
   amount: number;
@@ -78,17 +80,17 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders = [
             {orders.map((order) => (
               <tr key={order.id} className="hover:bg-gray-50 cursor-pointer">
                 <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                  <Link href={`/admin/orders/${order.id || ''}`} className="hover:text-indigo-600">
-                    {order.id || 'N/A'}
+                  <Link href="/admin/orders" className="hover:text-indigo-600">
+                    {order.orderNumber || order.id || 'N/A'}
                   </Link>
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                  <Link href={`/admin/users/${order.customerId || ''}`} className="hover:text-indigo-600">
+                  <Link href="/admin/users" className="hover:text-indigo-600">
                     {order.customerName || 'Unknown'}
                   </Link>
                 </td>
                 <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
-                  ${(order.amount || 0).toFixed(2)}
+                  {formatPrice(order.amount || 0)}
                 </td>
                 <td className="px-6 py-4 text-sm text-center whitespace-nowrap">
                   <span

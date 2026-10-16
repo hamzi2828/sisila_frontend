@@ -9,6 +9,8 @@ import OrdersPagination from './components/OrdersPagination';
 import OrderDetailsModal from './components/OrderDetailsModal';
 import { Order, OrderStatus } from './types';
 import { getAllOrders, updateOrderStatus } from './services/adminOrderService';
+import { formatPrice } from '@/lib/formatPrice';
+import { toast } from 'react-hot-toast';
 
 const OrdersPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,10 +73,7 @@ const OrdersPage = () => {
 
   // Format currency
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+    return formatPrice(amount);
   };
 
   // Format date
@@ -97,11 +96,11 @@ const OrdersPage = () => {
       await fetchOrders();
 
       // Show success message (optional)
-      alert(`Order status updated to ${newStatus} successfully!`);
+      toast.success(`Order status updated to ${newStatus} successfully!`);
     } catch (error) {
       console.error('Error updating order status:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      alert(`Failed to update order status: ${errorMessage}`);
+      toast.error(`Failed to update order status: ${errorMessage}`);
     }
   };
 

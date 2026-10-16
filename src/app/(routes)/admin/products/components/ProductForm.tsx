@@ -1739,7 +1739,7 @@ export default function ProductForm({
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="e.g., compression shirt, athletic wear, gym clothing, moisture-wicking, fitness apparel"
+                  placeholder="e.g., poetry tee, urdu calligraphy, oversized tee, streetwear pakistan"
                   className="block w-full rounded-2xl border-2 border-gray-200 shadow-lg focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all duration-300 px-6 py-4 text-lg font-medium text-gray-900 placeholder-gray-500 bg-white hover:border-emerald-300 pr-16"
                   value={form.metaKeywords || ""}
                   onChange={(e) => setField("metaKeywords", e.target.value)}

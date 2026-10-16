@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { formatPrice } from '@/lib/formatPrice';
 
 export type Product = {
   id: string;
@@ -104,7 +105,7 @@ function ProductCard({
         <div className="flex items-end justify-between">
           <div>
             <h3 className="text-white font-medium">{product.title}</h3>
-            <p className="text-white/85 text-sm">${product.price}</p>
+            <p className="text-white/85 text-sm">{formatPrice(product.price)}</p>
           </div>
           {/* <button
             onClick={onAdd}

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { formatPrice, FREE_SHIPPING_THRESHOLD } from '@/lib/formatPrice';
 
 type Props = {
   subtotal: number;
@@ -9,10 +10,10 @@ type Props = {
   canCheckout: boolean;
 };
 
-const money = (v: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+const money = (v: number) => formatPrice(v);
 
 export default function CartSummary({ subtotal, shipping, total, canCheckout }: Props) {
+  const remainingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5 transition-shadow duration-200 hover:shadow-sm">
       <h4 className="text-base font-semibold">Summary</h4>
@@ -24,6 +25,12 @@ export default function CartSummary({ subtotal, shipping, total, canCheckout }: 
         </div>
       </div>
 
+      <p className="mt-3 text-xs text-stone-600">
+        {remainingForFreeShipping > 0
+          ? `Add ${money(remainingForFreeShipping)} more for free shipping.`
+          : `Free shipping on orders over ${money(FREE_SHIPPING_THRESHOLD)}.`}
+      </p>
+
       <Link
         href="/checkout"
         className={[
@@ -33,7 +40,6 @@ export default function CartSummary({ subtotal, shipping, total, canCheckout }: 
       >
         Checkout
       </Link>
-      <p className="mt-2 text-xs text-stone-500">Taxes are calculated at payment.</p>
     </div>
   );
 }

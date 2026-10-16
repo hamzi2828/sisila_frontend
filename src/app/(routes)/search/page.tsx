@@ -7,6 +7,7 @@ import SearchResults from './components/SearchResults';
 import SearchEmpty from './components/SearchEmpty';
 import SearchChips from './components/SearchChips';
 import { publicProductService, type PublicProduct } from '../main/services/publicProductService';
+import { effectivePrice, resolveImage } from '@/lib/productMedia';
 
 type Item = { id: string; title: string; price: number; tag?: string; image: string; href: string };
 
@@ -36,7 +37,7 @@ function SearchPageContent() {
         // Transform API products to Item format
         const transformedResults: Item[] = response.data.map((product: PublicProduct) => {
           // Handle image for variant products
-          let imageUrl = product.thumbnailUrl || (product.bannerUrls && product.bannerUrls[0]) || '/images/placeholder.png';
+          let imageUrl = product.thumbnailUrl || (product.bannerUrls && product.bannerUrls[0]) || '';
 
           if (product.productType === 'variant' && product.variants && product.variants.length > 0) {
             const firstVariantColor = product.variants[0].color;
@@ -45,17 +46,12 @@ function SearchPageContent() {
             }
           }
 
-          // Add backend URL prefix if not already present
-          if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/images/')) {
-            imageUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}${imageUrl}`;
-          }
-
           return {
             id: product._id,
             title: product.name,
-            price: product.discountedPrice || product.price,
+            price: effectivePrice(product),
             tag: product.category,
-            image: imageUrl,
+            image: resolveImage(imageUrl),
             href: `/productdetail/${product._id}`,
           };
         });
@@ -103,7 +99,7 @@ function SearchPageContent() {
             </div>
           ) : results.length === 0 ? (
             <SearchEmpty query={q}>
-              <SearchChips chips={['tee', 'hoodie', 'shirt', 'pants']} />
+              <SearchChips chips={['poetry', 'ghalib', 'alif', 'cinema', 'anime']} />
             </SearchEmpty>
           ) : (
             <SearchResults items={results} />

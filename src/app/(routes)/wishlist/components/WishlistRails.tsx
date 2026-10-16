@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { formatPrice } from '@/lib/formatPrice';
 
 export default function WishlistRails({
   backInStock = [],
   priceDrops = [],
   lists = [],
-  money = (v: number) => `$${v.toFixed(2)}`,
+  money = formatPrice,
 }: {
   backInStock?: any[];
   priceDrops?: any[];
@@ -151,7 +152,7 @@ function Rail({
         {items.map((p: any) => (
           <Link
             key={p.id}
-            href="/productdetail"
+            href={`/productdetail/${p.id}`}
             className="group relative h-[300px] w-[220px] shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 transition hover:shadow-md"
           >
             <Image

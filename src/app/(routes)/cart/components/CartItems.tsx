@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Trash2, Plus, Minus } from 'lucide-react';
+import { formatPrice } from '@/lib/formatPrice';
 
 type CartItem = {
   id: string;
@@ -22,8 +23,7 @@ type Props = {
   onClear: () => void;
 };
 
-const money = (v: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+const money = (v: number) => formatPrice(v);
 
 export default function CartItems({ items, onInc, onDec, onRemove, onClear }: Props) {
   return (
@@ -38,7 +38,7 @@ export default function CartItems({ items, onInc, onDec, onRemove, onClear }: Pr
           >
             <div className="relative col-span-4 sm:col-span-3 aspect-[4/5] overflow-hidden rounded-xl">
               <Image
-                src={it.image}
+                src={it.image || '/images/image.png'}
                 alt={it.title}
                 fill
                 sizes="(max-width:1024px) 40vw, 20vw"

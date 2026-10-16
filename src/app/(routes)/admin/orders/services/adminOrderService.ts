@@ -28,7 +28,7 @@ export function transformOrderToLegacy(order: Order): LegacyOrder {
     total: order.total,
     items: order.items.map((item, index): LegacyOrderItem => {
       const product = typeof item.product === 'object' ? item.product as Product : null;
-      let productImage = '/images/gym1.svg';
+      let productImage = '/images/image.png';
 
       if (product?.primaryImageUrl) {
         productImage = product.primaryImageUrl;

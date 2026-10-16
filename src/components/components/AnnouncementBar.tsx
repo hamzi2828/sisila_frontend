@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Zap, X } from 'lucide-react';
+import { Truck, X } from 'lucide-react';
 
 type AnnouncementBarProps = {
   isOpen: boolean;
@@ -16,8 +16,8 @@ const AnnouncementBar: React.FC<AnnouncementBarProps> = ({ isOpen, onClose }) =>
     <div className="relative bg-gradient-to-r from-amber-100 via-rose-100 to-teal-100 text-gray-800">
       <div className="mx-auto flex max-w-7xl items-center justify-center gap-3 px-4 py-2 text-sm">
         <span className="inline-flex items-center gap-2">
-          <Zap className="h-4 w-4 text-amber-600" aria-hidden="true" />
-          Mid-season sale up to 40% off
+          <Truck className="h-4 w-4 text-amber-600" aria-hidden="true" />
+          Free shipping across Pakistan on orders over Rs 5,000
         </span>
         <Link href="/shop" className="rounded-full bg-black px-3 py-1 text-white hover:bg-gray-900">
           Shop now

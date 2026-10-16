@@ -117,7 +117,7 @@ const AdminDashboardClient = () => {
       icon: FiDollarSign,
       change: '+18.3%',
       changeType: 'increase' as const,
-      prefix: '$'
+      prefix: 'Rs '
     },
     {
       name: 'Orders Today',
@@ -129,11 +129,11 @@ const AdminDashboardClient = () => {
     },
     {
       name: 'Avg Order Value',
-      value: (dashboardData.stats.avgOrderValue || 0).toFixed(2),
+      value: Math.round(dashboardData.stats.avgOrderValue || 0).toLocaleString(),
       icon: FiDollarSign,
       change: '+1.8%',
       changeType: 'increase' as const,
-      prefix: '$'
+      prefix: 'Rs '
     },
     {
       name: 'Conversion Rate',

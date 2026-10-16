@@ -19,7 +19,7 @@ export default function AboutHeroStats() {
                 About Silsila
               </h1>
               <p className="mt-3 text-white/85">
-                Silsila merges cultural heritage with contemporary fashion — translating poetry, cinema, typography, and regional narratives into modern apparel.
+                Silsila is a Pakistani casual clothing line woven with cultural roots, values, and emotions — reflecting creativity that uplifts your vibe, aura, and style. We translate poetry, cinema, letterforms, and regional narratives into everyday wear.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-2">
@@ -41,7 +41,7 @@ export default function AboutHeroStats() {
                 <Image src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=1200&q=80" alt="Pigments" fill sizes="(max-width:1024px) 280px, 320px" className="object-cover" />
               </div>
               <div className="absolute right-6 bottom-6 h-48 w-40 -rotate-2 overflow-hidden rounded-2xl ring-1 ring-white/20">
-                <Image src="https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1200&q=80" alt="Dunes" fill sizes="(max-width:1024px) 240px, 280px" className="object-cover" />
+                <Image src="https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80" alt="Handwritten verses" fill sizes="(max-width:1024px) 240px, 280px" className="object-cover" />
               </div>
             </div>
           </div>
@@ -50,9 +50,9 @@ export default function AboutHeroStats() {
         {/* Quick stats */}
         <div className="mx-auto mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { k: 'Founded', v: '2025' },
-            { k: 'Core Themes', v: '4' },
-            { k: 'Categories', v: '10' },
+            { k: 'First drop', v: '2025' },
+            { k: 'Themes', v: '4' },
+            { k: 'Categories', v: '5' },
             { k: 'Series', v: '4' },
           ].map((s) => (
             <div key={s.k} className="rounded-2xl border border-stone-200 bg-white p-4 text-center">

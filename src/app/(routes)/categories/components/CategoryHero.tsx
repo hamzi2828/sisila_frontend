@@ -34,7 +34,7 @@ export default function CategoryHero({ core }: { core: Section[] }) {
           Categories, Curated
         </h1>
         <p className="mt-3 max-w-2xl text-white/80">
-          Five core moods, five fresh curations — discover designs through a modern, editorial lens.
+          Poetry, Witty, Fun, Artistic and Creative — five moods that carry our culture into everyday wear.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -48,10 +48,10 @@ export default function CategoryHero({ core }: { core: Section[] }) {
             </Link>
           ))}
           <Link
-            href="#curations"
+            href="/shop"
             className="inline-flex items-center rounded-full bg-white text-stone-900 px-4 py-2 text-sm font-medium hover:bg-stone-100 transition"
           >
-            View Curations
+            Shop All
           </Link>
         </div>
       </div>
@@ -59,7 +59,7 @@ export default function CategoryHero({ core }: { core: Section[] }) {
       {/* Floating image cluster */}
       <div className="pointer-events-none absolute inset-y-0 right-0 hidden md:block">
         <div className="relative h-full w-[48vw] max-w-[640px]">
-          {[0, 1, 2].map((i) => (
+          {[0, 1, 2].filter((i) => core[i]?.cover).map((i) => (
             <div
               key={core[i]?.id ?? i}
               className={`absolute rounded-2xl ring-1 ring-white/20 overflow-hidden ${
@@ -71,7 +71,7 @@ export default function CategoryHero({ core }: { core: Section[] }) {
               }`}
             >
               <Image
-                src={core[i]?.cover || ''}
+                src={core[i].cover}
                 alt={core[i]?.title || 'Category cover'}
                 fill
                 sizes="(max-width: 768px) 200px, 320px"

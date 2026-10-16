@@ -7,6 +7,7 @@ import { FiEdit2, FiTrash2, FiCheckCircle, FiXCircle, FiStar } from 'react-icons
 import CategoryModal, { type CategoryInput } from './CategoryModal';
 import blogCategoryService  from '../services/blogCategoryService';
 import { toast } from 'react-hot-toast';
+import { assetUrl } from '@/lib/productMedia';
 
 
 // Frontend category interface with normalized ID
@@ -290,7 +291,7 @@ export default function CategoriesTab() {
                       {cat.thumbnailUrl ? (
                         <div className="relative h-12 w-12 rounded-full border-2 border-gray-200 overflow-hidden">
                           <Image
-                            src={`${process.env.NEXT_PUBLIC_BACKEND_URL}${cat.thumbnailUrl}`}
+                            src={assetUrl(cat.thumbnailUrl)}
                             alt={cat.name}
                             fill
                             className="object-cover"
@@ -362,7 +363,7 @@ export default function CategoriesTab() {
                         <div className="mt-3">
                           <div className="relative w-full h-24 rounded-lg border border-gray-200 overflow-hidden">
                             <Image
-                              src={`${process.env.NEXT_PUBLIC_BACKEND_URL}${cat.bannerUrl}`}
+                              src={assetUrl(cat.bannerUrl)}
                               alt={`${cat.name} banner`}
                               fill
                               className="object-cover"

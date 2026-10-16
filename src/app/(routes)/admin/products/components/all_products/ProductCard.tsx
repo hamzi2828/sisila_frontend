@@ -3,6 +3,7 @@ import React from "react";
 import Image from "next/image";
 import { FiEdit2, FiTrash2, FiStar } from "react-icons/fi";
 import { Product } from "../AllProducts";
+import { formatPrice } from "@/lib/formatPrice";
 
 interface ProductCardProps {
   product: Product;
@@ -154,7 +155,7 @@ export default function ProductCard({
           {product.productType === "variant" && product.variants && product.variants.length > 0 ? (
             <>
               <span className="font-medium">
-                ${Math.min(...product.variants.map(v => v.price)).toFixed(2)} - ${Math.max(...product.variants.map(v => v.price)).toFixed(2)}
+                {formatPrice(Math.min(...product.variants.map(v => v.price)))} - {formatPrice(Math.max(...product.variants.map(v => v.price)))}
               </span>
               <span className="text-xs text-gray-500">
                 {product.variants.length} price points
@@ -162,10 +163,10 @@ export default function ProductCard({
             </>
           ) : (
             <>
-              <span className="font-medium">${product.price.toFixed(2)}</span>
+              <span className="font-medium">{formatPrice(product.price)}</span>
               {product.discountedPrice && product.discountedPrice < product.price && (
                 <span className="text-xs text-green-600">
-                  Sale: ${product.discountedPrice.toFixed(2)}
+                  Sale: {formatPrice(product.discountedPrice)}
                 </span>
               )}
             </>

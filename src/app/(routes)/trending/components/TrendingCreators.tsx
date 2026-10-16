@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { FALLBACK_GALLERY } from '@/lib/productMedia';
+import type { TrendingItem } from '../types';
 
-export default function TrendingCreators({ items = [] }: { items?: any[] }) {
+export default function TrendingCreators({ items = [] }: { items?: TrendingItem[] }) {
   return (
     <div>
       <div className="flex items-end justify-between">
@@ -26,18 +28,19 @@ export default function TrendingCreators({ items = [] }: { items?: any[] }) {
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div
+          <Link
             key={i}
-            className="relative h-64 overflow-hidden rounded-2xl ring-1 ring-stone-200 bg-white"
+            href={items[i]?.href || '/shop'}
+            className="relative block h-64 overflow-hidden rounded-2xl ring-1 ring-stone-200 bg-white"
           >
             <Image
-              src={items[i]?.image || 'https://placehold.co/600x600?text=Creator'}
-              alt="Creator fit"
+              src={items[i]?.detailImage || FALLBACK_GALLERY[i] || '/images/image.png'}
+              alt={items[i] ? `${items[i].title} styled` : 'Silsila look'}
               fill
               sizes="(max-width:1024px) 50vw, 25vw"
               className="object-cover"
             />
-          </div>
+          </Link>
         ))}
       </div>
     </div>

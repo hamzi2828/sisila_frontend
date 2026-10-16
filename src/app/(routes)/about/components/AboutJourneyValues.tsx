@@ -4,13 +4,13 @@ export default function AboutJourneyValues() {
       {/* Timeline */}
       <section id="timeline" className="px-6 md:px-10 lg:px-20 pb-12">
         <div className="mx-auto max-w-7xl ">
-          <Header eyebrow="Journey" title="Milestones" subtitle="Highlights from sketchbooks to the first collection." />
+          <Header eyebrow="Journey" title="Milestones" subtitle="From sketchbooks in Lahore to our first collection." />
           <div className="mt-6 space-y-4">
             {[
-              { y: '2024', t: 'Sketchbook beginnings', d: 'Researching poets, cinema frames, and letterforms.' },
-              { y: '2025 Q1', t: 'Silsila launches', d: 'Four core themes, ten categories, and the first lookbook.' },
-              { y: '2025 Q2', t: 'Poets Series', d: 'Homages to Ghalib, Faiz, Elia, Jalib, and Muneer.' },
-              { y: '2025 Q3', t: 'Retail pop-ups', d: 'Community showcases with live print sessions and readings.' },
+              { y: 'The idea', t: 'Sketchbook beginnings', d: 'Researching Urdu poetry, cinema frames, regional music, and the shapes of our alphabet.' },
+              { y: '2025', t: 'Silsila is founded', d: 'Four themes — Southeastern Hymns, Artistic Passion, Echoes of the Winds, and Uplifting Culture.' },
+              { y: 'First drop', t: 'Poets & Alphabets', d: 'Homages to Ghalib, Faiz Ahmed Faiz, John Elia, Habib Jalib, and Muneer Niazi — plus Alif, Bay, Pay letterform pieces.' },
+              { y: 'Next', t: 'Cinema & Anime', d: 'New series celebrating the screens and stories that shaped a generation.' },
             ].map((row, idx) => (
               <TimelineItem key={idx} {...row} />
             ))}
@@ -21,19 +21,19 @@ export default function AboutJourneyValues() {
       {/* Values */}
       <section id="values" className="px-6 md:px-10 lg:px-20 pb-12">
         <div className="mx-auto ">
-          <Header eyebrow="Values" title="What we care about" subtitle="Culture, quality, responsibility, and community." />
+          <Header eyebrow="Values" title="What we care about" subtitle="Roots, creativity, quality, and community." />
           <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <ValueCard iconClass="fa-solid fa-wand-magic-sparkles" title="Culture-first">
-              Respectful references and original voice in every release.
+              Rooted in Pakistani heritage — respectful references and an original voice in every release.
             </ValueCard>
             <ValueCard iconClass="fa-solid fa-shield-halved" title="Quality daily-wear">
-              Balanced fits, durable prints, and considered trims.
+              Relaxed casual fits, durable prints, and fabrics made for everyday wear.
             </ValueCard>
-            <ValueCard iconClass="fa-solid fa-leaf" title="Materials">
-              Preference for cottons and blends that last, minimizing waste.
+            <ValueCard iconClass="fa-solid fa-palette" title="Creativity">
+              Poetry, wit, fun, and art — five categories that let you wear your mood and express yourself.
             </ValueCard>
-            <ValueCard iconClass="fa-solid fa-recycle" title="Packaging">
-              Plastic‑free mailers and recyclable tags wherever possible.
+            <ValueCard iconClass="fa-solid fa-people-group" title="Community">
+              Designed in Pakistan, for people who want their clothes to carry a story — and uplift their vibe.
             </ValueCard>
           </div>
         </div>

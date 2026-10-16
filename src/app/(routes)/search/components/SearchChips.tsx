@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 export default function SearchChips({ chips = [] }: { chips?: string[] }) {
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap justify-center gap-2">
       {chips.map((s) => (
         <Link
           key={s}

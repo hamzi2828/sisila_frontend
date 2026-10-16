@@ -65,10 +65,10 @@ export default function WishlistGrid({
           ) : null}
 
           {/* Image */}
-          <Link href="/productdetail" className="block">
+          <Link href={`/productdetail/${p.id}`} className="block">
             <div className="relative w-full pt-[125%] bg-stone-100">
               <Image
-                src={p.image}
+                src={p.image || '/images/image.png'}
                 alt={p.title}
                 fill
                 sizes="(max-width:1024px) 50vw, 25vw"
@@ -87,7 +87,7 @@ export default function WishlistGrid({
           <div className="p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <Link href="/productdetail" className="line-clamp-1 text-sm font-medium hover:underline">
+                <Link href={`/productdetail/${p.id}`} className="line-clamp-1 text-sm font-medium hover:underline">
                   {p.title}
                 </Link>
                 <p className="mt-0.5 text-xs text-stone-600">{p.kind}</p>
@@ -120,7 +120,7 @@ export default function WishlistGrid({
                 Add to cart
               </button>
               <Link
-                href="/productdetail"
+                href={`/productdetail/${p.id}`}
                 className="inline-flex items-center justify-center rounded-full border border-stone-300/80 bg-white px-3 py-1.5 text-sm hover:bg-stone-50"
                 title="View"
               >

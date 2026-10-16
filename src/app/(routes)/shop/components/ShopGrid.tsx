@@ -2,11 +2,13 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { formatPrice } from '@/lib/formatPrice';
 
 type Product = {
   id: string;
   title: string;
   price: number;
+  compareAt?: number;
   image: string;
   href: string;
   tag?: string;
@@ -36,13 +38,13 @@ export default function ShopGrid({ products = [], collectionType, collectionTitl
             <PromoCard
               title={`More ${collectionType === 'theme' ? 'Themes' : 'Series'}`}
               href={collectionType === 'theme' ? '/themes' : '/series'}
-              image="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1400&q=80"
+              image="https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=1400&q=80"
               badge={`Back to ${collectionType === 'theme' ? 'Themes' : 'Series'}`}
             />
             <PromoCard
               title="Shop All Products"
               href="/shop"
-              image="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1400&q=80"
+              image="https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=1400&q=80"
               badge="All Collections"
             />
           </>
@@ -51,13 +53,13 @@ export default function ShopGrid({ products = [], collectionType, collectionTitl
             <PromoCard
               title="Explore Themes"
               href="/themes"
-              image="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1400&q=80"
+              image="https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&w=1400&q=80"
               badge="Themes Collection"
             />
             <PromoCard
               title="Explore Series"
               href="/series"
-              image="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1400&q=80"
+              image="https://images.unsplash.com/photo-1503341504253-dff4815485f1?auto=format&fit=crop&w=1400&q=80"
               badge="Series Collection"
             />
           </>
@@ -69,7 +71,7 @@ export default function ShopGrid({ products = [], collectionType, collectionTitl
           <div>
             <p className="text-sm uppercase tracking-[0.18em] text-stone-500">Lookbook</p>
             <h3 className="text-xl font-semibold">Editorial — Culture in Motion</h3>
-            <p className="text-stone-600">Visual stories across Poetry, Street, and more.</p>
+            <p className="text-stone-600">Visual stories across our themes and series.</p>
           </div>
           <Link href="/lookbook" className="inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-stone-800">
             See the lookbook ↗
@@ -99,9 +101,14 @@ function ProductCard({ product, priority = false }: { product: Product; priority
         />
       </div>
       <div className="p-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-medium">{product.title}</p>
-          <p className="text-sm text-stone-700">${product.price}</p>
+          <p className="shrink-0 text-sm text-stone-700">
+            {product.compareAt ? (
+              <span className="mr-1.5 text-xs text-stone-400 line-through">{formatPrice(product.compareAt)}</span>
+            ) : null}
+            {formatPrice(product.price)}
+          </p>
         </div>
         {product.tag ? <p className="mt-1 text-xs text-stone-500">{product.tag}</p> : null}
       </div>

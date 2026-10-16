@@ -44,7 +44,7 @@ export default function ThemeHero({ sections }: { sections: Section[] }) {
             </Link>
           ))}
           <Link
-            href="#moodboards"
+            href="#theme-list"
             className="inline-flex items-center rounded-full bg-white text-stone-900 px-4 py-2 text-sm font-medium hover:bg-stone-100 transition"
           >
             View Moodboards

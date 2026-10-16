@@ -58,7 +58,7 @@ const Field = ({
 
 // Ensure a safe YYYY-MM-DD string for <input type="date" />
 function toDateInput(d?: string | null): string {
-  if (!d) return new Date().toISOString().split("T")[0];
+  if (!d) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
   const iso = new Date(d).toISOString();
   return iso.split("T")[0];
@@ -159,7 +159,7 @@ export function ProfileSection<T extends UserProfileShape>({
           <button
             type="button"
             onClick={() => setIsEditing((prev) => !prev)}
-            className="px-4 py-2 border-2 border-primary text-primary font-semibold rounded-lg hover:bg-primary hover:text-black"
+            className="px-4 py-2 border-2 border-primary text-primary font-semibold rounded-lg hover:bg-primary hover:text-white"
           >
             <i className={`fas ${isEditing ? "fa-times" : "fa-edit"} mr-2`} />
             {isEditing ? "Cancel" : "Edit"}
@@ -240,7 +240,7 @@ export function ProfileSection<T extends UserProfileShape>({
           <button
             type="button"
             onClick={handleSaveClick}
-            className="px-5 py-3 bg-primary text-black font-semibold rounded-lg hover:opacity-90 disabled:opacity-60"
+            className="px-5 py-3 bg-primary text-white font-semibold rounded-lg hover:opacity-90 disabled:opacity-60"
             disabled={isSaving}
           >
             <i className="fas fa-save mr-2" />

@@ -22,7 +22,7 @@ export default function MainPage() {
         // Map PublicProduct to Product type
         const mappedProducts: Product[] = response.data.map((p: PublicProduct) => {
           // Handle image for variant products
-          let imageUrl = p.thumbnailUrl || (p.bannerUrls && p.bannerUrls[0]) || '/images/placeholder.png';
+          let imageUrl = p.thumbnailUrl || (p.bannerUrls && p.bannerUrls[0]) || '/images/image.png';
 
           if (p.productType === 'variant' && p.variants && p.variants.length > 0) {
             const firstVariantColor = p.variants[0].color;

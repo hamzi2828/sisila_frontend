@@ -6,6 +6,7 @@ import { getAuthToken } from '@/helper/helper';
 import CartItems from './components/CartItems';
 import CartSummary from './components/CartSummary';
 import EmptyState from './components/EmptyState';
+import { FREE_SHIPPING_THRESHOLD, FLAT_SHIPPING_FEE } from '@/lib/formatPrice';
 
 export type CartItem = {
   id: string;
@@ -223,35 +224,25 @@ export default function CartPage() {
           // Type guard to handle productId being string or ProductData
           const product = typeof item.productId === 'string' ? null : item.productId;
 
-          // Extract color from variant or SKU
-          let variantColor = item.variant?.color;
-          if (!variantColor && item.variant?.variantSku) {
-            const sku = item.variant.variantSku;
-            const colorMap: { [key: string]: string } = {
-              'GRE': 'Green',
-              'BLA': 'Black',
-              'ORA': 'Orange',
-              'RED': 'Red',
-              'BLU': 'Blue',
-              'WHI': 'White',
-              'YEL': 'Yellow',
-            };
-            for (const [code, colorName] of Object.entries(colorMap)) {
-              if (sku.toUpperCase().includes(code)) {
-                variantColor = colorName;
-                break;
-              }
-            }
-          }
+          // Resolve the chosen variant on the product so colour, size and price match the selection
+          const wantedVariant = item.variant?.variantId;
+          const matched = wantedVariant
+            ? (product?.variants || []).find(
+                (v) => v.variantId === wantedVariant || (v as { _id?: string })._id === wantedVariant
+              )
+            : undefined;
+          const matchedPrice = matched
+            ? ((matched as { discountedPrice?: number }).discountedPrice || matched.price)
+            : undefined;
 
           return {
             id: product?._id || (typeof item.productId === 'string' ? item.productId : ''),
             title: product?.name || 'Unknown Product',
-            price: item.variant?.price || product?.discountedPrice || product?.price || 0,
+            price: matchedPrice || item.variant?.price || product?.discountedPrice || product?.price || 0,
             image: getProductImage(item),
             qty: item.quantity,
-            size: item.variant?.size,
-            color: variantColor,
+            size: matched?.size || item.variant?.size,
+            color: matched?.color || item.variant?.color,
             itemId: item._id, // Store the cart item ID for updates/deletes
           };
         });
@@ -508,7 +499,7 @@ export default function CartPage() {
     () => items.reduce((s, i) => s + i.price * i.qty, 0),
     [items]
   );
-  const shipping = subtotal >= 75 || subtotal === 0 ? 0 : 6.95;
+  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : FLAT_SHIPPING_FEE;
   const total = subtotal + shipping;
 
   if (isLoading) {
@@ -552,12 +543,7 @@ export default function CartPage() {
           )}
 
           {items.length === 0 ? (
-            <EmptyState
-              subtotal={subtotal}
-              shipping={shipping}
-              total={total}
-              canCheckout={items.length > 0}
-            />
+            <EmptyState />
           ) : (
             <div className="mt-6 grid gap-8 lg:grid-cols-12">
               <div className="lg:col-span-8">

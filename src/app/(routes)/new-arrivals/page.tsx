@@ -1,20 +1,50 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import type { ArrivalItem } from './types';
 import NewArrivalsHero from './components/NewArrivalsHero';
 import NewArrivalsValue from './components/NewArrivalsValue';
 import NewArrivalsFeature from './components/NewArrivalsFeature';
 import NewArrivalsRail from './components/NewArrivalsRail';
-
-const ITEMS = [
-  { id: 'verses-tee', title: 'Verses Tee', price: 38, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1400&q=80' },
-  { id: 'palette-crew', title: 'Palette Crew', price: 66, image: 'https://images.unsplash.com/photo-1520975659191-5bb8826e8f76?auto=format&fit=crop&w=1400&q=80' },
-  { id: 'neon-alley-hoodie', title: 'Neon Alley Hoodie', price: 78, image: 'https://images.unsplash.com/photo-1518544801976-3e188ea222e7?auto=format&fit=crop&w=1400&q=80' },
-  { id: 'forest-tee', title: 'Forest Tee', price: 40, image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1400&q=80' },
-  { id: 'canvas-tee', title: 'Canvas Tee', price: 42, image: 'https://images.unsplash.com/photo-1496317899792-9d7dbcd928a1?auto=format&fit=crop&w=1400&q=80' },
-  { id: 'city-ls', title: 'City LS', price: 58, image: 'https://images.unsplash.com/photo-1503342217505-b0a15cf704d9?auto=format&fit=crop&w=1400&q=80' },
-];
+import { publicProductService } from '../main/services/publicProductService';
+import { effectivePrice, isOnSale, productHref, productImage } from '@/lib/productMedia';
 
 export default function NewArrivalsPage() {
+  const [items, setItems] = useState<ArrivalItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    publicProductService
+      .getLatestProducts(12)
+      .then((res) => {
+        if (cancelled) return;
+        setItems(
+          (res.data || []).map((p) => ({
+            id: p._id,
+            title: p.name,
+            price: effectivePrice(p),
+            compareAt: isOnSale(p) ? p.price : undefined,
+            image: productImage(p),
+            detailImage: productImage(p, 1),
+            href: productHref(p),
+          }))
+        );
+      })
+      .catch((err) => {
+        console.error('Failed to load new arrivals:', err);
+        if (!cancelled) setError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-stone-50 to-white text-stone-900">
       <section className="px-6 md:px-10 lg:px-20 pt-16 pb-8">
@@ -29,17 +59,37 @@ export default function NewArrivalsPage() {
         </div>
       </section>
 
-      <section className="px-6 md:px-10 lg:px-20">
-        <div className="mx-auto ">
-          <NewArrivalsFeature items={ITEMS} />
+      {loading ? (
+        <div className="flex items-center justify-center py-24">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-stone-300 border-t-stone-600" />
         </div>
-      </section>
+      ) : items.length === 0 ? (
+        <div className="px-6 py-24 text-center">
+          <p className="text-stone-600">
+            {error ? 'We couldn’t load new arrivals right now. Please try again shortly.' : 'New pieces are on their way — check back soon.'}
+          </p>
+          <Link
+            href="/shop"
+            className="mt-4 inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 transition"
+          >
+            Browse the shop
+          </Link>
+        </div>
+      ) : (
+        <>
+          <section className="px-6 md:px-10 lg:px-20">
+            <div className="mx-auto ">
+              <NewArrivalsFeature items={items} />
+            </div>
+          </section>
 
-      <section className="px-6 md:px-10 lg:px-20 pb-16">
-        <div className="mx-auto ">
-          <NewArrivalsRail items={ITEMS} />
-        </div>
-      </section>
+          <section className="px-6 md:px-10 lg:px-20 pb-16">
+            <div className="mx-auto ">
+              <NewArrivalsRail items={items} />
+            </div>
+          </section>
+        </>
+      )}
     </main>
   );
 }

@@ -4,25 +4,38 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, PackageSearch, MapPin, Headphones, CreditCard } from 'lucide-react';
+import { publicProductService } from '../services/publicProductService';
+import { FALLBACK_GALLERY, productImage, productHref } from '@/lib/productMedia';
 
 export type IGPost = { id: string; image: string; href?: string; likes?: number };
 
 type Props = { className?: string; handle?: string; posts?: IGPost[] };
 
-const DEFAULT_POSTS: IGPost[] = [
-  { id: 'ig-1', image: 'https://images.unsplash.com/photo-1581691952693-d2d60c02f2ac?auto=format&fit=crop&w=1600&q=80', likes: 1240 },
-  { id: 'ig-2', image: 'https://images.unsplash.com/photo-1543087903-1ac2ec7aa8c5?auto=format&fit=crop&w=1600&q=80', likes: 980 },
-  { id: 'ig-3', image: 'https://images.unsplash.com/photo-1511735111819-9a3f7709049c?auto=format&fit=crop&w=1600&q=80', likes: 860 },
-  { id: 'ig-4', image: 'https://images.unsplash.com/photo-1497032205916-ac775f0649ae?auto=format&fit=crop&w=1600&q=80', likes: 1420 },
-  { id: 'ig-5', image: 'https://images.unsplash.com/photo-1499013819532-e4ff41b00669?auto=format&fit=crop&w=1600&q=80', likes: 650 },
-  { id: 'ig-6', image: 'https://images.unsplash.com/photo-1536335550880-118d3d624d07?auto=format&fit=crop&w=1600&q=80', likes: 720 },
-];
+const DEFAULT_POSTS: IGPost[] = FALLBACK_GALLERY.map((image, i) => ({ id: `ig-${i + 1}`, image }));
 
 export default function InstagramFeedSection({
   className = '',
-  handle = '@silsila',
-  posts = DEFAULT_POSTS,
+  handle = '@silsila.pk',
+  posts: postsProp,
 }: Props) {
+  const [posts, setPosts] = useState<IGPost[]>(postsProp ?? DEFAULT_POSTS);
+  const profileUrl = `https://instagram.com/${handle.replace(/^@/, '')}`;
+
+  // Without explicit posts, show the latest product shots.
+  useEffect(() => {
+    if (postsProp) return;
+    let cancelled = false;
+    publicProductService
+      .getLatestProducts(6)
+      .then((res) => {
+        if (cancelled || !res?.data?.length) return;
+        setPosts(res.data.map((p) => ({ id: p._id, image: productImage(p), href: productHref(p) })));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [postsProp]);
   const railRef = useRef<HTMLDivElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(true);
@@ -55,7 +68,7 @@ export default function InstagramFeedSection({
           <h2 className="text-center text-2xl md:text-3xl font-semibold uppercase" style={{ fontFamily: 'Poppins, sans-serif' }}>
             Instagram
           </h2>
-          <Link href="https://instagram.com/" target="_blank" className="text-sm text-stone-700 hover:text-stone-900 hover:underline underline-offset-4">
+          <Link href={profileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-stone-700 hover:text-stone-900 hover:underline underline-offset-4">
             {handle} • Follow us
           </Link>
         </div>
@@ -99,7 +112,7 @@ export default function InstagramFeedSection({
             {posts.map((p, i) => (
               <Link
                 key={p.id}
-                href={p.href || '#'}
+                href={p.href || profileUrl}
                 className={[
                   'group relative shrink-0 snap-start overflow-hidden rounded-3xl bg-white ring-1 ring-stone-200/80',
                   'w-[88%] sm:w-[64%] md:w-1/3',
@@ -123,24 +136,24 @@ export default function InstagramFeedSection({
 
         {/* Feature row (non-duplicative to hero/footer) */}
         <div className="mt-8 grid grid-cols-1 gap-6 text-center sm:grid-cols-2 lg:grid-cols-4">
-          <Feature icon={<PackageSearch className="h-5 w-5" />} title="Track Your Order" desc="Click here for quick updates" />
-          <Feature icon={<MapPin className="h-5 w-5" />} title="Store locator" desc="Find a nearby store" />
-          <Feature icon={<Headphones className="h-5 w-5" />} title="Support 24/7" desc="We’re here anytime" />
-          <Feature icon={<CreditCard className="h-5 w-5" />} title="Payment Methods" desc="COD • Visa • MasterCard" />
+          <Feature href="/track" icon={<PackageSearch className="h-5 w-5" />} title="Track Your Order" desc="Click here for quick updates" />
+          <Feature href="/contact" icon={<MapPin className="h-5 w-5" />} title="Store locator" desc="Find us or get in touch" />
+          <Feature href="/faqs" icon={<Headphones className="h-5 w-5" />} title="Support 24/7" desc="Answers to common questions, anytime" />
+          <Feature href="/faqs" icon={<CreditCard className="h-5 w-5" />} title="Payment Methods" desc="COD • Visa • MasterCard" />
         </div>
       </div>
     </section>
   );
 }
 
-function Feature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+function Feature({ icon, title, desc, href }: { icon: React.ReactNode; title: string; desc: string; href: string }) {
   return (
-    <div className="flex flex-col items-center">
+    <Link href={href} className="group flex flex-col items-center">
       <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-900">
         {icon}
       </div>
-      <p className="mt-3 text-sm font-semibold">{title}</p>
+      <p className="mt-3 text-sm font-semibold group-hover:underline underline-offset-4">{title}</p>
       <p className="mt-1 max-w-[18rem] text-xs text-stone-600">{desc}</p>
-    </div>
+    </Link>
   );
 }

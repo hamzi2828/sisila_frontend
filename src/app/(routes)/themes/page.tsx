@@ -30,6 +30,14 @@ export default function ThemesPage() {
     fetchThemes();
   }, []);
 
+  // Sections render after the fetch, so honour /themes#id once they exist.
+  useEffect(() => {
+    if (isLoading || !themes.length) return;
+    const hash = decodeURIComponent(window.location.hash.slice(1));
+    if (!hash) return;
+    requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, [isLoading, themes.length]);
+
   if (isLoading) {
     return (
       <main className="min-h-screen bg-gradient-to-b from-stone-50 to-white flex items-center justify-center">
@@ -80,7 +88,7 @@ export default function ThemesPage() {
             <ThemeStickyNav sections={themes} />
           </aside>
 
-          <section className="lg:col-span-9 space-y-16">
+          <section id="theme-list" className="lg:col-span-9 space-y-16 scroll-mt-28">
             {themes.map((section) => (
               <ThemeProducts key={section._id} section={section} />
             ))}

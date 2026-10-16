@@ -5,6 +5,25 @@ import Link from 'next/link';
 import { addToCart } from '@/helper/cartHelper';
 import { toggleWishlist, isInWishlist } from '@/helper/wishlistHelper';
 
+// Variant colors are stored as names; map them to swatch tones that read well on screen.
+const COLOR_SWATCHES: Record<string, string> = {
+  black: '#111111',
+  white: '#f5f5f5',
+  navy: '#1f2a44',
+  olive: '#6b6b3a',
+  maroon: '#6d1a2a',
+  beige: '#d9c7a7',
+};
+
+function swatchColor(name: string): string {
+  return COLOR_SWATCHES[name.trim().toLowerCase()] || name;
+}
+
+function isLightSwatch(name: string): boolean {
+  const key = name.trim().toLowerCase();
+  return key === 'white' || key === 'beige';
+}
+
 export default function ProductBuyBox({
   product,
   productId,
@@ -63,7 +82,7 @@ export default function ProductBuyBox({
 
         if (matchingVariant) {
           variant = {
-            variantId: matchingVariant._id || `${color}-${size}`,
+            variantId: matchingVariant.variantId || matchingVariant._id || `${color}-${size}`,
             color: matchingVariant.color,
             size: matchingVariant.size,
             price: matchingVariant.price,
@@ -152,7 +171,7 @@ export default function ProductBuyBox({
         </span>
 
         <span className="inline-flex items-center gap-2 rounded-full bg-stone-50 px-3 py-1 text-stone-700 ring-1 ring-stone-200">
-          <i className="fa-solid fa-shield-halved" aria-hidden="true" /> 30-day returns
+          <i className="fa-solid fa-shield-halved" aria-hidden="true" /> 7-day exchanges
         </span>
       </div>
 
@@ -168,8 +187,13 @@ export default function ProductBuyBox({
                 key={c}
                 onClick={() => setColor(c)}
                 aria-label={`Select color ${c}`}
-                className={['h-9 w-9 rounded-full ring-2 transition', color === c ? 'ring-stone-900' : 'ring-transparent hover:ring-stone-400'].join(' ')}
-                style={{ backgroundColor: c }}
+                title={c}
+                className={[
+                  'h-9 w-9 rounded-full ring-2 ring-offset-2 transition',
+                  isLightSwatch(c) ? 'border border-stone-300' : 'border border-transparent',
+                  color === c ? 'ring-stone-900' : 'ring-transparent hover:ring-stone-400',
+                ].join(' ')}
+                style={{ backgroundColor: swatchColor(c) }}
               />
             ))}
           </div>

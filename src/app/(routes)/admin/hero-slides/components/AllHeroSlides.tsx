@@ -16,7 +16,7 @@ interface AllHeroSlidesProps {
 export default function AllHeroSlides({ slides, onEdit, onDelete, onToggleStatus, loading = false, error = null }: AllHeroSlidesProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
-  const [platformFilter, setPlatformFilter] = useState<"all" | "gymwear" | "gymfolio">("all");
+  const [platformFilter, setPlatformFilter] = useState<"all">("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [togglingStatus, setTogglingStatus] = useState<Set<string>>(new Set());
   const slidesPerPage = 6;
@@ -175,26 +175,6 @@ export default function AllHeroSlides({ slides, onEdit, onDelete, onToggleStatus
               </div>
             </div>
 
-            {/* Platform Filter */}
-            <div>
-              <label htmlFor="platform-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                Platform
-              </label>
-              <select
-                id="platform-filter"
-                value={platformFilter}
-                onChange={(e) => {
-                  setPlatformFilter(e.target.value as "all" | "gymwear" | "gymfolio");
-                  setCurrentPage(1);
-                }}
-                className="h-10 w-full rounded-md border border-gray-300 bg-white text-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="all">All Platforms</option>
-                <option value="gymwear">Gymwear</option>
-                <option value="gymfolio">Gymfolio</option>
-              </select>
-            </div>
-
             {/* Status Filter */}
             <div>
               <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
@@ -234,11 +214,6 @@ export default function AllHeroSlides({ slides, onEdit, onDelete, onToggleStatus
                 <div className="absolute top-2 left-2 flex flex-col gap-2">
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-900 bg-opacity-75 text-white">
                     Order: {slide.order}
-                  </span>
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                    slide.platform === 'gymwear' ? 'bg-indigo-100 text-indigo-800' : 'bg-pink-100 text-pink-800'
-                  }`}>
-                    {slide.platform === 'gymwear' ? 'Gymwear' : 'Gymfolio'}
                   </span>
                 </div>
                 <div className="absolute top-2 right-2">

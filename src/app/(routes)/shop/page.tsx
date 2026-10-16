@@ -1,30 +1,36 @@
 'use client';
 
 import { useMemo, useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { publicProductService, type PublicProduct } from '../main/services/publicProductService';
+import popularCategoriesService, { type PopularCategory } from '../main/services/popularCategoriesService';
+import { effectivePrice, isOnSale, resolveImage } from '@/lib/productMedia';
 import ShopHero from './components/ShopHero';
 import ShopValueBar from './components/ShopValueBar';
-import ShopFilters from './components/ShopFilters';
+import ShopFilters, { matchesPriceRange, type PriceRange, type SortKey } from './components/ShopFilters';
 import ShopGrid from './components/ShopGrid';
 
 type Product = {
   id: string;
   title: string;
   price: number;
+  compareAt?: number;
   image: string;
   href: string;
   tag?: string;
+  featured?: boolean;
+  createdAt?: string;
 };
-
-type PriceRange = 'All' | 'Under $40' | '$40–$60' | '$60–$80' | '$80+';
-type SortKey = 'Featured' | 'Price ↑' | 'Price ↓';
 
 function ShopPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const collection = searchParams.get('collection') as 'theme' | 'series' | null;
   const collectionId = searchParams.get('collectionId');
+  const categoryParam = (searchParams.get('category') || '').trim();
+  const sortParam = searchParams.get('sort');
 
   const [allProducts, setAllProducts] = useState<PublicProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,7 +39,34 @@ function ShopPageContent() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [q, setQ] = useState('');
   const [price, setPrice] = useState<PriceRange>('All');
-  const [sort, setSort] = useState<SortKey>('Featured');
+  const [sort, setSort] = useState<SortKey>(sortParam === 'new' ? 'Newest' : 'Featured');
+  const [categories, setCategories] = useState<PopularCategory[]>([]);
+
+  useEffect(() => {
+    if (sortParam === 'new') setSort('Newest');
+  }, [sortParam]);
+
+  useEffect(() => {
+    popularCategoriesService
+      .getPopularCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, []);
+
+  // The active category lives in the URL so filtered views are shareable.
+  const activeCategory = useMemo(() => {
+    if (!categoryParam) return null;
+    const match = categories.find((c) => c.name.toLowerCase() === categoryParam.toLowerCase());
+    return { name: match?.name || categoryParam, description: match?.description };
+  }, [categoryParam, categories]);
+
+  const setCategory = (name: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (name) params.set('category', name);
+    else params.delete('category');
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -54,7 +87,7 @@ function ShopPageContent() {
           setCollectionTitle(formattedTitle);
         } else {
           // Otherwise fetch all products
-          response = await publicProductService.getAllProducts(100, 1, 'createdAt', 'desc');
+          response = await publicProductService.getAllProducts(200, 1, 'createdAt', 'desc');
           setCollectionTitle('');
         }
 
@@ -74,7 +107,7 @@ function ShopPageContent() {
     // Map PublicProduct to Product type for ShopGrid
     let rows: Product[] = allProducts.map((p) => {
       // Handle image for variant products
-      let imageUrl = p.thumbnailUrl || (p.bannerUrls && p.bannerUrls[0]) || '/images/placeholder.png';
+      let imageUrl = p.thumbnailUrl || (p.bannerUrls && p.bannerUrls[0]) || '';
 
       if (p.productType === 'variant' && p.variants && p.variants.length > 0) {
         const firstVariantColor = p.variants[0].color;
@@ -83,20 +116,23 @@ function ShopPageContent() {
         }
       }
 
-      // Add backend URL prefix if not already present
-      if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/images/')) {
-        imageUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}${imageUrl}`;
-      }
-
       return {
         id: p._id,
         title: p.name,
-        price: p.discountedPrice || p.price,
-        image: imageUrl,
+        price: effectivePrice(p),
+        compareAt: isOnSale(p) ? p.price : undefined,
+        image: resolveImage(imageUrl),
         href: `/productdetail/${p._id}`,
-        tag: p.category
+        tag: p.category,
+        featured: p.featured,
+        createdAt: p.createdAt,
       };
     });
+
+    if (categoryParam) {
+      const wanted = categoryParam.toLowerCase();
+      rows = rows.filter((p) => (p.tag || '').toLowerCase() === wanted);
+    }
 
     const query = q.trim().toLowerCase();
     if (query) {
@@ -105,31 +141,22 @@ function ShopPageContent() {
       );
     }
 
-    rows = rows.filter((p) => {
-      switch (price) {
-        case 'Under $40':
-          return p.price < 40;
-        case '$40–$60':
-          return p.price >= 40 && p.price <= 60;
-        case '$60–$80':
-          return p.price > 60 && p.price <= 80;
-        case '$80+':
-          return p.price > 80;
-        default:
-          return true;
-      }
-    });
+    rows = rows.filter((p) => matchesPriceRange(price, p.price));
 
+    // API order is newest first; 'Featured' floats featured pieces to the top.
+    if (sort === 'Featured') rows.sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
+    if (sort === 'Newest') rows.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     if (sort === 'Price ↑') rows.sort((a, b) => a.price - b.price);
     if (sort === 'Price ↓') rows.sort((a, b) => b.price - a.price);
 
     return rows;
-  }, [allProducts, price, q, sort]);
+  }, [allProducts, price, q, sort, categoryParam]);
 
   const clearAll = () => {
     setPrice('All');
     setQ('');
     setSort('Featured');
+    if (categoryParam) setCategory('');
   };
 
   if (isLoading) {
@@ -170,7 +197,15 @@ function ShopPageContent() {
     <main className="min-h-screen bg-gradient-to-b from-stone-50 to-white text-stone-900">
       <section className="px-6 md:px-10 lg:px-20 pt-16 pb-10">
         <div className="mx-auto ">
-          <ShopHero />
+          {activeCategory && !collectionTitle ? (
+            <ShopHero
+              eyebrow="Category"
+              title={activeCategory.name}
+              description={activeCategory.description || `Explore Silsila's ${activeCategory.name} designs.`}
+            />
+          ) : (
+            <ShopHero />
+          )}
         </div>
       </section>
 
@@ -178,6 +213,27 @@ function ShopPageContent() {
 
       <section className="px-6 md:px-10 lg:px-20 pb-20">
         <div className="mx-auto ">
+          {/* Category Breadcrumb */}
+          {activeCategory && !collectionTitle && (
+            <div className="mb-6">
+              <nav className="flex items-center gap-2 text-sm text-stone-600">
+                <Link href="/shop" className="hover:text-stone-900 underline underline-offset-4">
+                  All Products
+                </Link>
+                <span>/</span>
+                <Link href="/categories" className="hover:text-stone-900 underline underline-offset-4">
+                  Categories
+                </Link>
+                <span>/</span>
+                <span className="font-medium text-stone-900">{activeCategory.name}</span>
+              </nav>
+              <h1 className="mt-4 text-3xl md:text-4xl font-bold">{activeCategory.name}</h1>
+              <p className="mt-2 text-stone-600">
+                {products.length} {products.length === 1 ? 'product' : 'products'} available
+              </p>
+            </div>
+          )}
+
           {/* Collection Breadcrumb */}
           {collectionTitle && (
             <div className="mb-6">
@@ -215,7 +271,22 @@ function ShopPageContent() {
             setSort={setSort}
             count={products.length}
             clearAll={clearAll}
+            categories={categories.map((c) => c.name)}
+            category={activeCategory?.name || ''}
+            setCategory={setCategory}
           />
+
+          {products.length === 0 && (
+            <div className="mt-10 rounded-2xl border border-stone-200 bg-white p-10 text-center">
+              <p className="text-stone-600">No products match these filters.</p>
+              <button
+                onClick={clearAll}
+                className="mt-4 inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-stone-800"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
 
           <ShopGrid
             products={products}

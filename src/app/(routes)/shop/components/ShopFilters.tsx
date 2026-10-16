@@ -2,8 +2,25 @@
 
 import { SlidersHorizontal, X, Search } from 'lucide-react';
 
-type PriceRange = 'All' | 'Under $40' | '$40–$60' | '$60–$80' | '$80+';
-type SortKey = 'Featured' | 'Price ↑' | 'Price ↓';
+export type PriceRange = 'All' | 'Under Rs 3,000' | 'Rs 3,000–5,000' | 'Rs 5,000–8,000' | 'Over Rs 8,000';
+export type SortKey = 'Featured' | 'Newest' | 'Price ↑' | 'Price ↓';
+export const PRICE_RANGES: PriceRange[] = ['All', 'Under Rs 3,000', 'Rs 3,000–5,000', 'Rs 5,000–8,000', 'Over Rs 8,000'];
+export const SORTS: SortKey[] = ['Featured', 'Newest', 'Price ↑', 'Price ↓'];
+
+export function matchesPriceRange(range: PriceRange, price: number): boolean {
+  switch (range) {
+    case 'Under Rs 3,000':
+      return price < 3000;
+    case 'Rs 3,000–5,000':
+      return price >= 3000 && price <= 5000;
+    case 'Rs 5,000–8,000':
+      return price > 5000 && price <= 8000;
+    case 'Over Rs 8,000':
+      return price > 8000;
+    default:
+      return true;
+  }
+}
 
 export default function ShopFilters({
   drawerOpen,
@@ -16,6 +33,9 @@ export default function ShopFilters({
   setSort,
   count,
   clearAll,
+  categories = [],
+  category = '',
+  setCategory,
 }: {
   drawerOpen: boolean;
   setDrawerOpen: (v: boolean) => void;
@@ -27,9 +47,10 @@ export default function ShopFilters({
   setSort: (v: SortKey) => void;
   count: number;
   clearAll: () => void;
+  categories?: string[];
+  category?: string;
+  setCategory?: (v: string) => void;
 }) {
-  const PRICE_RANGES: PriceRange[] = ['All', 'Under $40', '$40–$60', '$60–$80', '$80+'];
-  const SORTS: SortKey[] = ['Featured', 'Price ↑', 'Price ↓'];
 
   return (
     <>
@@ -57,9 +78,10 @@ export default function ShopFilters({
       </div>
 
       {/* Active summary */}
-      {(price !== 'All' || q) && (
+      {(price !== 'All' || q || category) && (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
           <span className="text-stone-600">Filters:</span>
+          {category && setCategory && <Badge onClear={() => setCategory('')}>{category}</Badge>}
           {price !== 'All' && <Badge onClear={() => setPrice('All')}>{price}</Badge>}
           {q && <Badge onClear={() => setQ('')}>{q}</Badge>}
           <button
@@ -102,6 +124,27 @@ export default function ShopFilters({
                   />
                 </div>
               </div>
+
+              {/* Category */}
+              {categories.length > 0 && setCategory && (
+                <div>
+                  <p className="text-sm font-medium">Category</p>
+                  <div className="mt-2 grid gap-2">
+                    {['', ...categories].map((c) => (
+                      <label key={c || 'all'} className="inline-flex items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="category"
+                          className="h-4 w-4 border-stone-300 text-stone-900 focus:ring-stone-400"
+                          checked={category.toLowerCase() === c.toLowerCase()}
+                          onChange={() => setCategory(c)}
+                        />
+                        <span>{c || 'All'}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Price */}
               <div>

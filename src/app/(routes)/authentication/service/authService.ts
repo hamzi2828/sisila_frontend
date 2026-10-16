@@ -8,7 +8,6 @@ export interface SignUpPayload {
 }
 
 export async function signUp(payload: SignUpPayload) {
-    console.log("payload", payload);
 
   const res = await fetch(`${API_BASE_URL}/user/signup`, {
     method: "POST",

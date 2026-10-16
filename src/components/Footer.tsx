@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Instagram, Youtube, Twitter, ArrowUp, Mail, MapPin, Phone } from 'lucide-react';
+import { Instagram, Youtube, Facebook, ArrowUp, Mail, MapPin, Phone } from 'lucide-react';
 import { fetchNavbarData, type Category, type Theme, type Series } from './components/navbarService';
 
 export default function Footer() {
@@ -24,16 +24,37 @@ export default function Footer() {
 function Newsletter() {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
+  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    if (!email || busy) return;
     setBusy(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setBusy(false);
-    setDone(true);
-    setEmail('');
+    setStatus(null);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+      const res = await fetch(`${baseUrl}/api/newsletter/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), source: 'footer' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.success !== false) {
+        setStatus({
+          type: 'success',
+          message: res.status === 200 ? 'Welcome back — your subscription is active again.' : 'Thanks for subscribing — welcome to the Silsila circle.',
+        });
+        setEmail('');
+      } else if (res.status === 409) {
+        setStatus({ type: 'error', message: 'This email is already subscribed.' });
+      } else {
+        setStatus({ type: 'error', message: data?.message || 'Could not subscribe right now. Please try again.' });
+      }
+    } catch {
+      setStatus({ type: 'error', message: 'Network error — please check your connection and try again.' });
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -46,7 +67,7 @@ function Newsletter() {
               <h2 className="mt-2 text-2xl md:text-3xl font-semibold uppercase text-white" style={{ fontFamily: 'Poppins, sans-serif' }}>
                 Join the Silsila community
               </h2>
-              <p className="mt-2 text-neutral-300">Drops, stories, and early access to culturally‑inspired design. Get 10% off your first order.</p>
+              <p className="mt-2 text-neutral-300">New drops, stories behind the designs, and early access to culturally‑inspired collections.</p>
 
               <form onSubmit={submit} className="mt-5 flex w-full flex-col gap-3 sm:flex-row">
                 <input
@@ -74,7 +95,18 @@ function Newsletter() {
                 .
               </p>
 
-              {done && <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-neutral-800 px-3 py-1.5 text-sm text-white ring-1 ring-neutral-700">Thanks for subscribing — check your inbox.</p>}
+              {status && (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className={[
+                    'mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm ring-1',
+                    status.type === 'success' ? 'bg-neutral-800 text-white ring-neutral-700' : 'bg-neutral-900 text-red-300 ring-red-900/60',
+                  ].join(' ')}
+                >
+                  {status.message}
+                </p>
+              )}
             </div>
 
             <div className="flex items-center justify-center">
@@ -89,11 +121,11 @@ function Newsletter() {
 />
                   <div>
                     <p className="text-xs uppercase tracking-[0.18em] text-neutral-400">Silsila</p>
-                    <p className="text-neutral-200 text-sm">Culture in Motion — Since 2024</p>
+                    <p className="text-neutral-200 text-sm">Culture in Motion — Since 2025</p>
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs text-neutral-200">
-                  <Badge>30‑day returns</Badge>
+                  <Badge>7‑day exchanges</Badge>
                   <Badge>Secure checkout</Badge>
                 </div>
               </div>
@@ -182,15 +214,15 @@ function LinksAndBrand() {
             <p className="mt-3 max-w-sm text-sm text-neutral-300">Culturally‑inspired apparel blending heritage with contemporary fashion — designed for modern expression.</p>
 
             <div className="mt-4 flex items-center gap-2">
-              <Social href="https://instagram.com/" label="Instagram"><Instagram className="h-4 w-4" /></Social>
-              <Social href="https://twitter.com/" label="Twitter / X"><Twitter className="h-4 w-4" /></Social>
-              <Social href="https://youtube.com/" label="YouTube"><Youtube className="h-4 w-4" /></Social>
+              <Social href="https://instagram.com/silsila.pk" label="Instagram"><Instagram className="h-4 w-4" /></Social>
+              <Social href="https://facebook.com/silsila.pk" label="Facebook"><Facebook className="h-4 w-4" /></Social>
+              <Social href="https://youtube.com/@silsila.pk" label="YouTube"><Youtube className="h-4 w-4" /></Social>
             </div>
 
             <div className="mt-5 grid gap-2 text-sm text-neutral-300">
-              <p className="inline-flex items-center gap-2"><Mail className="h-4 w-4 text-neutral-500" /> support@silsila.co</p>
-              <p className="inline-flex items-center gap-2"><Phone className="h-4 w-4 text-neutral-500" /> +92 300 0000000</p>
-              <p className="inline-flex items-center gap-2"><MapPin className="h-4 w-4 text-neutral-500" /> Karachi, PK</p>
+              <p className="inline-flex items-center gap-2"><Mail className="h-4 w-4 text-neutral-500" /> <a href="mailto:hello@silsilla.pk" className="hover:text-white hover:underline underline-offset-4">hello@silsilla.pk</a></p>
+              <p className="inline-flex items-center gap-2"><Phone className="h-4 w-4 text-neutral-500" /> <a href="tel:+923000000000" className="hover:text-white hover:underline underline-offset-4">+92 300 0000000</a></p>
+              <p className="inline-flex items-center gap-2"><MapPin className="h-4 w-4 text-neutral-500" /> Lahore, Pakistan</p>
             </div>
           </div>
 
@@ -201,7 +233,7 @@ function LinksAndBrand() {
                 <ul className="space-y-2 text-sm">
                   {c.links.map((l) => (
                     <li key={l.label}>
-                      <Link href={l.href} className={['group inline-flex items-center gap-1 hover:underline underline-offset-4', l.subtle ? 'text-neutral-400 hover:text-neutral-100' : ''].join(' ')}>
+                      <Link href={l.href} className={['group inline-flex items-center gap-1 hover:underline underline-offset-4', ('subtle' in l && l.subtle) ? 'text-neutral-400 hover:text-neutral-100' : ''].join(' ')}>
                         <span>{l.label}</span>
                         
                       </Link>
@@ -214,8 +246,9 @@ function LinksAndBrand() {
         </div>
 
         <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Pill>30‑day returns & exchanges</Pill>
-          <Pill>Secure payments (Visa • MasterCard • PayPal)</Pill>
+          <Pill>Free shipping across Pakistan over Rs 5,000</Pill>
+          <Pill>7‑day exchanges</Pill>
+          <Pill>COD • Visa • MasterCard</Pill>
         </div>
       </div>
     </section>
@@ -254,7 +287,7 @@ function BottomBar({ year }: { year: number }) {
 /* Small pieces */
 function Social({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
   return (
-    <Link href={href} target="_blank" aria-label={label} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-700 bg-neutral-900 text-neutral-200 transition hover:bg-neutral-800 hover:shadow-sm" title={label}>
+    <Link href={href} target="_blank" rel="noopener noreferrer" aria-label={label} className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-700 bg-neutral-900 text-neutral-200 transition hover:bg-neutral-800 hover:shadow-sm" title={label}>
       {children}
     </Link>
   );

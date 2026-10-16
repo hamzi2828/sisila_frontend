@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 import { checkoutService, type ShippingAddress } from '../services/checkoutService';
 import { toast } from 'react-hot-toast';
 import { getAuthToken, isAuthenticated } from '@/helper/helper';
+import { formatPrice } from '@/lib/formatPrice';
+import { calcShipping, loadLocalCart, mapBackendCartItem } from '../utils/checkoutCart';
 
 type CartItem = {
   id: string;
@@ -81,10 +83,9 @@ type BackendCartResponse = {
   };
 };
 
-const CART_KEY = 'silsila_cart';
 const CHECKOUT_KEY = 'silsila_checkout';
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
-const money = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+const money = (v: number) => formatPrice(v);
 
 export default function CheckoutPaymentPage() {
   const router = useRouter();
@@ -96,8 +97,8 @@ export default function CheckoutPaymentPage() {
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
-  const [code, setCode] = useState('');
-  const [discount, setDiscount] = useState(0);
+  // Promo codes are not supported by the payment backend yet, so no discount is applied here.
+  const discount: number = 0;
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch cart from backend
@@ -122,55 +123,10 @@ export default function CheckoutPaymentPage() {
         if (data.success && data.data?.items) {
           setBackendCartItems(data.data.items);
 
-          // Also transform to display format
-          const transformedCart: CartItem[] = data.data.items.map((item) => {
-            const product = item.productId;
-
-            // Get image - handle variant products with colorMedia
-            let image = '';
-
-            if (product.colorMedia && Object.keys(product.colorMedia).length > 0) {
-              // For variant products, try to get image based on selected variant color
-              if (item.variant?.variantId && product.variants) {
-                const selectedVariant = product.variants.find(v => v.variantId === item.variant?.variantId);
-                if (selectedVariant?.color && product.colorMedia[selectedVariant.color]) {
-                  image = product.colorMedia[selectedVariant.color].thumbnailUrl;
-                }
-              }
-
-              // Fallback to first available color if variant color not found
-              if (!image) {
-                const firstColor = Object.keys(product.colorMedia)[0];
-                image = product.colorMedia[firstColor]?.thumbnailUrl || '';
-              }
-            } else {
-              // For regular products, use thumbnailUrl or first banner
-              image = product.thumbnailUrl || product.bannerUrls?.[0] || '';
-            }
-
-            const fullImage = image && !image.startsWith('http') ? `${API_BASE_URL}${image}` : image;
-
-            // Get variant details
-            let variantInfo = undefined;
-            if (item.variant?.variantId && product.variants) {
-              const selectedVariant = product.variants.find(v => v.variantId === item.variant?.variantId);
-              if (selectedVariant) {
-                variantInfo = {
-                  color: selectedVariant.color,
-                  size: selectedVariant.size
-                };
-              }
-            }
-
-            return {
-              id: item._id || product._id, // Use cart item ID for uniqueness
-              title: product.name,
-              price: item.variant?.price || product.discountedPrice || product.price,
-              image: fullImage,
-              qty: item.quantity,
-              variant: variantInfo,
-            };
-          });
+          // Also transform to display format (shared with the other checkout steps)
+          const transformedCart: CartItem[] = data.data.items
+            .filter((item) => item && item.productId && typeof item.productId === 'object')
+            .map((item) => mapBackendCartItem(item));
 
           setCart(transformedCart);
         }
@@ -188,7 +144,6 @@ export default function CheckoutPaymentPage() {
       if (s.payment) {
         setMethod(s.payment.method);
         setCardName(s.payment.name || '');
-        setDiscount(s.discount || 0);
       }
     }
 
@@ -196,24 +151,16 @@ export default function CheckoutPaymentPage() {
     if (isAuthenticated()) {
       fetchBackendCart();
     } else {
-      // Try to load from localStorage as fallback
-      const c = localStorage.getItem(CART_KEY);
-      if (c) setCart(JSON.parse(c));
+      // Guest: show the locally saved cart
+      setCart(loadLocalCart());
     }
   }, []);
 
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty, 0), [cart]);
-  const shipCost = state.shipping === 'express' ? 14.95 : subtotal >= 75 ? 0 : 6.95;
+  const shipCost = calcShipping(subtotal, state.shipping);
   const totalBefore = subtotal + shipCost;
   const total = Math.max(0, totalBefore - discount);
 
-  const applyCode = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simple demo codes
-    const map: Record<string, number> = { SILSILA10: 10, WELCOME5: 5 };
-    const off = map[code.toUpperCase()] || 0;
-    setDiscount(off);
-  };
 
   const saveAndNext = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -223,7 +170,7 @@ export default function CheckoutPaymentPage() {
     // Check if user is authenticated
     if (!isAuthenticated()) {
       toast.error('Please login to continue with checkout');
-      router.push('/login?redirect=/checkout/payment');
+      router.push('/authentication?redirect=/checkout/payment');
       return;
     }
 
@@ -277,7 +224,9 @@ export default function CheckoutPaymentPage() {
 
             // Find specific variant in product variants array
             if (item.productId.variants && variantId) {
-              const variant = item.productId.variants.find(v => v.variantId === variantId);
+              const variant = item.productId.variants.find(
+                v => v.variantId === variantId || (v as { _id?: string })._id === variantId
+              );
               if (variant) {
                 size = variant.size;
                 color = variant.color;
@@ -375,21 +324,6 @@ export default function CheckoutPaymentPage() {
                 </div>
               )}
 
-              <div className="pt-2">
-                <form onSubmit={applyCode} className="flex gap-2">
-                  <input
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    placeholder="Promo code (SILSILA10)"
-                    className="flex-1 rounded-xl border border-stone-300/80 px-3 py-2 text-sm outline-none focus:border-stone-400"
-                  />
-                  <button className="rounded-xl border border-stone-300/80 px-3 py-2 text-sm hover:bg-stone-50">
-                    Apply
-                  </button>
-                </form>
-                {discount > 0 && <p className="mt-1 text-sm text-emerald-700">Discount applied: -{money(discount)}</p>}
-              </div>
-
               <div className="flex items-center justify-between pt-2">
                 <Link href="/checkout" className="text-sm text-stone-600 hover:text-stone-900">
                   ← Back to shipping
@@ -457,7 +391,7 @@ export default function CheckoutPaymentPage() {
               {/* Price Summary */}
               <div className="mt-3 space-y-2 text-sm">
                 <Row label="Subtotal" value={money(subtotal)} />
-                <Row label="Shipping" value={money(shipCost)} />
+                <Row label="Shipping" value={shipCost === 0 ? 'Free' : money(shipCost)} />
                 {discount > 0 && <Row label="Discount" value={`-${money(discount)}`} />}
                 <div className="border-t pt-2">
                   <Row label="Total" value={money(total)} bold />

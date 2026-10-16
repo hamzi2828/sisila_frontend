@@ -30,6 +30,14 @@ export default function SeriesPage() {
     fetchSeries();
   }, []);
 
+  // Sections render after the fetch, so honour /series#id once they exist.
+  useEffect(() => {
+    if (isLoading || !series.length) return;
+    const hash = decodeURIComponent(window.location.hash.slice(1));
+    if (!hash) return;
+    requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, [isLoading, series.length]);
+
   if (isLoading) {
     return (
       <main className="min-h-screen bg-gradient-to-b from-stone-50 to-white flex items-center justify-center">
@@ -80,7 +88,7 @@ export default function SeriesPage() {
             <SeriesStickyNav sections={series} />
           </aside>
 
-          <section className="lg:col-span-9 space-y-16">
+          <section id="series-list" className="lg:col-span-9 space-y-16 scroll-mt-28">
             {series.map((section) => (
               <SeriesProducts key={section._id} section={section} />
             ))}

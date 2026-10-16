@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { colorService, mapColor } from "../services/colorService";
 import { sizeService, mapSize } from "../services/sizeService";
+import { toast } from 'react-hot-toast';
 
 const slugify = (str: string) =>
   str
@@ -62,7 +63,7 @@ export default function ColorsSizesTab() {
       setNewColor({ name: "", hex: "", active: true });
     } catch (e) {
       console.error("Failed to create color", e);
-      alert("Failed to create color");
+      toast.error("Failed to create color");
     }
   };
 
@@ -91,7 +92,7 @@ export default function ColorsSizesTab() {
       setEditingColorId(null);
     } catch (e) {
       console.error("Failed to update color", e);
-      alert("Failed to update color");
+      toast.error("Failed to update color");
     } finally {
       setSaving(false);
     }
@@ -121,7 +122,7 @@ export default function ColorsSizesTab() {
       setEditingSizeId(null);
     } catch (e) {
       console.error("Failed to update size", e);
-      alert("Failed to update size");
+      toast.error("Failed to update size");
     } finally {
       setSaving(false);
     }
@@ -137,7 +138,7 @@ export default function ColorsSizesTab() {
       setNewSize({ name: "", active: true });
     } catch (e) {
       console.error("Failed to create size", e);
-      alert("Failed to create size");
+      toast.error("Failed to create size");
     }
   };
 
@@ -147,7 +148,7 @@ export default function ColorsSizesTab() {
     try { await colorService.setActive(id, next); } catch (e) {
       console.error("Failed to update color", e);
       setColors(prev);
-      alert("Failed to update color");
+      toast.error("Failed to update color");
     }
   };
 
@@ -157,7 +158,7 @@ export default function ColorsSizesTab() {
     try { await sizeService.setActive(id, next); } catch (e) {
       console.error("Failed to update size", e);
       setSizes(prev);
-      alert("Failed to update size");
+      toast.error("Failed to update size");
     }
   };
 
@@ -167,7 +168,7 @@ export default function ColorsSizesTab() {
     try { await colorService.deleteColor(id); } catch (e) {
       console.error("Failed to delete color", e);
       setColors(prev);
-      alert("Failed to delete color");
+      toast.error("Failed to delete color");
     }
   };
 
@@ -177,7 +178,7 @@ export default function ColorsSizesTab() {
     try { await sizeService.deleteSize(id); } catch (e) {
       console.error("Failed to delete size", e);
       setSizes(prev);
-      alert("Failed to delete size");
+      toast.error("Failed to delete size");
     }
   };
 

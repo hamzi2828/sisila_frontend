@@ -139,14 +139,12 @@ export default function OrderDetailsModal({ order, onClose, formatDate, getStatu
                     const product = typeof item.product === 'object' ? item.product : null;
                     const productName = product?.name || `Product ${index + 1}`;
 
-                    let productImage = '/images/gym1.svg';
-                    if (product?.primaryImageUrl) {
-                      productImage = process.env.NEXT_PUBLIC_BACKEND_URL + product.primaryImageUrl;
-                    } else if (product?.thumbnailUrl) {
-                      productImage = process.env.NEXT_PUBLIC_BACKEND_URL + product.thumbnailUrl;
-                    } else if (product?.images?.[0]) {
-                      productImage = process.env.NEXT_PUBLIC_BACKEND_URL + product.images[0];
-                    }
+                    const rawImage = product?.primaryImageUrl || product?.thumbnailUrl || product?.images?.[0];
+                    const productImage = !rawImage
+                      ? '/images/image.png'
+                      : rawImage.startsWith('http')
+                      ? rawImage
+                      : `${process.env.NEXT_PUBLIC_BACKEND_URL}${rawImage}`;
 
                     return (
                       <div key={item._id || index} className="px-4 py-4 grid grid-cols-12 gap-4 items-center">

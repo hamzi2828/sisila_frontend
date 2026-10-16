@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { formatPrice } from '@/lib/formatPrice';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -67,8 +68,8 @@ export const collectionService = {
       return products.map(product => ({
         id: product._id,
         name: product.name,
-        price: `$${product.discountedPrice || product.price}`,
-        discountedPrice: product.discountedPrice ? `$${product.price}` : undefined,
+        price: formatPrice(product.discountedPrice || product.price),
+        discountedPrice: product.discountedPrice ? formatPrice(product.price) : undefined,
         image: this.getProductImage(product),
         slug: product.slug
       }));
@@ -90,17 +91,7 @@ export const collectionService = {
     }
     
     if (!imageUrl) {
-      // Use a variety of fallback images
-      const fallbackImages = [
-        '/images/gym-2.svg',
-        '/images/gym-3.svg', 
-        '/images/gym-4.svg',
-        '/images/gym-5.svg',
-        '/images/gym-6.svg',
-        '/images/gym-7.svg'
-      ];
-      const randomIndex = Math.floor(Math.random() * fallbackImages.length);
-      return fallbackImages[randomIndex];
+      return '/images/image.png';
     }
     
     // If it's already a full URL, return as is

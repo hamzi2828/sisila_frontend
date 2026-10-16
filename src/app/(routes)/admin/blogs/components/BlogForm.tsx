@@ -402,7 +402,7 @@ export default function BlogForm({
               <label className="block text-sm font-medium text-gray-700">Title</label>
               <input
                 type="text"
-                placeholder="e.g., 10 Tips to Improve Your Workout"
+                placeholder="e.g., Five Ways to Style an Oversized Tee"
                 className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
                 value={form.title}
                 onChange={(e) => setField("title", e.target.value)}
@@ -499,7 +499,7 @@ export default function BlogForm({
               <label className="block text-sm font-medium text-gray-700">Tags (comma-separated)</label>
               <input
                 type="text"
-                placeholder="e.g., fitness, workout, health"
+                placeholder="e.g., poetry, culture, styling"
                 className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
                 value={form.tags?.join(", ") || ""}
                 onChange={(e) => handleTagsChange(e.target.value)}
@@ -626,7 +626,7 @@ export default function BlogForm({
               <label className="block text-sm font-medium text-gray-700">Meta Keywords (comma-separated)</label>
               <input
                 type="text"
-                placeholder="e.g., fitness tips, workout guide, health"
+                placeholder="e.g., silsila journal, urdu poetry, streetwear"
                 className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
                 value={form.metaKeywords || ""}
                 onChange={(e) => setField("metaKeywords", e.target.value)}

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { removeToken } from "@/helper/helper";
+import { formatPrice } from "@/lib/formatPrice";
 
 export interface HeaderProps {
   userProfile: {
@@ -98,15 +99,9 @@ export const Header: React.FC<HeaderProps> = ({ userProfile }) => {
             </div>
             <div className="text-center">
               <div className="text-xl sm:text-2xl font-bold text-black">
-                Rs {userProfile.totalSpent.toLocaleString()}
+                {formatPrice(userProfile.totalSpent)}
               </div>
               <div className="text-xs text-gray-500">Total Spent</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xl sm:text-2xl font-bold text-primary">
-                {userProfile.loyaltyPoints}
-              </div>
-              <div className="text-xs text-gray-500">Points</div>
             </div>
           </div>
         </div>

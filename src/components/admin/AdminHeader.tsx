@@ -27,9 +27,9 @@ export default function AdminHeader({ isSidebarOpen, onToggleSidebar }: AdminHea
         <div className="ml-4">
           <div className="w-8 h-8 overflow-hidden bg-gray-200 rounded-full">
             <Image
-              className="object-cover w-full h-full"
-              src="https://ui-avatars.com/api/?name=Admin&background=4f46e5&color=fff"
-              alt="Admin"
+              className="object-contain w-full h-full bg-white p-0.5"
+              src="/images/silsila-logo.png"
+              alt="Silsila"
               width={32}
               height={32}
             />

@@ -2,6 +2,15 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Order, OrderStatus } from "../service/userDetailService";
+import { formatPrice } from "@/lib/formatPrice";
+
+const FALLBACK_IMAGE = "/images/image.png";
+
+function resolveImageUrl(path?: string | null): string {
+  if (!path) return FALLBACK_IMAGE;
+  if (/^https?:\/\//i.test(path) || path.startsWith("data:") || path.startsWith("/images/")) return path;
+  return `${process.env.NEXT_PUBLIC_BACKEND_URL || ""}${path}`;
+}
 
 export interface OrdersSectionProps {
   filteredOrders: Order[];
@@ -60,7 +69,7 @@ export const OrdersSection: React.FC<OrdersSectionProps> = ({
               const productName = product?.name || `Product ${index + 1}`;
 
               // Try to get variant-specific image first, fallback to general product images
-              let productImage = '/images/gym1.svg'; // Default fallback
+              let productImage = ''; // resolved to FALLBACK_IMAGE below if nothing is found
 
               if (product?.primaryImageUrl) {
                 // Use the variant-specific image set by backend
@@ -80,9 +89,9 @@ export const OrdersSection: React.FC<OrdersSectionProps> = ({
 
               return (
                 <div key={item._id || index} className="flex items-center gap-3">
-                  <Link href={productId ? `/product-detail/${productId}` : "/products"} className="block">
+                  <Link href={productId ? `/productdetail/${productId}` : "/shop"} className="block">
                     <Image
-                      src={process.env.NEXT_PUBLIC_BACKEND_URL + productImage}
+                      src={resolveImageUrl(productImage)}
                       alt={productName}
                       width={48}
                       height={48}
@@ -91,13 +100,13 @@ export const OrdersSection: React.FC<OrdersSectionProps> = ({
                   </Link>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <Link href={productId ? `/product-detail/${productId}` : "/products"} className="font-semibold text-gray-900 text-sm truncate hover:underline">
+                      <Link href={productId ? `/productdetail/${productId}` : "/shop"} className="font-semibold text-gray-900 text-sm truncate hover:underline">
                         {productName}
                       </Link>
-                      <span className="text-sm font-bold text-black">Rs {item.price.toLocaleString()}</span>
+                      <span className="text-sm font-bold text-black">{formatPrice(item.price)}</span>
                     </div>
                     <p className="text-xs text-gray-500">
-                      {item.color} • {item.size} • Qty: {item.quantity}
+                      {[item.color !== 'Default' && item.color, item.size !== 'One Size' && item.size, `Qty: ${item.quantity}`].filter(Boolean).join(' • ')}
                     </p>
                 
                   </div>
@@ -108,21 +117,21 @@ export const OrdersSection: React.FC<OrdersSectionProps> = ({
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="text-left">
-              <div className="text-lg font-bold text-black">Total: Rs {order.total.toLocaleString()}</div>
+              <div className="text-lg font-bold text-black">Total: {formatPrice(order.total)}</div>
               {!!order.discount && (
-                <div className="text-sm text-primary">Saved Rs {order.discount.toLocaleString()}</div>
+                <div className="text-sm text-primary">Saved {formatPrice(order.discount)}</div>
               )}
             </div>
             <div className="flex gap-2">
               <Link
-                href={{ pathname: "/order-detail", query: { id: order._id } }}
+                href={{ pathname: "/track", query: { order: order.orderNumber } }}
                 className="px-3 py-2 border-2 border-gray-300 rounded-lg hover:border-primary hover:text-primary text-sm"
               >
                 <i className="fas fa-eye mr-2" />
                 Details
               </Link>
               {order.orderStatus === "delivered" && (
-                <Link href="/cart" className="px-3 py-2 bg-primary text-black rounded-lg text-sm hover:opacity-90">
+                <Link href="/cart" className="px-3 py-2 bg-primary text-white rounded-lg text-sm hover:opacity-90">
                   <i className="fas fa-redo mr-2" />
                   Reorder
                 </Link>
@@ -166,12 +175,12 @@ export const OrdersSection: React.FC<OrdersSectionProps> = ({
             {orderFilter !== "all" && (
               <button
                 onClick={() => setOrderFilter("all")}
-                className="px-5 py-3 border-2 border-primary text-primary rounded-lg hover:bg-primary hover:text-black"
+                className="px-5 py-3 border-2 border-primary text-primary rounded-lg hover:bg-primary hover:text-white"
               >
                 Clear Filters
               </button>
             )}
-            <Link href="/products" className="px-5 py-3 bg-black text-white rounded-lg hover:opacity-90">
+            <Link href="/shop" className="px-5 py-3 bg-black text-white rounded-lg hover:opacity-90">
               <i className="fas fa-shopping-bag mr-2" />
               Start Shopping
             </Link>

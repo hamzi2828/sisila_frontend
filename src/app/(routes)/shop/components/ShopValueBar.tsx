@@ -1,15 +1,16 @@
 'use client';
 
-import { Truck, RefreshCcw, ShieldCheck, Sparkles } from 'lucide-react';
+import { Truck, RefreshCcw, Banknote, Sparkles } from 'lucide-react';
+import { FREE_SHIPPING_THRESHOLD, formatPrice } from '@/lib/formatPrice';
 
 export default function ShopValueBar() {
   return (
     <section className="px-6 md:px-10 lg:px-20 pb-6">
       <div className="mx-auto  grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <ValueItem icon={<Truck className="h-4 w-4" />} title="Free shipping" desc="On US orders $75+" />
-        <ValueItem icon={<RefreshCcw className="h-4 w-4" />} title="Easy returns" desc="30-day window" />
-        <ValueItem icon={<ShieldCheck className="h-4 w-4" />} title="Secure checkout" desc="PCI compliant" />
-        <ValueItem icon={<Sparkles className="h-4 w-4" />} title="Quality guaranteed" desc="Crafted to last" />
+        <ValueItem icon={<Truck className="h-4 w-4" />} title="Free shipping" desc={`On orders over ${formatPrice(FREE_SHIPPING_THRESHOLD)}`} />
+        <ValueItem icon={<Banknote className="h-4 w-4" />} title="Cash on Delivery" desc="Available nationwide" />
+        <ValueItem icon={<RefreshCcw className="h-4 w-4" />} title="Easy exchanges" desc="7-day exchange window" />
+        <ValueItem icon={<Sparkles className="h-4 w-4" />} title="Quality guaranteed" desc="Designed & printed in Pakistan" />
       </div>
     </section>
   );

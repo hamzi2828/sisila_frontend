@@ -43,7 +43,7 @@ export default function SeriesHero({ sections }: { sections: Series[] }) {
             </Link>
           ))}
           <Link
-            href="#rails"
+            href="#series-list"
             className="inline-flex items-center rounded-full bg-white text-stone-900 px-4 py-2 text-sm font-medium hover:bg-stone-100 transition"
           >
             Mood Rails

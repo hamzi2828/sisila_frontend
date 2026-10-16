@@ -52,7 +52,7 @@ export const popularCategoriesService = {
     const imageUrl = category.thumbnailUrl || category.bannerUrl;
     
     if (!imageUrl) {
-      return '/images/gym-5.svg'; // fallback image
+      return '/images/image.png'; // fallback image
     }
     
     // If it's already a full URL, return as is

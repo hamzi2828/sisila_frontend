@@ -2,8 +2,14 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { formatPrice } from '@/lib/formatPrice';
+import { FALLBACK_GALLERY } from '@/lib/productMedia';
+import type { ArrivalItem } from '../types';
 
-export default function NewArrivalsFeature({ items = [] }: { items?: any[] }) {
+export default function NewArrivalsFeature({ items = [] }: { items?: ArrivalItem[] }) {
+  // Detail shots: alternate angles of the first two arrivals.
+  const shots = [items[0]?.detailImage || FALLBACK_GALLERY[0], items[1]?.detailImage || FALLBACK_GALLERY[1]];
+
   return (
     <div>
       <div className="grid grid-cols-12 grid-rows-6 gap-3">
@@ -34,8 +40,9 @@ export default function NewArrivalsFeature({ items = [] }: { items?: any[] }) {
             </ul>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Shot src="https://images.unsplash.com/photo-1495567720989-cebdbdd97913?auto=format&fit=crop&w=1200&q=80" />
-            <Shot src="https://images.unsplash.com/photo-1494319827402-c4b9b83f5741?auto=format&fit=crop&w=1200&q=80" />
+            {shots.map((src, i) => (
+              <Shot key={i} src={src} />
+            ))}
           </div>
         </div>
       </div>
@@ -43,9 +50,9 @@ export default function NewArrivalsFeature({ items = [] }: { items?: any[] }) {
   );
 }
 
-function Tile({ item, className = '' }: any) {
+function Tile({ item, className = '' }: { item: ArrivalItem; className?: string }) {
   return (
-    <Link href="/productdetail" className={['group relative overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200', className].join(' ')}>
+    <Link href={item.href} className={['group relative overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200', className].join(' ')}>
       <div className="relative w-full h-full min-h-[240px]">
         <Image src={item.image} alt={item.title} fill sizes="(max-width:1024px) 100vw, 60vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
@@ -57,16 +64,21 @@ function Tile({ item, className = '' }: any) {
   );
 }
 
-function Card({ item }: any) {
+function Card({ item }: { item: ArrivalItem }) {
   return (
-    <Link href="/productdetail" className="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200 hover:shadow-md transition">
+    <Link href={item.href} className="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200 hover:shadow-md transition">
       <div className="relative w-full pt-[125%]">
         <Image src={item.image} alt={item.title} fill sizes="(max-width:1024px) 50vw, 25vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
       </div>
       <div className="p-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-medium">{item.title}</p>
-          <p className="text-sm text-stone-700">${item.price}</p>
+          <p className="shrink-0 text-sm text-stone-700">
+            {item.compareAt ? (
+              <span className="mr-1.5 text-xs text-stone-400 line-through">{formatPrice(item.compareAt)}</span>
+            ) : null}
+            {formatPrice(item.price)}
+          </p>
         </div>
       </div>
     </Link>

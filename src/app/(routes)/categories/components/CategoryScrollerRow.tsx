@@ -8,11 +8,12 @@ type Section = {
   id: string;
   title: string;
   description: string;
+  href?: string;
   gallery: GalleryItem[];
 };
 
 export default function CategoryScrollerRow({ section }: { section: Section }) {
-  const { id, title, description, gallery } = section;
+  const { id, title, description, gallery, href = '/shop' } = section;
 
   return (
     <section id={id} className="scroll-mt-28">
@@ -28,7 +29,7 @@ export default function CategoryScrollerRow({ section }: { section: Section }) {
         </div>
         <div className="flex gap-3">
           <Link
-            href={`/productdetail?category=${id}`}
+            href={href}
             className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-4 py-2 text-sm hover:bg-stone-50 transition"
           >
             Explore {title}
@@ -39,7 +40,7 @@ export default function CategoryScrollerRow({ section }: { section: Section }) {
       <div className="mt-4 no-scrollbar flex gap-4 overflow-x-auto px-1 py-2 scroll-ps-1">
         {gallery.map((item, idx) => (
           <Link
-            href={item.href || `/productdetail?category=${id}`}
+            href={item.href || href}
             key={`${id}-${idx}`}
             className="group relative shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 hover:shadow-md transition w-[76vw] sm:w-[58vw] md:w-[210px] aspect-[3/4] md:aspect-auto md:h-[280px]"
           >

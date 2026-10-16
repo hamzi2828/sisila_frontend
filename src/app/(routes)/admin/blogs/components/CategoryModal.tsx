@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { assetUrl } from '@/lib/productMedia';
 
 export interface CategoryInput {
   name: string;
@@ -113,7 +114,7 @@ export default function CategoryModal({ open, mode, initial, onClose, onSubmit }
                   <div className="mt-1 mb-2">
                     <div className="relative h-16 w-16 rounded border overflow-hidden">
                       <Image
-                        src={`${process.env.NEXT_PUBLIC_BACKEND_URL}${initial.thumbnailUrl}`}
+                        src={assetUrl(initial.thumbnailUrl)}
                         alt="Current thumbnail"
                         fill
                         className="object-cover"
@@ -154,7 +155,7 @@ export default function CategoryModal({ open, mode, initial, onClose, onSubmit }
                   <div className="mt-1 mb-2">
                     <div className="relative h-16 w-32 rounded border overflow-hidden">
                       <Image
-                        src={`${process.env.NEXT_PUBLIC_BACKEND_URL}${initial.bannerUrl}`}
+                        src={assetUrl(initial.bannerUrl)}
                         alt="Current banner"
                         fill
                         className="object-cover"

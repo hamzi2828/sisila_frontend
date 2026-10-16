@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import { FiPlus, FiEdit2, FiTrash2, FiToggleLeft, FiToggleRight, FiX, FiUpload } from "react-icons/fi";
 import Image from "next/image";
 import authorService, { Author } from "../services/authorService";
+import { toast } from 'react-hot-toast';
+import { assetUrl } from '@/lib/productMedia';
 
 interface AuthorFormData {
   name: string;
@@ -104,7 +106,7 @@ export default function AuthorsTab() {
     });
     
     if (author.avatar) {
-      setAvatarPreview(`${process.env.NEXT_PUBLIC_BACKEND_URL}${author.avatar}`);
+      setAvatarPreview(assetUrl(author.avatar));
     }
     
     setIsModalOpen(true);
@@ -119,7 +121,7 @@ export default function AuthorsTab() {
       await fetchAuthors();
     } catch (error) {
       console.error("Error deleting author:", error);
-      alert("Failed to delete author. They may have blogs associated with them.");
+      toast.error("Failed to delete author. They may have blogs associated with them.");
     } finally {
       setIsLoading(false);
     }
@@ -232,7 +234,7 @@ export default function AuthorsTab() {
                       {author.avatar ? (
                         <Image
                           className="h-10 w-10 rounded-full object-cover"
-                          src={`${process.env.NEXT_PUBLIC_BACKEND_URL}${author.avatar}`}
+                          src={assetUrl(author.avatar)}
                           alt={author.name}
                           width={40}
                           height={40}

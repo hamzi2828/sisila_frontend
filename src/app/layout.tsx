@@ -18,26 +18,30 @@ const manrope = Manrope({
   display: 'swap',
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://silsila.example';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.silsilla.pk';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'Silsila — Culturally‑inspired apparel',
+    default: 'Silsila — Casual clothing woven with cultural roots',
     template: '%s — Silsila',
   },
   description:
-    'Silsila merges cultural heritage with contemporary fashion — themes, series, and modern daily‑wear silhouettes.',
+    'Silsila is a Pakistani casual clothing line woven with cultural roots, values, and emotions — creativity that uplifts your vibe, aura, and style. Shop Poets, Alphabets, Cinema and Anime series with delivery across Pakistan.',
   applicationName: 'Silsila',
   keywords: [
     'Silsila',
+    'Pakistani clothing brand',
+    'casual wear Pakistan',
+    'graphic tees Pakistan',
+    'Urdu poetry t-shirts',
+    'Poets series',
+    'Ghalib',
+    'Faiz Ahmed Faiz',
+    'Alphabets series',
+    'Southeastern Hymns',
+    'Echoes of the Winds',
     'cultural fashion',
-    'poets series',
-    'echoes of the winds',
-    'streetwear',
-    'typography',
-    'lookbook',
-    'modern apparel',
   ],
   robots: {
     index: true,
@@ -47,28 +51,28 @@ export const metadata: Metadata = {
     canonical: '/',
   },
   openGraph: {
-    title: 'Silsila — Culturally‑inspired apparel',
+    title: 'Silsila — Casual clothing woven with cultural roots',
     description:
-      'Themes, categories, and series shaped for modern expression. Explore lookbooks, stories, and the latest drops.',
+      'A Pakistani casual clothing line woven with cultural roots, values, and emotions. Explore themes, series, lookbooks, and the latest drops.',
     url: siteUrl,
     siteName: 'Silsila',
     images: [
       {
-        url: '/images/og-silsila.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Silsila — Modern editorial collage',
+        url: '/images/silsila-logo.png',
+        width: 542,
+        height: 460,
+        alt: 'Silsila',
       },
     ],
-    locale: 'en_US',
+    locale: 'en_PK',
     type: 'website',
   },
   twitter: {
-    card: 'summary_large_image',
-    title: 'Silsila — Culturally‑inspired apparel',
+    card: 'summary',
+    title: 'Silsila — Casual clothing woven with cultural roots',
     description:
-      'Themes, categories, and series shaped for modern expression.',
-    images: ['/images/og-silsila.jpg'],
+      'A Pakistani casual clothing line woven with cultural roots, values, and emotions.',
+    images: ['/images/silsila-logo.png'],
   },
   icons: {
     icon: '/favicon.ico',

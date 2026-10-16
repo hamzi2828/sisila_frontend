@@ -1,4 +1,5 @@
 import React from "react";
+import { formatPrice } from "@/lib/formatPrice";
 
 export interface StatsSectionProps {
   joinedDate: string;
@@ -18,7 +19,7 @@ export const StatsSection: React.FC<StatsSectionProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="text-center">
           <div className="w-16 h-16 mx-auto mb-3 bg-primary rounded-full flex items-center justify-center">
-            <i className="fas fa-user text-black text-2xl" />
+            <i className="fas fa-user text-white text-2xl" />
           </div>
           <h3 className="text-lg font-bold text-black">Member Since</h3>
           <p className="text-gray-500">
@@ -38,16 +39,16 @@ export const StatsSection: React.FC<StatsSectionProps> = ({
           <div className="w-16 h-16 mx-auto mb-3 bg-green-100 rounded-full flex items-center justify-center">
             <i className="fas fa-rupee-sign text-green-500 text-2xl" />
           </div>
-          <h3 className="text-lg font-bold text-black">Rs {totalSpent.toLocaleString()}</h3>
+          <h3 className="text-lg font-bold text-black">{formatPrice(totalSpent)}</h3>
           <p className="text-gray-500">Total amount spent</p>
         </div>
 
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-3 bg-yellow-100 rounded-full flex items-center justify-center">
-            <i className="fas fa-star text-yellow-500 text-2xl" />
+          <div className="w-16 h-16 mx-auto mb-3 bg-stone-100 rounded-full flex items-center justify-center">
+            <i className="fas fa-truck text-stone-700 text-2xl" />
           </div>
-          <h3 className="text-lg font-bold text-black">{loyaltyPoints} Points</h3>
-          <p className="text-gray-500">Loyalty points earned</p>
+          <h3 className="text-lg font-bold text-black">Free Delivery</h3>
+          <p className="text-gray-500">On orders over Rs 5,000</p>
         </div>
       </div>
     </section>

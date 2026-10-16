@@ -10,6 +10,7 @@ type Section = {
   description: string;
   cover: string;
   accent?: string;
+  href?: string;
   gallery: GalleryItem[];
 };
 
@@ -20,7 +21,7 @@ export default function CategoryFeatureStripe({
   section: Section;
   flipped?: boolean;
 }) {
-  const { id, title, description, cover, accent = 'from-black/90 to-black/5', gallery } = section;
+  const { id, title, description, cover, accent = 'from-black/90 to-black/5', gallery, href = '/shop' } = section;
   const big = gallery[0]?.image || cover;
   const rightTop = gallery[1]?.image || cover;
   const rightBottom = gallery[2]?.image || cover;
@@ -84,7 +85,7 @@ export default function CategoryFeatureStripe({
 
               <div className="mt-5 flex flex-wrap gap-3">
                 <Link
-                  href={`/productdetail?category=${id}`}
+                  href={href}
                   className="inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 transition"
                 >
                   Shop {title}

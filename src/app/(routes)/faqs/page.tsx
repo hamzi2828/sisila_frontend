@@ -10,16 +10,22 @@ type FAQ = {
 };
 
 const DATA: FAQ[] = [
-  { id: 'ship-1', group: 'Shipping', q: 'How long does shipping take?', a: 'Standard shipping arrives in 3–5 business days. Orders $75+ ship free.' },
-  { id: 'ship-2', group: 'Shipping', q: 'Do you ship internationally?', a: 'We currently ship within Pakistan; international is coming soon.' },
-  { id: 'orders-1', group: 'Orders', q: 'Can I edit or cancel my order?', a: 'We can update or cancel within 2 hours of placing an order. Contact support@silsila.co.' },
-  { id: 'orders-2', group: 'Orders', q: 'Where can I track my order?', a: 'Use the Track page in your order email or visit /track and enter your order number.' },
-  { id: 'returns-1', group: 'Returns', q: 'What is your return policy?', a: '30‑day returns on unworn items with original tags. Start a return via your order email.' },
-  { id: 'returns-2', group: 'Returns', q: 'How do refunds work?', a: 'Refunds are issued to the original payment method within 3–7 business days of receiving the return.' },
-  { id: 'sizing-1', group: 'Sizing', q: 'How do I find my size?', a: 'See the size guide on each product page or contact us with your measurements.' },
-  { id: 'payment-1', group: 'Payment', q: 'Which payment methods do you accept?', a: 'COD, Visa, and MasterCard are accepted. More options coming soon.' },
-  { id: 'account-1', group: 'Account', q: 'Do I need an account to order?', a: 'No, you can checkout as a guest. Accounts help track orders and save details.' },
-  { id: 'products-1', group: 'Products', q: 'How do I care for my pieces?', a: 'Most pieces are machine wash cold and tumble dry low. See Fabric & Care on the product page.' },
+  { id: 'ship-1', group: 'Shipping', q: 'How long does delivery take?', a: 'We ship across Pakistan. Orders are dispatched from Lahore and usually arrive within 3–5 working days; remote areas can take a little longer.' },
+  { id: 'ship-2', group: 'Shipping', q: 'How much does shipping cost?', a: 'Shipping is free on orders over Rs 5,000. Below that, a flat delivery charge of Rs 250 applies anywhere in Pakistan.' },
+  { id: 'ship-3', group: 'Shipping', q: 'Do you ship internationally?', a: 'Not yet — we currently deliver within Pakistan only. Follow us on Instagram (@silsila.pk) to hear when international shipping goes live.' },
+  { id: 'orders-1', group: 'Orders', q: 'How do I track my order?', a: 'Visit the Track Order page (/track) and enter your order number and email. You will also receive updates as your order is confirmed and dispatched.' },
+  { id: 'orders-2', group: 'Orders', q: 'Can I change or cancel my order?', a: 'Yes, as long as it has not been dispatched. Email hello@silsilla.pk or call +92 300 0000000 with your order number as soon as possible.' },
+  { id: 'returns-1', group: 'Returns', q: 'What is your exchange policy?', a: 'We offer exchanges within 7 days of delivery for unworn, unwashed items with original tags and packaging. Sale items and customised pieces are final sale.' },
+  { id: 'returns-2', group: 'Returns', q: 'How do I request an exchange?', a: 'Email hello@silsilla.pk within 7 days of delivery with your order number and the size or item you would like instead. We will share the return address and next steps.' },
+  { id: 'returns-3', group: 'Returns', q: 'What if my item arrives damaged or incorrect?', a: 'Sorry about that! Message us within 48 hours of delivery with photos of the item and packaging, and we will arrange a replacement at no extra cost.' },
+  { id: 'sizing-1', group: 'Sizing', q: 'What sizes do you offer?', a: 'Most styles come in S, M, L and XL. Available sizes are shown on each product page.' },
+  { id: 'sizing-2', group: 'Sizing', q: 'How do I find my size?', a: 'Open the size guide on the product page and compare it with a garment you already own. Our fits are relaxed and casual — if you are between sizes, size down for a closer fit or up for a looser one.' },
+  { id: 'payment-1', group: 'Payment', q: 'Which payment methods do you accept?', a: 'Cash on Delivery (COD) anywhere in Pakistan, plus Visa and MasterCard debit/credit cards through our secure checkout.' },
+  { id: 'payment-2', group: 'Payment', q: 'Are prices inclusive of taxes?', a: 'Yes. All prices are listed in Pakistani Rupees (PKR) and include applicable taxes. Shipping, if any, is shown at checkout.' },
+  { id: 'account-1', group: 'Account', q: 'Do I need an account to order?', a: 'No, you can check out as a guest. A Silsila account lets you track orders, save your wishlist and get early access to new drops.' },
+  { id: 'products-1', group: 'Products', q: 'How should I care for my Silsila pieces?', a: 'Wash inside out in cold water on a gentle cycle, avoid bleach, and dry in the shade. Do not iron directly on prints or embroidery — iron inside out on low heat.' },
+  { id: 'products-2', group: 'Products', q: 'What are your themes and series?', a: 'Our designs are organised into four themes — Southeastern Hymns, Artistic Passion, Echoes of the Winds and Uplifting Culture — and series such as Poets, Alphabets, Cinema and Anime. Explore them from the Themes and Series pages.' },
+  { id: 'contact-1', group: 'Account', q: 'How can I reach customer support?', a: 'Email hello@silsilla.pk, call +92 300 0000000 (Mon–Sat, 10am–7pm PKT), or use the contact form. We usually reply within 24–48 hours.' },
 ];
 
 const GROUPS = ['All', 'Shipping', 'Orders', 'Returns', 'Sizing', 'Payment', 'Account', 'Products'] as const;
@@ -35,7 +41,7 @@ const ICON_BY_GROUP: Record<Exclude<Group, 'All'>, string> = {
   Products: 'fa-shirt',
 };
 
-const SUGGESTIONS = ['shipping', 'returns', 'size', 'payment', 'order status'];
+const SUGGESTIONS = ['delivery', 'exchange', 'size', 'COD', 'track'];
 
 export default function FAQsPage() {
   const [query, setQuery] = useState('');
@@ -87,7 +93,7 @@ export default function FAQsPage() {
           <h1 className="mt-2 text-3xl md:text-5xl font-semibold uppercase" style={{ fontFamily: 'Poppins, sans-serif' }}>
             FAQs
           </h1>
-          <p className="mt-3 text-stone-700">Quick answers about orders, shipping, returns, and sizing.</p>
+          <p className="mt-3 text-stone-700">Quick answers about orders, delivery across Pakistan, exchanges, and sizing.</p>
 
           {/* Search + suggestions */}
           <div className="mt-5">
@@ -98,7 +104,7 @@ export default function FAQsPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && jumpToContent()}
-                  placeholder="Search topics (e.g., shipping, returns)"
+                  placeholder="Search topics (e.g., delivery, exchanges)"
                   className="w-full rounded-full border border-stone-300/80 bg-white pl-9 pr-4 py-2 text-sm outline-none placeholder:text-stone-400 focus:border-stone-400"
                 />
               </div>
@@ -265,11 +271,11 @@ export default function FAQsPage() {
             </div>
             <div className="mt-3 flex justify-center gap-2">
               <a
-                href="mailto:support@silsila.co"
+                href="mailto:hello@silsilla.pk"
                 className="inline-flex items-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-stone-800"
               >
                 <i className="fa-regular fa-envelope mr-2" />
-                Email support@silsila.co
+                Email hello@silsilla.pk
               </a>
               <a
                 href="/contact"

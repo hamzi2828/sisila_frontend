@@ -7,6 +7,7 @@ import { addToCart } from '@/helper/cartHelper';
 import WishlistHero from './components/WishlistHero';
 import WishlistFilters from './components/WishlistFilters';
 import WishlistGrid from './components/WishlistGrid';
+import { formatPrice } from '@/lib/formatPrice';
 
 type SavedItem = {
   id: string;
@@ -40,6 +41,7 @@ type WishlistProductData = {
   name: string;
   category: string;
   price: number;
+  discountedPrice?: number;
   stock: number;
   status: string;
   featured: boolean;
@@ -64,8 +66,7 @@ type WishlistAPIResponse = {
   };
 };
 
-const money = (v: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+const money = (v: number) => formatPrice(v);
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -132,7 +133,7 @@ export default function WishlistPage() {
           return banner.startsWith('http') ? banner : `${API_BASE_URL}${banner}`;
         }
 
-        return '';
+        return '/images/image.png';
       };
 
       // Transform API response to SavedItem format
@@ -140,12 +141,16 @@ export default function WishlistPage() {
       if (data.success && data.data?.products && Array.isArray(data.data.products)) {
         const transformedItems: SavedItem[] = data.data.products.map((item) => {
           const product = item.productId;
+          const hasDiscount =
+            typeof product.discountedPrice === 'number' &&
+            product.discountedPrice > 0 &&
+            product.discountedPrice < product.price;
 
           return {
             id: product._id,
             title: product.name,
-            price: product.price,
-            compareAt: undefined, // Price comparison not available in wishlist
+            price: hasDiscount ? (product.discountedPrice as number) : product.price,
+            compareAt: hasDiscount ? product.price : undefined,
             image: getProductImage(product),
             tag: product.category || '',
             stock: product.stock > 10 ? 'in' : product.stock > 0 ? 'low' : 'out',

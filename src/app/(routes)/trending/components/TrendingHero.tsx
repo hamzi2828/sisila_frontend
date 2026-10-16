@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import type { TrendingTag } from '../types';
 
-export default function TrendingHero({ tags = [] }: { tags?: string[] }) {
+export default function TrendingHero({ tags = [] }: { tags?: TrendingTag[] }) {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-stone-200 bg-gradient-to-br from-black via-stone-900 to-stone-800 text-white">
       <div className="p-8 md:p-12 lg:p-16">
@@ -14,17 +15,18 @@ export default function TrendingHero({ tags = [] }: { tags?: string[] }) {
           Trending Now
         </h1>
         <p className="mt-2 text-white/80 max-w-xl">
-          Most-loved styles from the last 7 days — as seen on the feed.
+          Most-loved Silsila pieces right now — the designs everyone is reaching for.
         </p>
 
         <div className="mt-5 flex flex-wrap gap-2">
           {tags.map((t) => (
-            <span
-              key={t}
-              className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm"
+            <Link
+              key={t.href}
+              href={t.href}
+              className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm hover:bg-white/15 transition"
             >
-              {t}
-            </span>
+              {t.label}
+            </Link>
           ))}
         </div>
 

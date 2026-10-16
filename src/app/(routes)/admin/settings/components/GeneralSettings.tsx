@@ -15,8 +15,8 @@ interface GeneralSettingsProps {
 
 export default function GeneralSettings({ settings, onUpdate, isLoading }: GeneralSettingsProps) {
   const [formData, setFormData] = useState({
-    siteName: settings?.siteName || 'GymWear',
-    siteUrl: settings?.siteUrl || 'https://gymwear.example.com',
+    siteName: settings?.siteName || 'Silsila',
+    siteUrl: settings?.siteUrl || 'https://www.silsilla.pk',
     timezone: settings?.timezone || 'UTC+05:00',
     dateFormat: settings?.dateFormat || 'MM/DD/YYYY',
   });

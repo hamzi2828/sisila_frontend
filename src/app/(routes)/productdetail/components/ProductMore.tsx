@@ -23,11 +23,15 @@ export default function ProductMore({
   product,
   money,
   collectionType,
+  collectionId,
+  category,
   currentProductId,
 }: {
   product: ProductDetails;
   money: (v: number) => string;
   collectionType?: 'theme' | 'series' | null;
+  collectionId?: string;
+  category?: string;
   currentProductId: string;
 }) {
   const [relatedProducts, setRelatedProducts] = useState<RelatedProduct[]>([]);
@@ -35,21 +39,25 @@ export default function ProductMore({
 
   useEffect(() => {
     const fetchRelatedProducts = async () => {
-      if (!collectionType) return;
+      if (!collectionId && !category) return;
 
       try {
         setIsLoading(true);
-        // Fetch all products and filter by collectionType
         const response = await publicProductService.getAllProducts(50, 1, 'createdAt', 'desc');
 
         if (response.success && response.data) {
-          // Filter by collectionType and exclude current product
-          const filtered = response.data.filter(
-            (p: PublicProduct) =>
-              p.collectionType === collectionType &&
-              p._id !== currentProductId
-          );
-          const productsToShow = filtered.slice(0, 6);
+          // Prefer products from the same collection, then the same category; never the current product
+          const others = response.data.filter((p: PublicProduct) => p._id !== currentProductId);
+          const sameCollection = collectionId
+            ? others.filter((p: PublicProduct) => p.collectionId === collectionId)
+            : [];
+          const sameCategory = category
+            ? others.filter(
+                (p: PublicProduct) =>
+                  p.category === category && !sameCollection.some((c) => c._id === p._id)
+              )
+            : [];
+          const productsToShow = [...sameCollection, ...sameCategory].slice(0, 8);
 
           const mapped = productsToShow.map((p: PublicProduct) => {
             let image = '';
@@ -63,7 +71,8 @@ export default function ProductMore({
                   ? url
                   : `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}${url}`;
               }
-            } else if (p.thumbnailUrl) {
+            }
+            if (!image && p.thumbnailUrl) {
               image = p.thumbnailUrl.startsWith('http')
                 ? p.thumbnailUrl
                 : `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}${p.thumbnailUrl}`;
@@ -73,7 +82,7 @@ export default function ProductMore({
               id: p._id,
               title: p.name,
               price: p.discountedPrice || p.price,
-              image: image || 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1200&q=80',
+              image: image || '/images/image.png',
               href: `/productdetail/${p._id}`,
             };
           });
@@ -88,7 +97,7 @@ export default function ProductMore({
     };
 
     fetchRelatedProducts();
-  }, [collectionType, currentProductId]);
+  }, [collectionId, category, currentProductId]);
 
   return (
     <div className="mt-12">
@@ -108,9 +117,15 @@ export default function ProductMore({
         </Accordion>
       </div>
 
-      {!isLoading && relatedProducts.length > 0 && collectionType && (
+      {!isLoading && relatedProducts.length > 0 && (
         <RelatedRail
-          heading={`More from ${collectionType === 'series' ? 'Series' : 'Themes'}`}
+          heading={
+            collectionType === 'series'
+              ? 'More from this series'
+              : collectionType === 'theme'
+              ? 'More from this theme'
+              : 'You may also like'
+          }
           items={relatedProducts}
           money={money}
         />
@@ -152,7 +167,7 @@ function RelatedRail({ heading, items = [], money }: { heading: string; items?: 
       <div className="my-4 no-scrollbar flex gap-5 overflow-x-auto px-1 py-4">
         {items.map((p, idx: number) => (
           <Link
-            href={p.href || '/productdetail'}
+            href={p.href}
             key={p.id || `${p.title}-${idx}`}
             className="group relative h-[320px] w-[240px] shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 hover:shadow-md transition"
           >

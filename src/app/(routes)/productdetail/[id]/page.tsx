@@ -9,6 +9,7 @@ import ProductHeader from '../components/ProductHeader';
 import ProductGallery from '../components/ProductGallery';
 import ProductBuyBox from '../components/ProductBuyBox';
 import ProductMore from '../components/ProductMore';
+import { formatPrice } from '@/lib/formatPrice';
 
 type CategoryId = string;
 type ThemeId = string;
@@ -25,6 +26,7 @@ type Product = {
   sizes?: ('XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL')[];
   stock?: 'in' | 'low' | 'out';
   categoryId: CategoryId;
+  category: string;
   themeId: ThemeId;
   seriesId?: SeriesId;
   description: string;
@@ -32,7 +34,7 @@ type Product = {
   features?: string;
 };
 
-const money = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+const money = (v: number) => formatPrice(v);
 
 // Helper to normalize size names
 function normalizeSize(size: string): 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | undefined {
@@ -121,12 +123,13 @@ function mapPublicProductToProduct(p: PublicProduct): Product {
   return {
     title: p.name,
     price: p.discountedPrice || p.price,
-    images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1400&q=80'],
+    images: images.length > 0 ? images : ['/images/image.png'],
     badges: p.featured ? ['New'] : undefined,
     colors,
     sizes,
     stock,
     categoryId,
+    category: p.category || 'General',
     themeId,
     seriesId,
     description: p.description || '',
@@ -269,7 +272,9 @@ export default function ProductDetailPage() {
           <ProductMore
             product={product}
             money={money}
+            collectionId={rawProduct?.collectionType && rawProduct.collectionType !== 'none' ? rawProduct.collectionId : undefined}
             collectionType={rawProduct?.collectionType === 'none' ? null : rawProduct?.collectionType}
+            category={rawProduct?.category}
             currentProductId={productId}
           />
         </div>
@@ -288,12 +293,13 @@ export default function ProductDetailPage() {
               try {
                 let variant = undefined;
                 if (rawProduct?.productType === 'variant' && rawProduct?.variants && (color || size)) {
+                  // Backend variants also carry variantId/_id/sku, which PublicProduct doesn't declare
                   const matchingVariant = rawProduct.variants.find((v: any) =>
                     (!color || v.color === color) && (!size || v.size === size)
-                  );
+                  ) as (NonNullable<PublicProduct['variants']>[number] & { variantId?: string; _id?: string; sku?: string }) | undefined;
                   if (matchingVariant) {
                     variant = {
-                      variantId: matchingVariant._id || `${color}-${size}`,
+                      variantId: matchingVariant.variantId || matchingVariant._id || `${color}-${size}`,
                       color: matchingVariant.color,
                       size: matchingVariant.size,
                       price: matchingVariant.price,

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { formatPrice } from '@/lib/formatPrice';
 
 export default function SearchResults({ items = [] }: { items?: any[] }) {
   return (
@@ -23,9 +24,9 @@ export default function SearchResults({ items = [] }: { items?: any[] }) {
             />
           </div>
           <div className="p-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium">{p.title}</p>
-              <p className="text-sm text-stone-700">${p.price}</p>
+              <p className="shrink-0 text-sm text-stone-700">{formatPrice(p.price)}</p>
             </div>
             {p.tag ? <p className="mt-1 text-xs text-stone-500">{p.tag}</p> : null}
           </div>

@@ -79,7 +79,7 @@ export default function ThemesSection({ className = '' }: ThemesSectionProps) {
             {themes.map((t) => (
               <Link
                 key={t._id}
-                href={`/themes`}
+                href={`/themes#${t.id}`}
                 className="group relative overflow-hidden rounded-2xl ring-1 ring-stone-200/80 bg-white"
               >
                 <div className="relative h-56">

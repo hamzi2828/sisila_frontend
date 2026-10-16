@@ -6,6 +6,7 @@ import DetailHeader from './components/DetailHeader';
 import DetailCover from './components/DetailCover';
 import DetailRelated from './components/DetailRelated';
 import blogsService, { FeaturedBlog } from '../main/services/blogsService';
+import { toast } from 'react-hot-toast';
 
 // Type for related blog items
 interface RelatedBlogItem {
@@ -126,7 +127,7 @@ function BlogDetailContent() {
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(window.location.href);
-                alert('Link copied to clipboard!');
+                toast.success('Link copied');
               } catch (err) {
                 console.error('Failed to copy:', err);
               }

@@ -5,12 +5,12 @@ export default function AboutPillars() {
   return (
     <section id="pillars" className="px-6 md:px-10 lg:px-20 pb-12">
       <div className="mx-auto ">
-        <Header eyebrow="Creative Pillars" title="What shapes our point of view" subtitle="Culture-first design expressed through four anchors." />
+        <Header eyebrow="Creative Pillars" title="What shapes our point of view" subtitle="Every Silsila piece belongs to one of four themes." />
         <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          <PillarCard iconClass="fa-solid fa-music" title="Southeastern Hymns" image="https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=1400&q=80" />
-          <PillarCard iconClass="fa-solid fa-palette" title="Artistic Passion" image="https://images.unsplash.com/photo-1495567720989-cebdbdd97913?auto=format&fit=crop&w=1400&q=80" />
-          <PillarCard iconClass="fa-solid fa-wind" title="Echoes of the Winds" image="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1400&q=80" />
-          <PillarCard iconClass="fa-solid fa-hand-holding-heart" title="Uplifting Culture" image="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=1400&q=80" />
+          <PillarCard iconClass="fa-solid fa-music" title="Southeastern Hymns" description="Regional heritage and musical traditions." image="https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=1400&q=80" />
+          <PillarCard iconClass="fa-solid fa-palette" title="Artistic Passion" description="Self-expression and creativity." image="https://images.unsplash.com/photo-1495567720989-cebdbdd97913?auto=format&fit=crop&w=1400&q=80" />
+          <PillarCard iconClass="fa-solid fa-wind" title="Echoes of the Winds" description="Freedom, movement, and nature." image="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1400&q=80" />
+          <PillarCard iconClass="fa-solid fa-hand-holding-heart" title="Uplifting Culture" description="Positive cultural narratives." image="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=1400&q=80" />
         </div>
       </div>
     </section>
@@ -29,7 +29,7 @@ function Header({ eyebrow, title, subtitle }: { eyebrow: string; title: string; 
   );
 }
 
-function PillarCard({ iconClass, title, image }: { iconClass: string; title: string; image: string }) {
+function PillarCard({ iconClass, title, description, image }: { iconClass: string; title: string; description: string; image: string }) {
   return (
     <Link href="/themes" className="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200 hover:shadow-md transition">
       <div className="relative w-full pt-[68%]">
@@ -41,6 +41,7 @@ function PillarCard({ iconClass, title, image }: { iconClass: string; title: str
         </div>
         <div className="absolute inset-x-0 bottom-0 p-4">
           <p className="text-white text-lg font-semibold">{title}</p>
+          <p className="mt-0.5 text-sm text-white/85">{description}</p>
         </div>
       </div>
     </Link>

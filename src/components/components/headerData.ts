@@ -49,7 +49,7 @@ export const megaMenuData: Record<string, MegaMenu> = {
       },
     ],
     image: {
-      src: 'https://images.unsplash.com/photo-1519744346363-66f0d6f9e6a6?auto=format&fit=crop&w=1200&q=80',
+      src: 'https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?auto=format&fit=crop&w=1200&q=80',
       alt: 'Shop',
       href: '/shop',
       caption: 'Shop all products',
@@ -58,28 +58,18 @@ export const megaMenuData: Record<string, MegaMenu> = {
   Categories: {
     sections: [
       {
-        heading: 'Core',
+        heading: 'All Categories',
         links: [
-          { label: 'Poetry', href: '/categories#poetry' },
-          { label: 'Witty', href: '/categories#witty' },
-          { label: 'Fun', href: '/categories#fun' },
-          { label: 'Artistic', href: '/categories#artistic' },
-          { label: 'Creative', href: '/categories#creative' },
-        ],
-      },
-      {
-        heading: 'Curations',
-        links: [
-          { label: 'Minimal', href: '/categories#minimal' },
-          { label: 'Street', href: '/categories#street' },
-          { label: 'Retro', href: '/categories#retro' },
-          { label: 'Nature', href: '/categories#nature' },
-          { label: 'Typography', href: '/categories#typography' },
+          { label: 'Poetry', href: '/shop?category=Poetry' },
+          { label: 'Witty', href: '/shop?category=Witty' },
+          { label: 'Fun', href: '/shop?category=Fun' },
+          { label: 'Artistic', href: '/shop?category=Artistic' },
+          { label: 'Creative', href: '/shop?category=Creative' },
         ],
       },
     ],
     image: {
-      src: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=80',
+      src: 'https://images.unsplash.com/photo-1503341504253-dff4815485f1?auto=format&fit=crop&w=1200&q=80',
       alt: 'Categories',
       href: '/categories',
       caption: 'Explore categories',
@@ -88,7 +78,7 @@ export const megaMenuData: Record<string, MegaMenu> = {
   Themes: {
     sections: [
       {
-        heading: 'Creative Pillars',
+        heading: 'All Themes',
         links: [
           { label: 'Southeastern Hymns', href: '/themes#southeastern-hymns' },
           { label: 'Artistic Passion', href: '/themes#artistic-passion' },
@@ -98,7 +88,7 @@ export const megaMenuData: Record<string, MegaMenu> = {
       },
     ],
     image: {
-      src: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&q=80',
+      src: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&w=1200&q=80',
       alt: 'Themes',
       href: '/themes',
       caption: 'See all themes',
@@ -107,7 +97,7 @@ export const megaMenuData: Record<string, MegaMenu> = {
   Series: {
     sections: [
       {
-        heading: 'By Series',
+        heading: 'All Series',
         links: [
           { label: 'Poets', href: '/series#poets' },
           { label: 'Alphabets', href: '/series#alphabets' },
@@ -117,7 +107,7 @@ export const megaMenuData: Record<string, MegaMenu> = {
       },
     ],
     image: {
-      src: 'https://images.unsplash.com/photo-1542751110-97427bbecf20?auto=format&fit=crop&w=1200&q=80',
+      src: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?auto=format&fit=crop&w=1200&q=80',
       alt: 'Series',
       href: '/series',
       caption: 'Explore series',
@@ -126,9 +116,9 @@ export const megaMenuData: Record<string, MegaMenu> = {
 };
 
 export const trendingSearches = [
-  'Poets tee',
+  'Poetry',
   'Ghalib',
-  'Anime hoodie',
-  'Typography graphic',
-  'Street hoodie'
+  'Alif',
+  'Cinema',
+  'Anime',
 ];

@@ -2,15 +2,23 @@
 
 import Link from 'next/link';
 
-export default function ShopHero() {
+export default function ShopHero({
+  eyebrow = 'All Products',
+  title = 'Shop',
+  description = 'Culturally-inspired apparel — daily-wear silhouettes and considered graphics.',
+}: {
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+} = {}) {
   return (
     <div className="relative overflow-hidden rounded-3xl border border-stone-200/60 bg-gradient-to-br from-black via-stone-900 to-stone-800 text-white">
       <div className="relative z-10 p-8 md:p-12 lg:p-16">
-        <p className="uppercase tracking-[0.22em] text-xs md:text-sm text-white/70">All Products</p>
+        <p className="uppercase tracking-[0.22em] text-xs md:text-sm text-white/70">{eyebrow}</p>
         <h1 className="mt-2 text-3xl md:text-5xl font-semibold uppercase" style={{ fontFamily: 'Poppins, sans-serif' }}>
-          Shop
+          {title}
         </h1>
-        <p className="mt-2 text-white/80">Culturally-inspired apparel — daily-wear silhouettes and considered graphics.</p>
+        <p className="mt-2 text-white/80">{description}</p>
         <div className="mt-5 flex flex-wrap gap-2">
           <Link href="/new-arrivals" className={pill(true)}>New Arrivals</Link>
           <Link href="/trending" className={pill()}>Trending</Link>

@@ -8,15 +8,16 @@ import { useEffect, useState, Suspense } from 'react';
 import { checkoutService } from '../services/checkoutService';
 import { getAuthToken, isAuthenticated } from '@/helper/helper';
 import { toast } from 'react-hot-toast';
+import { formatPrice } from '@/lib/formatPrice';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
-const money = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v);
+const money = (v: number) => formatPrice(v);
 
 function SuccessPageContent() {
   const params = useSearchParams();
   const router = useRouter();
   const sessionId = params.get('session_id');
-  const orderId = params.get('order') || `SO-${new Date().getFullYear()}-0001`;
+  const orderId = params.get('order') || '';
 
   const [isVerifying, setIsVerifying] = useState(true);
   const [orderDetails, setOrderDetails] = useState<any>(null);
@@ -33,7 +34,12 @@ function SuccessPageContent() {
 
           if (result.success) {
             console.log('✅ Payment verified successfully');
-            setOrderDetails(result.data);
+            // Backend returns the saved order as `order` (may be null until the Stripe webhook has run)
+            setOrderDetails(
+              result.data ||
+                result.order ||
+                (result.session ? { total: result.session.amount_total, paymentStatus: result.session.payment_status } : null)
+            );
 
             // Clear the cart after successful payment
             await clearCart();
@@ -42,8 +48,12 @@ function SuccessPageContent() {
             toast.error('Payment verification failed');
           }
         } else {
-          // No session_id, might be COD or direct order
-          console.log('No session_id found, checking for order');
+          // Cash on Delivery: the review step saved the created order before redirecting here
+          const saved = sessionStorage.getItem('silsila_last_order');
+          if (saved) {
+            const order = JSON.parse(saved);
+            if (!orderId || order.orderNumber === orderId) setOrderDetails(order);
+          }
         }
       } catch (err) {
         console.error('Error verifying payment:', err);
@@ -94,10 +104,10 @@ function SuccessPageContent() {
     }
   };
 
-  const subtotal = orderDetails?.subtotal || 0;
-  const shipping = orderDetails?.shipping || 6.5;
-  const tax = orderDetails?.tax || 0;
-  const total = orderDetails?.total || subtotal + shipping + tax;
+  const subtotal = Number(orderDetails?.subtotal) || 0;
+  const shipping = Number(orderDetails?.shippingCost ?? orderDetails?.shipping) || 0;
+  // No tax is charged at checkout (the backend's stored `tax` field is informational only), so it isn't shown.
+  const total = Number(orderDetails?.total) || subtotal + shipping;
 
   // Show loading state while verifying
   if (isVerifying) {
@@ -151,8 +161,13 @@ function SuccessPageContent() {
             Order placed
           </h1>
           <p className="mt-2 text-stone-600">
-            Thank you! We've emailed your receipt. Your order number is{' '}
-            <span className="font-medium text-stone-900">{orderDetails?.orderNumber || orderId}</span>.
+            Thank you for your order!
+            {orderDetails?.orderNumber || orderId ? (
+              <>
+                {' '}Your order number is{' '}
+                <span className="font-medium text-stone-900">{orderDetails?.orderNumber || orderId}</span>.
+              </>
+            ) : null}
           </p>
 
           <div className="mt-5 flex items-center justify-center gap-2">
@@ -183,34 +198,37 @@ function SuccessPageContent() {
             </div>
             <div className="mt-3 space-y-4">
               {orderDetails?.items && orderDetails.items.length > 0 ? (
-                orderDetails.items.map((item: any, index: number) => (
+                orderDetails.items.map((item: any, index: number) => {
+                  const product = item.productId || item.product;
+                  const productInfo = product && typeof product === 'object' ? product : null;
+                  const thumb: string | undefined = productInfo?.thumbnailUrl;
+                  const name: string = productInfo?.name || item.name || 'Product';
+                  const color = item.variant?.color || (!['N/A', 'Default'].includes(item.color) ? item.color : undefined);
+                  const size = item.variant?.size || (!['N/A', 'One Size'].includes(item.size) ? item.size : undefined);
+                  return (
                   <div key={index} className="flex items-center gap-3">
                     <div className="relative h-20 w-16 overflow-hidden rounded-xl ring-1 ring-stone-200 bg-stone-100">
-                      {item.productId?.thumbnailUrl && (
-                        <Image
-                          src={item.productId.thumbnailUrl.startsWith('http')
-                            ? item.productId.thumbnailUrl
-                            : `${API_BASE_URL}${item.productId.thumbnailUrl}`
-                          }
-                          alt={item.productId?.name || 'Product'}
-                          fill
-                          sizes="64px"
-                          className="object-cover"
-                        />
-                      )}
+                      <Image
+                        src={thumb ? (thumb.startsWith('http') ? thumb : `${API_BASE_URL}${thumb}`) : '/images/image.png'}
+                        alt={name}
+                        fill
+                        sizes="64px"
+                        className="object-cover"
+                      />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium">{item.productId?.name || 'Product'}</p>
+                      <p className="text-sm font-medium">{name}</p>
                       <p className="text-xs text-stone-600">Qty {item.quantity}</p>
-                      {item.variant && (
+                      {color || size ? (
                         <p className="text-xs text-stone-500">
-                          {item.variant.color} / {item.variant.size}
+                          {[color, size].filter(Boolean).join(' / ')}
                         </p>
-                      )}
+                      ) : null}
                     </div>
                     <div className="text-sm">{money(item.price * item.quantity)}</div>
                   </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-sm text-stone-500">No items found</p>
               )}
@@ -251,7 +269,6 @@ function SuccessPageContent() {
               <div className="mt-3 border-t border-stone-200 pt-3 space-y-1 text-sm">
                 <Row label="Subtotal" value={money(subtotal)} />
                 <Row label="Shipping" value={shipping === 0 ? 'Free' : money(shipping)} />
-                <Row label="Tax" value={money(tax)} />
                 <div className="my-2 border-t border-stone-200" />
                 <Row label={<span className="font-semibold">Total</span>} value={<span className="font-semibold">{money(total)}</span>} />
               </div>
@@ -261,11 +278,11 @@ function SuccessPageContent() {
               <p className="text-sm font-semibold">Next steps</p>
               <ul className="mt-2 list-disc pl-5 text-sm text-stone-700 space-y-1.5">
                 <li>You’ll get a shipping confirmation with tracking.</li>
-                <li>Need help? Contact support@silsila.co</li>
+                <li>Need help? Contact <a href="mailto:hello@silsilla.pk" className="underline">hello@silsilla.pk</a></li>
               </ul>
               <div className="mt-3">
                 <Link
-                  href="/track"
+                  href={orderId ? `/track?order=${encodeURIComponent(orderId)}` : "/track"}
                   className="inline-flex items-center rounded-full border border-stone-300/80 bg-white px-4 py-2 text-sm hover:bg-stone-50"
                 >
                   Track your order

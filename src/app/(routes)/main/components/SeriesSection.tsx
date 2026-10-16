@@ -82,7 +82,7 @@ export default function SeriesSection({ className = '' }: SeriesSectionProps) {
             {series.map((s) => (
               <Link
                 key={s._id}
-                href={`/series`}
+                href={`/series#${s.id}`}
                 className="group relative overflow-hidden rounded-2xl ring-1 ring-stone-200/80 bg-white"
               >
                 <div className="relative h-56">

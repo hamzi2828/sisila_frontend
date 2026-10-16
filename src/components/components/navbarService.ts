@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { megaMenuData, type MegaMenu } from './headerData';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
@@ -60,11 +61,15 @@ export async function fetchNavbarData(): Promise<NavbarData> {
   }
 }
 
-// Build dynamic mega menu data
-export function buildDynamicMegaMenus(data: NavbarData) {
+const toAbsolute = (src?: string) =>
+  src ? (src.startsWith('http') ? src : `${API_BASE_URL}${src}`) : undefined;
+
+// Build dynamic mega menu data. Menus with no API data are omitted so the
+// static fallbacks in headerData stay in place.
+export function buildDynamicMegaMenus(data: NavbarData): Record<string, MegaMenu> {
   const { categories, themes, series } = data;
 
-  return {
+  const menus: Record<string, MegaMenu> = {
     Categories: {
       sections: [
         {
@@ -76,9 +81,11 @@ export function buildDynamicMegaMenus(data: NavbarData) {
         },
       ],
       image: {
-        src: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1200&q=80',
+        src:
+          toAbsolute(categories[0]?.bannerUrl || categories[0]?.thumbnailUrl) ||
+          megaMenuData.Categories.image!.src,
         alt: 'Categories',
-        href: '/shop',
+        href: '/categories',
         caption: 'Explore all categories',
       },
     },
@@ -93,9 +100,7 @@ export function buildDynamicMegaMenus(data: NavbarData) {
         },
       ],
       image: {
-        src: themes[0]?.cover
-          ? (themes[0].cover.startsWith('http') ? themes[0].cover : `${API_BASE_URL}${themes[0].cover}`)
-          : 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&q=80',
+        src: toAbsolute(themes[0]?.cover) || megaMenuData.Themes.image!.src,
         alt: 'Themes',
         href: '/themes',
         caption: 'See all themes',
@@ -112,13 +117,16 @@ export function buildDynamicMegaMenus(data: NavbarData) {
         },
       ],
       image: {
-        src: series[0]?.cover
-          ? (series[0].cover.startsWith('http') ? series[0].cover : `${API_BASE_URL}${series[0].cover}`)
-          : 'https://images.unsplash.com/photo-1542751110-97427bbecf20?auto=format&fit=crop&w=1200&q=80',
+        src: toAbsolute(series[0]?.cover) || megaMenuData.Series.image!.src,
         alt: 'Series',
         href: '/series',
         caption: 'Explore series',
       },
     },
   };
+
+  if (!categories.length) delete menus.Categories;
+  if (!themes.length) delete menus.Themes;
+  if (!series.length) delete menus.Series;
+  return menus;
 }

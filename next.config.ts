@@ -26,6 +26,14 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'other-levels.com',
       },
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'silsila-backend.vercel.app',
+      },
     ],
     // Disable image optimization in development for faster builds
     unoptimized: process.env.NODE_ENV !== 'production',

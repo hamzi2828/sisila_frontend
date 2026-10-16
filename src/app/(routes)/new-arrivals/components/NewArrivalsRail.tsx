@@ -2,8 +2,10 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { formatPrice } from '@/lib/formatPrice';
+import type { ArrivalItem } from '../types';
 
-export default function NewArrivalsRail({ items = [] }: { items?: any[] }) {
+export default function NewArrivalsRail({ items = [] }: { items?: ArrivalItem[] }) {
   return (
     <div>
       <div className="flex items-end justify-between">
@@ -22,14 +24,14 @@ export default function NewArrivalsRail({ items = [] }: { items?: any[] }) {
         {items.map((p, idx) => (
           <Link
             key={`rail-${p.id}`}
-            href="/productdetail"
+            href={p.href}
             className="group relative h-[300px] w-[220px] shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200/80 hover:shadow-md transition"
           >
             <Image src={p.image} alt={p.title} fill sizes="220px" className="object-cover transition-transform duration-500 group-hover:scale-[1.03]" priority={idx < 2} />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
             <div className="absolute inset-x-0 bottom-0 p-3">
               <p className="text-white text-sm font-medium">{p.title}</p>
-              <p className="text-white/85 text-xs">${p.price}</p>
+              <p className="text-white/85 text-xs">{formatPrice(p.price)}</p>
             </div>
           </Link>
         ))}

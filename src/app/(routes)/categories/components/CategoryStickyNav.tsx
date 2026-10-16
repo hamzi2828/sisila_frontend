@@ -8,7 +8,7 @@ export default function CategoryStickyNav({ core }: { core: Section[] }) {
   return (
     <div className="sticky top-36 space-y-8">
       <div>
-        <p className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-500">Core</p>
+        <p className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-500">Categories</p>
         <nav className="grid gap-2">
           {core.map((c) => (
             <Link
@@ -23,14 +23,21 @@ export default function CategoryStickyNav({ core }: { core: Section[] }) {
         </nav>
       </div>
       <div>
-        <p className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-500">Curations</p>
+        <p className="mb-3 text-xs uppercase tracking-[0.18em] text-stone-500">Browse</p>
         <nav className="grid gap-2">
           <Link
             href="#curations"
             className="inline-flex items-center justify-between rounded-xl border border-stone-200/70 bg-white px-3 py-2 text-sm hover:bg-stone-50 transition"
           >
-            <span>All Curations</span>
+            <span>Pieces by Category</span>
             <span>↓</span>
+          </Link>
+          <Link
+            href="/shop"
+            className="inline-flex items-center justify-between rounded-xl border border-stone-200/70 bg-white px-3 py-2 text-sm hover:bg-stone-50 transition"
+          >
+            <span>Shop All</span>
+            <span>↗</span>
           </Link>
         </nav>
       </div>
