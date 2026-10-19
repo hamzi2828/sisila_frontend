@@ -208,3 +208,100 @@ html {
   bottom: 0;
   background: linear-gradient(to top, rgba(0,0,0,0.06), transparent);
 }
+/* ===================================
+     ADMIN PANEL (light, stone palette)
+     Overrides the dark storefront scrollbar inside /admin.
+     =================================== */
+
+/* Sidebar / small scroll areas: 4px thumb on a transparent track */
+.admin-scrollbar::-webkit-scrollbar {
+  width: 4px !important;
+  height: 4px !important;
+}
+.admin-scrollbar::-webkit-scrollbar-track {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+.admin-scrollbar::-webkit-scrollbar-thumb {
+  background: #d6d3d1 !important; /* stone-300 */
+  border-radius: 2px !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.admin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a8a29e !important; /* stone-400 */
+  transform: none !important;
+}
+.admin-scrollbar {
+  scrollbar-width: thin !important;
+  scrollbar-color: #d6d3d1 transparent !important;
+}
+
+/* Main admin content area */
+.admin-page-scroll::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+.admin-page-scroll::-webkit-scrollbar-track {
+  background: #f5f5f4 !important; /* stone-100 */
+  box-shadow: none !important;
+}
+.admin-page-scroll::-webkit-scrollbar-thumb {
+  background: #d6d3d1 !important;
+  border-radius: 3px !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.admin-page-scroll::-webkit-scrollbar-thumb:hover {
+  background: #a8a29e !important;
+  transform: none !important;
+}
+
+/* Every scrollable element inside the admin shell */
+.admin-layout,
+.admin-layout * {
+  scrollbar-width: thin;
+  scrollbar-color: #d6d3d1 #f5f5f4;
+}
+.admin-layout .admin-scrollbar {
+  scrollbar-color: #d6d3d1 transparent;
+}
+.admin-layout::-webkit-scrollbar,
+.admin-layout *::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+.admin-layout::-webkit-scrollbar-track,
+.admin-layout *::-webkit-scrollbar-track {
+  background: #f5f5f4 !important;
+  box-shadow: none !important;
+  border-radius: 3px !important;
+}
+.admin-layout::-webkit-scrollbar-thumb,
+.admin-layout *::-webkit-scrollbar-thumb {
+  background: #d6d3d1 !important;
+  border-radius: 3px !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.admin-layout::-webkit-scrollbar-thumb:hover,
+.admin-layout *::-webkit-scrollbar-thumb:hover {
+  background: #a8a29e !important;
+  transform: none !important;
+}
+.admin-layout::-webkit-scrollbar-thumb:active,
+.admin-layout *::-webkit-scrollbar-thumb:active {
+  background: #78716c !important; /* stone-500 */
+}
+.admin-layout::-webkit-scrollbar-corner,
+.admin-layout *::-webkit-scrollbar-corner {
+  background: #f5f5f4 !important;
+}
+.admin-layout .admin-scrollbar::-webkit-scrollbar {
+  width: 4px !important;
+  height: 4px !important;
+}
+.admin-layout .admin-scrollbar::-webkit-scrollbar-track {
+  background: transparent !important;
+}

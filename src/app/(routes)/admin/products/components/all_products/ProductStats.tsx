@@ -1,53 +1,65 @@
 "use client";
 import React from "react";
-import { FiPackage, FiStar } from "react-icons/fi";
-import { Product } from "../AllProducts";
+import { CheckCircle2, FileEdit, Layers, Package, PackageX, Star } from "lucide-react";
+import { StatCard, StatGrid } from "@/components/admin/ui";
+import type { Product } from "../AllProducts";
+
+export type ProductStatusFilter = "all" | "published" | "draft" | "out_of_stock";
 
 interface ProductStatsProps {
   products: Product[];
-  filteredCount: number;
+  loading?: boolean;
+  /** Current status filter; highlights the matching tile when `highlight` is true. */
+  statusFilter?: ProductStatusFilter;
+  highlight?: boolean;
+  /** Makes the status tiles act as quick filters. */
+  onStatusSelect?: (status: ProductStatusFilter) => void;
 }
 
-export default function ProductStats({ products, filteredCount }: ProductStatsProps) {
-  const publishedCount = products.filter(p => p.status === 'published').length;
-  const draftCount = products.filter(p => p.status === 'draft').length;
-  const variantCount = products.filter(p => p.productType === 'variant').length;
-  const featuredCount = products.filter(p => p.featured).length;
+export default function ProductStats({ products, loading, statusFilter = "all", highlight = true, onStatusSelect }: ProductStatsProps) {
+  const count = (fn: (p: Product) => boolean) => (loading ? "–" : products.filter(fn).length);
+  const select = (status: ProductStatusFilter) => (onStatusSelect ? () => onStatusSelect(status) : undefined);
+  const isActive = (status: ProductStatusFilter) => highlight && !!onStatusSelect && statusFilter === status;
 
   return (
-    <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-      <div className="px-4 py-5 sm:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Products Overview</h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">
-              {filteredCount} of {products.length} products
-            </p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <FiPackage className="h-4 w-4" />
-              <span>{products.length} Total</span>
-            </div>
-            <div className="flex items-center space-x-2 text-sm text-blue-600">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span>{variantCount} Variants</span>
-            </div>
-            <div className="flex items-center space-x-2 text-sm text-green-600">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span>{publishedCount} Published</span>
-            </div>
-            <div className="flex items-center space-x-2 text-sm text-yellow-600">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-              <span>{draftCount} Draft</span>
-            </div>
-            <div className="flex items-center space-x-2 text-sm text-yellow-600">
-              <FiStar className="h-3 w-3 fill-current" />
-              <span>{featuredCount} Featured</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <StatGrid cols={6} className="grid-cols-3 gap-1.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <StatCard
+        size="sm"
+        label="Total"
+        value={loading ? "–" : products.length}
+        icon={Package}
+        active={isActive("all")}
+        onClick={select("all")}
+      />
+      <StatCard
+        size="sm"
+        label="Published"
+        value={count((p) => p.status === "published")}
+        icon={CheckCircle2}
+        tone="success"
+        active={isActive("published")}
+        onClick={select("published")}
+      />
+      <StatCard
+        size="sm"
+        label="Draft"
+        value={count((p) => p.status === "draft")}
+        icon={FileEdit}
+        tone="warning"
+        active={isActive("draft")}
+        onClick={select("draft")}
+      />
+      <StatCard
+        size="sm"
+        label="Out of stock"
+        value={count((p) => p.status === "out_of_stock")}
+        icon={PackageX}
+        tone="danger"
+        active={isActive("out_of_stock")}
+        onClick={select("out_of_stock")}
+      />
+      <StatCard size="sm" label="Featured" value={count((p) => !!p.featured)} icon={Star} tone="warning" />
+      <StatCard size="sm" label="Variants" value={count((p) => p.productType === "variant")} icon={Layers} tone="violet" />
+    </StatGrid>
   );
 }

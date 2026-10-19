@@ -142,9 +142,9 @@ export const productService = {
       throw err;
     }
   },
+  // Images in formData should go through prepareImagesForUpload (@/lib/compressImage) first:
+  // the API is a Vercel function and rejects request bodies over 4.5 MB.
   async createProduct(formData: FormData): Promise<ProductUI> {
-    console.log("formData", formData);
-    
     const res = await axios.post(`${API_BASE_URL}/products`, formData, {
       headers: {
         ...getAuthHeader(),
@@ -175,39 +175,19 @@ export const productService = {
     });
   },
   async toggleProductStatus(id: string, status: 'published' | 'draft'): Promise<ProductUI> {
-    try {
-      // Try the PATCH endpoint first
-      const res = await axios.patch(`${API_BASE_URL}/products/${id}/status`, 
-        { status }, 
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeader(),
-          },
-        }
-      );
-      const data = res.data?.data ?? res.data;
-      if (!data || typeof data !== 'object') throw new Error('Unexpected toggleProductStatus response');
-      return mapToUI(data as ProductDTO);
-    } catch (error: any) {
-      // If PATCH /status endpoint doesn't exist, try using the general PUT update endpoint
-      if (error.response?.status === 404) {
-        console.log('Status endpoint not found, trying general update endpoint');
-        const formData = new FormData();
-        formData.append('status', status);
-        
-        const res = await axios.put(`${API_BASE_URL}/products/${id}`, formData, {
-          headers: {
-            ...getAuthHeader(),
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-        const data = res.data?.data ?? res.data;
-        if (!data || typeof data !== 'object') throw new Error('Unexpected updateProduct response');
-        return mapToUI(data as ProductDTO);
-      }
-      throw error;
-    }
+    // The backend has no PATCH /products/:id/status route; status changes go through the normal update.
+    const formData = new FormData();
+    formData.append('status', status);
+
+    const res = await axios.put(`${API_BASE_URL}/products/${id}`, formData, {
+      headers: {
+        ...getAuthHeader(),
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    const data = res.data?.data ?? res.data;
+    if (!data || typeof data !== 'object') throw new Error('Unexpected updateProduct response');
+    return mapToUI(data as ProductDTO);
   },
   async toggleFeatured(id: string, featured: boolean): Promise<ProductUI> {
     const formData = new FormData();

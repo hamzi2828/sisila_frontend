@@ -10,6 +10,7 @@ import ProductGallery from '../components/ProductGallery';
 import ProductBuyBox from '../components/ProductBuyBox';
 import ProductMore from '../components/ProductMore';
 import { formatPrice } from '@/lib/formatPrice';
+import { htmlToPlainText } from '@/lib/htmlToText';
 
 type CategoryId = string;
 type ThemeId = string;
@@ -132,9 +133,9 @@ function mapPublicProductToProduct(p: PublicProduct): Product {
     category: p.category || 'General',
     themeId,
     seriesId,
-    description: p.description || '',
-    shortDescription: p.shortDescription || '',
-    features: p.features || '',
+    description: htmlToPlainText(p.description),
+    shortDescription: htmlToPlainText(p.shortDescription),
+    features: htmlToPlainText(p.features),
   };
 }
 

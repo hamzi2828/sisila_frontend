@@ -1,114 +1,94 @@
 import React from 'react';
 import Link from 'next/link';
+import { ArrowRight, ShoppingBag } from 'lucide-react';
 import { formatPrice } from '@/lib/formatPrice';
-
-interface Order {
-  id: string;
-  orderNumber?: string;
-  customerId: string;
-  customerName: string;
-  amount: number;
-  status: string;
-  createdAt: string;
-}
+import { EmptyState, StatusBadge, Table, TBody, TD, TH, THead, TR } from '@/components/admin/ui';
+import type { Order } from '../services/dashboardService';
 
 interface RecentOrdersTableProps {
   orders: Order[];
 }
 
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
 export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({ orders = [] }) => {
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'processing':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'shipped':
-        return 'bg-blue-100 text-blue-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      case 'pending':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   return (
-    <div className="p-6 bg-white rounded-lg shadow">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-medium text-gray-900">Recent Orders</h2>
+    <div>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 border-b border-stone-200">
+        <div>
+          <h3 className="text-sm sm:text-base font-semibold text-stone-900">Recent Orders</h3>
+          <p className="mt-0.5 text-xs text-stone-500">The latest orders across your store</p>
+        </div>
         <Link
           href="/admin/orders"
-          className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+          className="inline-flex items-center gap-1 text-xs sm:text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors"
         >
-          View All
+          View all <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                Order ID
-              </th>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                Customer
-              </th>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
-                Amount
-              </th>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-center text-gray-500 uppercase">
-                Status
-              </th>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-right text-gray-500 uppercase">
-                Date
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+
+      {orders.length === 0 ? (
+        <EmptyState
+          icon={ShoppingBag}
+          title="No orders yet"
+          description="New orders will show up here as soon as customers check out."
+        />
+      ) : (
+        <>
+          {/* Mobile: stacked rows */}
+          <ul className="divide-y divide-stone-100 sm:hidden">
             {orders.map((order) => (
-              <tr key={order.id} className="hover:bg-gray-50 cursor-pointer">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                  <Link href="/admin/orders" className="hover:text-indigo-600">
-                    {order.orderNumber || order.id || 'N/A'}
-                  </Link>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                  <Link href="/admin/users" className="hover:text-indigo-600">
-                    {order.customerName || 'Unknown'}
-                  </Link>
-                </td>
-                <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
-                  {formatPrice(order.amount || 0)}
-                </td>
-                <td className="px-6 py-4 text-sm text-center whitespace-nowrap">
-                  <span
-                    className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${getStatusColor(
-                      order.status || 'pending'
-                    )}`}
-                  >
-                    {order.status || 'Pending'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-right text-gray-500 whitespace-nowrap">
-                  {order.createdAt ? formatDate(order.createdAt) : 'N/A'}
-                </td>
-              </tr>
+              <li key={order.id}>
+                <Link href="/admin/orders" className="flex items-start justify-between gap-3 px-4 py-3 hover:bg-stone-50">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-stone-900">#{order.orderNumber || order.id?.slice(-6) || 'N/A'}</p>
+                    <p className="truncate text-xs text-stone-500">{order.customerName || 'Guest'}</p>
+                    <p className="mt-0.5 text-[11px] text-stone-400">{order.createdAt ? formatDate(order.createdAt) : '—'}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <p className="text-sm font-semibold text-stone-900">{formatPrice(order.amount || 0)}</p>
+                    <StatusBadge status={order.status || 'pending'} size="sm" />
+                  </div>
+                </Link>
+              </li>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </ul>
+
+          {/* sm+: table */}
+          <Table wrapperClassName="hidden sm:block">
+            <THead>
+              <tr>
+                <TH>Order</TH>
+                <TH>Customer</TH>
+                <TH align="right">Amount</TH>
+                <TH align="center">Status</TH>
+                <TH align="right">Date</TH>
+              </tr>
+            </THead>
+            <TBody>
+              {orders.map((order) => (
+                <TR key={order.id}>
+                  <TD className="font-medium text-stone-900">
+                    <Link href="/admin/orders" className="hover:underline underline-offset-4">
+                      #{order.orderNumber || order.id?.slice(-6) || 'N/A'}
+                    </Link>
+                  </TD>
+                  <TD className="text-stone-600">{order.customerName || 'Guest'}</TD>
+                  <TD align="right" className="font-medium text-stone-900">{formatPrice(order.amount || 0)}</TD>
+                  <TD align="center">
+                    <StatusBadge status={order.status || 'pending'} />
+                  </TD>
+                  <TD align="right" className="text-stone-500">{order.createdAt ? formatDate(order.createdAt) : '—'}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </>
+      )}
     </div>
   );
 };

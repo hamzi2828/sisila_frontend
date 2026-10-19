@@ -1,13 +1,44 @@
 "use client";
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import Image from "next/image";
 import { toast } from "react-hot-toast";
-import { FiPlus, FiX } from "react-icons/fi";
+import {
+  AlignLeft,
+  Eye,
+  FileText,
+  Image as ImageIcon,
+  Info,
+  Plus,
+  Save,
+  Search,
+  Settings2,
+  Tag,
+} from "lucide-react";
 import type { Product, ProductVariant } from "./AllProducts";
 import type { Category } from "./CategoriesTab";
 import { slugify, buildVariantCombos, syncVariants, type Variant } from "../services/productCreateService";
 import { productService } from "../services/productService";
 import { collectionService, type CollectionItem } from "../services/collectionService";
+import { prepareImagesForUpload } from "@/lib/compressImage";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { formatPrice } from "@/lib/formatPrice";
+import { htmlToPlainText } from "@/lib/htmlToText";
+import {
+  Button,
+  FormField,
+  Input,
+  Section,
+  Select,
+  StatusBadge,
+  Textarea,
+} from "@/components/admin/ui";
+import { ImageGalleryField, SingleImageField } from "./product_form/ImageFields";
+import { OptionChips } from "./product_form/OptionChips";
+import { VariantEditor } from "./product_form/VariantEditor";
+import { ColorImagesCard } from "./product_form/ColorImagesCard";
+import { HintWithCount, ProductTypePicker, StatusPicker } from "./product_form/FormBits";
+import { SeoPreview } from "./product_form/SeoPreview";
+import { ProductSummary } from "./product_form/ProductSummary";
+import { focusFirstError } from "./product_form/focusFirstError";
 
 // Extended Product type with SEO and description fields
 interface ExtendedProduct extends Product {
@@ -50,6 +81,25 @@ interface ColorMediaData {
 
 const META_TITLE_LIMIT = 60;
 const META_DESC_LIMIT = 155;
+// The backend stores at most 5 banner images per product
+const MAX_BANNERS = 5;
+
+// Existing image URLs from the API: absolute (Vercel Blob) or backend-relative (legacy uploads)
+const toDisplayUrl = (url?: string): string | undefined => {
+  if (!url) return url;
+  if (/^(https?:|blob:|data:)/i.test(url)) return url;
+  return `${process.env.NEXT_PUBLIC_BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
+// Reason a picked file can't be used as an image, or null when it is fine
+const imageRejection = (file: File): string | null => {
+  if (file.type.startsWith("image/")) return null;
+  return /\.(heic|heif)$/i.test(file.name)
+    ? "HEIC photos are not supported. Please export the photo as JPG or PNG."
+    : "Please upload an image file (JPG, PNG or WebP)";
+};
+
+const IMAGE_HINT = "JPG, PNG or WebP. Images are optimized automatically before upload.";
 
 const initialFormData: ProductFormData = {
   name: "",
@@ -108,7 +158,8 @@ export default function ProductForm({
         metaDescription: (initialData as ExtendedProduct)?.metaDescription || "",
         metaKeywords: (initialData as ExtendedProduct)?.metaKeywords || "",
         metaSchema: (initialData as ExtendedProduct)?.metaSchema || "",
-        description: (initialData as ExtendedProduct)?.description || "",
+        // Seeded products stored HTML; show (and re-save) it as the plain text the store displays.
+        description: htmlToPlainText((initialData as ExtendedProduct)?.description),
         shortDescription: (initialData as ExtendedProduct)?.shortDescription || "",
         features: (initialData as ExtendedProduct)?.features || "",
         collectionType: initialData.collectionType || "none",
@@ -119,8 +170,8 @@ export default function ProductForm({
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<"content" | "description" | "seo">("content");
   const [isLoading, setIsLoading] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // File handling state
   const [thumbFile, setThumbFile] = useState<File | null>(null);
@@ -146,14 +197,17 @@ export default function ProductForm({
   const slug = useMemo(() => slugify(form.name), [form.name]);
   
   
-  // Helper to clean URL for sending to backend (remove domain, keep relative path)
+  // Helper to clean URL for sending to backend: backend-served paths become relative ("/uploads/..."),
+  // absolute URLs on other hosts (Vercel Blob) are kept as-is. Prefixing those with "/" broke the image.
   const cleanUrlForBackend = (url: string): string => {
     if (!url) return url;
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || '';
-    let cleanUrl = url;
+    const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/$/, '');
+    let cleanUrl = url.trim();
     if (backendUrl && cleanUrl.startsWith(backendUrl)) {
-      cleanUrl = cleanUrl.replace(backendUrl, '');
+      cleanUrl = cleanUrl.slice(backendUrl.length);
     }
+    cleanUrl = cleanUrl.replace(/^\/+(?=https?:\/\/)/i, '');
+    if (/^https?:\/\//i.test(cleanUrl)) return cleanUrl;
     return cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
   };
   // Initialize form data from initialData for edit mode
@@ -168,14 +222,13 @@ export default function ProductForm({
         
         // Initialize colorMedia from existing product data
         if (initialData.colorMedia && typeof initialData.colorMedia === 'object') {
-          const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
           const colorMediaData: Record<string, ColorMediaData> = {};
           Object.entries(initialData.colorMedia).forEach(([color, media]) => {
             if (media && typeof media === 'object') {
               colorMediaData[color] = {
-                thumbnailUrl: media.thumbnailUrl ? `${backendUrl}${media.thumbnailUrl}` : undefined,
-                bannerUrls: Array.isArray(media.bannerUrls) 
-                  ? media.bannerUrls.map((url: string) => `${backendUrl}${url}`) 
+                thumbnailUrl: toDisplayUrl(media.thumbnailUrl),
+                bannerUrls: Array.isArray(media.bannerUrls)
+                  ? media.bannerUrls.map((url: string) => toDisplayUrl(url) as string)
                   : [],
                 bannerFiles: [], // No files initially since these are existing URLs
                 modified: false // Mark as not modified initially
@@ -277,12 +330,26 @@ export default function ProductForm({
     if (!isVariant) {
       if (!form.price || form.price < 0) e.price = "Price must be a positive number";
       if (form.stock < 0) e.stock = "Stock cannot be negative";
+      else if (!Number.isInteger(Number(form.stock))) e.stock = "Stock must be a whole number";
+      if (form.discountedPrice !== undefined && form.discountedPrice !== null && form.discountedPrice > form.price) {
+        e.discountedPrice = "Discounted price cannot be higher than the regular price";
+      }
       if (mode === "create" && !thumbFile && !form.thumbnailUrl?.trim()) {
         e.thumbnail = "Thumbnail is required";
       }
     } else {
       if (selectedColors.length === 0) e.colors = "Select at least one color";
       if (selectedSizes.length === 0) e.sizes = "Select at least one size";
+      ((form.variants as ProductVariant[]) || []).forEach((v, i) => {
+        const label = `${v.color} / ${v.size}`;
+        if (!v.price || v.price < 0) e[`variant-${i}-price`] = `Enter a price for ${label}`;
+        else if (v.discountedPrice !== undefined && v.discountedPrice !== null && v.discountedPrice > v.price) {
+          e[`variant-${i}-discountedPrice`] = `Discount for ${label} is higher than its price`;
+        }
+        if (Number(v.stock) < 0 || !Number.isInteger(Number(v.stock || 0))) {
+          e[`variant-${i}-stock`] = `Stock for ${label} must be a whole number`;
+        }
+      });
     }
     
     // SEO validations
@@ -297,7 +364,7 @@ export default function ProductForm({
     }
     
     setErrors(e);
-    return Object.keys(e).length === 0;
+    return e;
   };
   
   const setField = useCallback(<K extends keyof ProductFormData>(key: K, value: ProductFormData[K]) => {
@@ -310,66 +377,86 @@ export default function ProductForm({
     });
   }, []);
   
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "thumbnail" | "banner") => {
-    const file = e.target.files?.[0];
+  // Clear inline errors as soon as the admin edits the field
+  const clearError = useCallback((...keys: string[]) => {
+    setErrors((prev) => {
+      if (!keys.some((k) => prev[k])) return prev;
+      const next = { ...prev };
+      keys.forEach((k) => delete next[k]);
+      return next;
+    });
+  }, []);
+
+  const handleThumbnailFiles = (files: FileList | File[]) => {
+    const file = Array.from(files)[0];
     if (!file) return;
-    
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
+
+    const rejection = imageRejection(file);
+    if (rejection) {
+      toast.error(rejection);
       return;
     }
-    
-    if (type === "thumbnail") {
-      if (form.thumbnailUrl && form.thumbnailUrl.toString().startsWith("blob:")) {
-        safeRevoke(form.thumbnailUrl.toString());
-      }
-      const url = URL.createObjectURL(file);
-      setThumbFile(file);
-      // Removed setThumbName since it was unused
-      setField("thumbnailUrl", url);
-      setErrors(prev => ({ ...prev, thumbnail: "" }));
-    } else {
-      const existing = form.bannerUrls || [];
-      if (existing.length >= 10) {
-        toast.error("Maximum 10 banner images allowed");
-        return;
-      }
-      const url = URL.createObjectURL(file);
-      setField("bannerUrls", [...existing, url]);
-      setBannerFiles(prev => [...prev, file]);
+
+    if (form.thumbnailUrl && form.thumbnailUrl.toString().startsWith("blob:")) {
+      safeRevoke(form.thumbnailUrl.toString());
     }
+    const url = URL.createObjectURL(file);
+    setThumbFile(file);
+    setField("thumbnailUrl", url);
+    setErrors(prev => ({ ...prev, thumbnail: "" }));
   };
-  
+
+  // Create: drop the picked thumbnail. Edit: undo a newly picked one and show the saved image again.
+  const clearThumbnail = () => {
+    safeRevoke(form.thumbnailUrl?.toString());
+    setThumbFile(null);
+    setField("thumbnailUrl", mode === "edit" ? toDisplayUrl(initialData?.thumbnailUrl) || "" : "");
+    if (thumbInputRef.current) thumbInputRef.current.value = "";
+  };
+
   const handleMultipleBannerFiles = (files: FileList) => {
     const existing = form.bannerUrls || [];
-    const spaceLeft = 5 - existing.length;
-    const filesToAdd = Array.from(files).slice(0, spaceLeft);
-    
-    if (filesToAdd.length < files.length) {
+    const spaceLeft = Math.max(0, MAX_BANNERS - existing.length);
+    const images = Array.from(files).filter((file) => file.type.startsWith("image/"));
+    if (images.length < files.length) {
+      const rejected = Array.from(files).find((file) => !file.type.startsWith("image/"));
+      toast.error(rejected && images.length === 0 ? imageRejection(rejected)! : "Only image files can be added");
+    }
+    const filesToAdd = images.slice(0, spaceLeft);
+
+    if (filesToAdd.length < images.length) {
       toast.error(`Only ${spaceLeft} more banner images can be added`);
     }
-    
-    filesToAdd.forEach(file => {
-      if (file.type.startsWith("image/")) {
-        const url = URL.createObjectURL(file);
-        setField("bannerUrls", [...(form.bannerUrls || []), url]);
-        setBannerFiles(prev => [...prev, file]);
-      }
-    });
+    if (filesToAdd.length === 0) return;
+
+    // One state update for all files (updating inside the loop kept only the last preview)
+    const urls = filesToAdd.map((file) => URL.createObjectURL(file));
+    setField("bannerUrls", [...existing, ...urls]);
+    setBannerFiles(prev => [...prev, ...filesToAdd]);
   };
-  
+
   const removeBanner = (index: number) => {
     const banners = [...(form.bannerUrls || [])];
+    // bannerFiles only holds NEW files, in the same order as the blob: previews in bannerUrls
+    // (existing server banners come first in edit mode), so map the index to the new-file index.
+    const fileIndex = banners.slice(0, index + 1).filter((u) => String(u).startsWith("blob:")).length - 1;
     const [removed] = banners.splice(index, 1);
     if (removed) safeRevoke(removed.toString());
     setField("bannerUrls", banners);
-    setBannerFiles(prev => prev.filter((_, i) => i !== index));
+    if (removed && String(removed).startsWith("blob:") && fileIndex >= 0) {
+      setBannerFiles(prev => prev.filter((_, i) => i !== fileIndex));
+    }
   };
   
   const handleColorThumbFiles = (color: string, files: FileList | File[]) => {
     const file = Array.from(files)[0];
     if (!file) return;
-    
+    const rejection = imageRejection(file);
+    if (rejection) {
+      toast.error(rejection);
+      return;
+    }
+
     setColorMedia((prev) => {
       const prevUrl = prev[color]?.thumbnailUrl;
       if (prevUrl && prevUrl.startsWith("blob:")) {
@@ -390,35 +477,49 @@ export default function ProductForm({
   };
   
   const handleColorBannerFiles = (color: string, files: FileList | File[]) => {
-    const incoming = Array.from(files);
-    if (!incoming.length) return;
-    
+    const picked = Array.from(files);
+    if (!picked.length) return;
+    const incoming = picked.filter((file) => !imageRejection(file));
+    if (incoming.length < picked.length) {
+      toast.error(incoming.length === 0 ? imageRejection(picked[0])! : "Only image files can be added");
+    }
+    // Same limit as the product banners (the old 10 here contradicted the "Max 5" label)
+    const spaceLeft = Math.max(0, MAX_BANNERS - (colorMedia[color]?.bannerUrls?.length || 0));
+    if (incoming.length > spaceLeft) {
+      toast.error(spaceLeft > 0
+        ? `Only ${spaceLeft} more ${color} banner images can be added`
+        : `Maximum ${MAX_BANNERS} banner images per color`);
+    }
+    const toAdd = incoming.slice(0, spaceLeft);
+    if (!toAdd.length) return;
+    const urls = toAdd.map((f) => URL.createObjectURL(f));
+
     setColorMedia((prev) => {
       const curr = prev[color] || { bannerUrls: [], bannerFiles: [] };
       const existing = curr.bannerUrls || [];
       const existingFiles = curr.bannerFiles || [];
-      const spaceLeft = 10 - existing.length;
-      const toAdd = incoming.slice(0, Math.max(0, spaceLeft));
-      const urls = toAdd.map((f) => URL.createObjectURL(f));
-      
-      return { 
-        ...prev, 
-        [color]: { 
-          ...curr, 
+
+      return {
+        ...prev,
+        [color]: {
+          ...curr,
           bannerUrls: [...existing, ...urls],
           bannerFiles: [...existingFiles, ...toAdd],
-          modified: true 
-        } 
+          modified: true
+        }
       };
     });
   };
-  
+
   const removeColorBanner = (color: string, index: number) => {
     setColorMedia((prev) => {
       const banners = [...(prev[color]?.bannerUrls || [])];
       const files = [...(prev[color]?.bannerFiles || [])];
+      // bannerFiles only holds NEW files, in the same order as their blob: previews (saved banners
+      // come first in edit mode), so map the preview index to the new-file index.
+      const fileIndex = banners.slice(0, index + 1).filter((u) => String(u).startsWith("blob:")).length - 1;
       const [removed] = banners.splice(index, 1);
-      files.splice(index, 1);
+      if (removed && String(removed).startsWith("blob:") && fileIndex >= 0) files.splice(fileIndex, 1);
       if (removed) safeRevoke(removed);
       return { 
         ...prev, 
@@ -448,15 +549,38 @@ export default function ProductForm({
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) {
-      if (errors.metaTitle || errors.metaDescription || errors.metaSchema) setActiveTab("seo");
+    const validationErrors = validate();
+    const firstError = Object.values(validationErrors).find(Boolean);
+    if (firstError) {
+      // Every section is on one page now: bring the first invalid field into view
+      focusFirstError(formRef.current);
+      toast.error(firstError);
       return;
     }
-    
+
     setIsLoading(true);
+    const toastId = toast.loading(mode === "create" ? "Creating product..." : "Saving product...");
     try {
       const fallbackMetaTitle = (form.metaTitle || form.name || "").slice(0, META_TITLE_LIMIT);
-      
+
+      // Shrink photos in the browser before upload: the API runs on Vercel, which rejects any
+      // request over 4.5 MB, and a single phone photo can be bigger than that.
+      const shouldSendColor = (media: ColorMediaData) => mode === "edit" || !!media.modified;
+      const originals: File[] = isVariant
+        ? Object.values(colorMedia).filter(shouldSendColor).flatMap((media) => [
+            ...(media.thumbFile ? [media.thumbFile] : []),
+            ...(media.bannerFiles || []),
+          ])
+        : [...(thumbFile ? [thumbFile] : []), ...bannerFiles];
+      const optimized = new Map<File, File>();
+      if (originals.length > 0) {
+        toast.loading(`Optimizing ${originals.length} image${originals.length > 1 ? "s" : ""}...`, { id: toastId });
+        const prepared = await prepareImagesForUpload(originals);
+        originals.forEach((file, i) => optimized.set(file, prepared[i]));
+        toast.loading(mode === "create" ? "Creating product..." : "Saving product...", { id: toastId });
+      }
+      const forUpload = (file: File) => optimized.get(file) ?? file;
+
       const formData = new FormData();
       
       // Basic fields
@@ -464,8 +588,10 @@ export default function ProductForm({
       formData.append("slug", slug);
       formData.append("category", form.category);
       formData.append("price", String(form.price ?? 0));
-      if (form.discountedPrice !== undefined && form.discountedPrice !== null) {
+      if (form.discountedPrice !== undefined && form.discountedPrice !== null && !Number.isNaN(form.discountedPrice)) {
         formData.append("discountedPrice", String(form.discountedPrice));
+      } else if (mode === "edit") {
+        formData.append("discountedPrice", ""); // cleared in the form: remove the saved discount
       }
       formData.append("stock", String(form.stock ?? 0));
       formData.append("status", form.status);
@@ -516,11 +642,12 @@ export default function ProductForm({
           console.log(`Processing color ${color}:`, media);
           
           // Always process media in edit mode, regardless of modified status
-          if (mode === "edit" || media.modified) {
+          if (shouldSendColor(media)) {
             // Send new thumbnail file if uploaded
             if (media.thumbFile) {
-              const thumbFileName = `${color}_${media.thumbFile.name}`;
-              const renamedThumbFile = new File([media.thumbFile], thumbFileName, { type: media.thumbFile.type });
+              const thumb = forUpload(media.thumbFile);
+              const thumbFileName = `${color}_${thumb.name}`;
+              const renamedThumbFile = new File([thumb], thumbFileName, { type: thumb.type });
               formData.append("colorThumbnail", renamedThumbFile);
             } else if (media.thumbnailUrl && !media.thumbnailUrl.startsWith('blob:')) {
               // Keep existing thumbnail if no new file uploaded
@@ -530,7 +657,8 @@ export default function ProductForm({
             
             // Send new banner files if uploaded
             if (media.bannerFiles && media.bannerFiles.length > 0) {
-              media.bannerFiles.forEach((file, index) => {
+              media.bannerFiles.forEach((original, index) => {
+                const file = forUpload(original);
                 const bannerFileName = `${color}_${index}_${file.name}`;
                 const renamedBannerFile = new File([file], bannerFileName, { type: file.type });
                 formData.append("colorBanner", renamedBannerFile);
@@ -549,8 +677,8 @@ export default function ProductForm({
         }
       } else {
         // Handle single products
-        if (thumbFile) formData.append("thumbnail", thumbFile);
-        bannerFiles.forEach((f) => formData.append("banners", f));
+        if (thumbFile) formData.append("thumbnail", forUpload(thumbFile));
+        bannerFiles.forEach((f) => formData.append("banners", forUpload(f)));
       }
       
       // For edit mode, preserve existing images
@@ -590,7 +718,7 @@ export default function ProductForm({
         onSubmit(submitData);
       }
       
-      toast.success(`Product ${mode === "create" ? "created" : "updated"} successfully!`);
+      toast.success(`Product ${mode === "create" ? "created" : "updated"} successfully!`, { id: toastId });
       
       if (mode === "create") {
         // Reset form
@@ -609,1304 +737,620 @@ export default function ProductForm({
       
     } catch (error) {
       console.error(`Error ${mode === "create" ? "creating" : "updating"} product:`, error);
-      toast.error(`Failed to ${mode} product`);
+      // Show the real reason (validation message, image too large, unsupported file, session expired...)
+      toast.error(`Failed to ${mode} product: ${getApiErrorMessage(error)}`, { id: toastId, duration: 8000 });
     } finally {
       setIsLoading(false);
     }
   };
   
+  // ---------------------------------------------------------------- Derived values for the UI
+  const variantList = ((form.variants as ProductVariant[]) || []);
+  const effectivePrice = (price?: number, discounted?: number) =>
+    discounted !== undefined && discounted !== null && !Number.isNaN(discounted) && discounted > 0 && discounted < (price || 0)
+      ? discounted
+      : price || 0;
+  const variantPrices = variantList.map((v) => effectivePrice(v.price, v.discountedPrice)).filter((p) => p > 0);
+  const minVariantPrice = variantPrices.length ? Math.min(...variantPrices) : 0;
+  const maxVariantPrice = variantPrices.length ? Math.max(...variantPrices) : 0;
+  const hasDiscount =
+    !isVariant &&
+    form.discountedPrice !== undefined &&
+    form.discountedPrice !== null &&
+    !Number.isNaN(form.discountedPrice) &&
+    form.discountedPrice > 0 &&
+    form.discountedPrice < (form.price || 0);
+  const discountPercent = hasDiscount ? Math.round((1 - (form.discountedPrice as number) / form.price) * 100) : 0;
+
+  const summaryPrice: React.ReactNode = isVariant
+    ? variantPrices.length
+      ? minVariantPrice === maxVariantPrice
+        ? formatPrice(minVariantPrice)
+        : `${formatPrice(minVariantPrice)} – ${formatPrice(maxVariantPrice)}`
+      : "—"
+    : form.price
+      ? hasDiscount
+        ? (
+          <span>
+            {formatPrice(form.discountedPrice)}{" "}
+            <span className="text-xs font-normal text-stone-400 line-through">{formatPrice(form.price)}</span>
+          </span>
+        )
+        : formatPrice(form.price)
+      : "—";
+  const summaryStock = isVariant
+    ? variantList.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+    : Number(form.stock) || 0;
+  const firstColorThumb = selectedColors.map((c) => colorMedia[c]?.thumbnailUrl).find(Boolean);
+  // Variant products may still carry a general thumbnail from before colour images existed
+  const summaryThumb = (isVariant ? firstColorThumb : undefined) || form.thumbnailUrl?.toString() || undefined;
+  const summaryImages = isVariant
+    ? selectedColors.reduce(
+        (sum, c) => sum + (colorMedia[c]?.thumbnailUrl ? 1 : 0) + (colorMedia[c]?.bannerUrls?.length || 0),
+        0
+      )
+    : (form.thumbnailUrl ? 1 : 0) + (form.bannerUrls?.length || 0);
+  const collectionItems = form.collectionType === "theme" ? themes : form.collectionType === "series" ? series : [];
+  const collectionTitle =
+    form.collectionType && form.collectionType !== "none" && form.collectionId
+      ? collectionItems.find((item) => item.id === form.collectionId)?.title
+      : undefined;
+  const errorCount = Object.values(errors).filter(Boolean).length;
+
   // SEO Preview
   const previewTitle = (form.metaTitle || form.name || "").slice(0, META_TITLE_LIMIT);
   const previewUrl = `/products/${slug || "your-slug"}`;
-  const previewDesc = (form.metaDescription || `${form.name} - ${form.category} - Starting from £${form.price}`).slice(0, META_DESC_LIMIT);
-  
+  const fromPrice = isVariant ? minVariantPrice : effectivePrice(form.price, form.discountedPrice);
+  const previewDesc = (
+    form.metaDescription ||
+    (form.name ? `${form.name}${form.category ? ` - ${form.category}` : ""}${fromPrice ? ` - Starting from ${formatPrice(fromPrice)}` : ""}` : "")
+  ).slice(0, META_DESC_LIMIT);
+
+  const updateVariant = (index: number, patch: Partial<ProductVariant>) => {
+    const newVariants = [...variantList];
+    newVariants[index] = { ...newVariants[index], ...patch };
+    setField("variants", newVariants);
+    clearError(...Object.keys(patch).map((key) => `variant-${index}-${key}`));
+  };
+
+  const toggleColor = (color: string) => {
+    setSelectedColors(selectedColors.includes(color) ? selectedColors.filter((c) => c !== color) : [...selectedColors, color]);
+    clearError("colors");
+  };
+
+  const toggleSize = (size: string) => {
+    setSelectedSizes(selectedSizes.includes(size) ? selectedSizes.filter((s) => s !== size) : [...selectedSizes, size]);
+    clearError("sizes");
+  };
+
+  const manageButton = (label: string) =>
+    onManageAttributes ? (
+      <button
+        type="button"
+        onClick={onManageAttributes}
+        className="text-xs font-medium text-stone-500 underline-offset-4 transition-colors hover:text-stone-900 hover:underline"
+      >
+        {label}
+      </button>
+    ) : null;
+
   return (
-    <div className="bg-white shadow-xl rounded-xl border border-gray-100">
-      <form onSubmit={handleSubmit} className="">
-        {/* Enhanced Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 rounded-t-xl">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-xl font-semibold text-white">
-                {mode === "create" ? "Create New Product" : "Edit Product"}
-              </h3>
-              <p className="text-indigo-100 text-sm mt-1">
-                {mode === "create"
-                  ? "Add a new product to your inventory"
-                  : "Update product information and settings"
-                }
-              </p>
-            </div>
-            {onCancel && (
-              <button
-                type="button"
-                onClick={onCancel}
-                className="text-white hover:text-indigo-200 transition-colors duration-200 p-2 hover:bg-white/20 rounded-lg"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
+    <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-4 sm:space-y-6">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3 lg:items-start">
+        {/* ------------------------------------------------ Main column */}
+        <div className="min-w-0 space-y-4 sm:space-y-6 lg:col-span-2">
+          <Section
+            title="Basic information"
+            subtitle="Name, category and collection"
+            icon={<FileText className="h-5 w-5" />}
+          >
+            <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2">
+              <FormField label="Product name" htmlFor="product-name" required error={errors.name} className="md:col-span-2">
+                <Input
+                  id="product-name"
+                  required
+                  placeholder="e.g. Ghalib Ink Portrait Hoodie"
+                  value={form.name}
+                  invalid={!!errors.name}
+                  onChange={(e) => {
+                    setField("name", e.target.value);
+                    clearError("name");
+                  }}
+                />
+              </FormField>
 
-        {/* Enhanced Tabs */}
-        <div className="bg-gray-50 border-b border-gray-200">
-          <nav className="flex px-6" aria-label="Tabs">
-            {[
-              {
-                key: "content",
-                label: "Product Details",
-                icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
-                description: "Basic info, pricing, variants"
-              },
-              {
-                key: "description",
-                label: "Description",
-                icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
-                description: "Product descriptions, features"
-              },
-              {
-                key: "seo",
-                label: "SEO & Meta",
-                icon: "M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9",
-                description: "Meta tags, search optimization"
-              },
-            ].map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setActiveTab(t.key as "content" | "description" | "seo")}
-                className={`group relative flex flex-col items-center px-6 py-4 text-sm font-medium transition-all duration-200 ${
-                  activeTab === t.key
-                    ? "text-indigo-600 bg-white rounded-t-lg shadow-sm border-x border-t border-gray-200 -mb-px"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-t-lg"
-                }`}
-              >
-                <svg className={`w-5 h-5 mb-1 ${activeTab === t.key ? 'text-indigo-600' : 'text-gray-400 group-hover:text-gray-500'}`}
-                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={t.icon} />
-                </svg>
-                <span className="font-medium">{t.label}</span>
-                <span className={`text-xs mt-1 ${activeTab === t.key ? 'text-indigo-500' : 'text-gray-400'}`}>
-                  {t.description}
-                </span>
-              </button>
-            ))}
-          </nav>
-        </div>
+              <FormField label="URL slug" htmlFor="product-slug" hint="Generated automatically from the name">
+                <Input
+                  id="product-slug"
+                  readOnly
+                  value={slug}
+                  placeholder="generated-from-name"
+                  className="bg-stone-50 font-mono text-stone-600"
+                />
+              </FormField>
 
-        <div className="px-6 py-6">
+              <FormField label="Category" htmlFor="product-category" required error={errors.category}>
+                <Select
+                  id="product-category"
+                  required
+                  value={form.category}
+                  invalid={!!errors.category}
+                  onChange={(e) => {
+                    setField("category", e.target.value);
+                    clearError("category");
+                  }}
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
 
-        {/* CONTENT TAB */}
-        {activeTab === "content" && (
-          <div className="space-y-8">
-            {/* Basic Info Section */}
-            <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-              <div className="flex items-center mb-4">
-                <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center mr-3">
-                  <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h4 className="text-lg font-semibold text-gray-900">Basic Information</h4>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="sm:col-span-2">
-                  <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">
-                    <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                    Product Name
-                    <span className="text-red-500 ml-1">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g., Premium Compression T-Shirt"
-                      className="block w-full rounded-xl border-2 border-gray-200 shadow-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 px-5 py-4 text-lg font-medium text-gray-900 placeholder-gray-500 bg-white hover:border-gray-300"
-                      value={form.name}
-                      onChange={(e) => setField("name", e.target.value)}
-                    />
-                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                    </div>
-                  </div>
-                  {errors.name && <p className="mt-3 text-sm text-red-600 flex items-center bg-red-50 px-3 py-2 rounded-lg">
-                    <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {errors.name}
-                  </p>}
-                </div>
+              <FormField label="Collection type" htmlFor="product-collection-type" hint="Optionally link this product to a theme or series">
+                <Select
+                  id="product-collection-type"
+                  value={form.collectionType || "none"}
+                  onChange={(e) => {
+                    setField("collectionType", e.target.value as "theme" | "series" | "none");
+                    setField("collectionId", ""); // Reset collection ID when type changes
+                  }}
+                >
+                  <option value="none">None</option>
+                  <option value="theme">Theme</option>
+                  <option value="series">Series</option>
+                </Select>
+              </FormField>
 
-                <div>
-                  <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                    URL Slug
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      readOnly
-                      value={slug}
-                      className="block w-full rounded-xl border-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 shadow-lg text-gray-600 px-5 py-4 text-lg font-medium"
-                    />
-                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                      <div className="bg-blue-100 rounded-lg p-2">
-                        <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-sm text-blue-600 flex items-center bg-blue-50 px-3 py-2 rounded-lg">
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    Auto-generated from product name
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">
-                    <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
-                    Category
-                    <span className="text-red-500 ml-1">*</span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      required
-                      className="block w-full rounded-xl border-2 border-gray-200 shadow-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 px-5 py-4 text-lg font-medium text-gray-900 bg-white hover:border-gray-300 appearance-none"
-                      value={form.category}
-                      onChange={(e) => setField("category", e.target.value)}
-                    >
-                      <option value="" className="text-gray-500">Select a category</option>
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.name}>
-                          {cat.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                      <div className="bg-purple-100 rounded-lg p-2">
-                        <svg className="h-4 w-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                  {errors.category && <p className="mt-3 text-sm text-red-600 flex items-center bg-red-50 px-3 py-2 rounded-lg">
-                    <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {errors.category}
-                  </p>}
-                </div>
-
-                {/* Collection Type Dropdown */}
-                <div>
-                  <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></span>
-                    Collection Type
-                    <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Optional</span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      className="block w-full rounded-xl border-2 border-gray-200 shadow-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 px-5 py-4 text-lg font-medium text-gray-900 bg-white hover:border-gray-300 appearance-none"
-                      value={form.collectionType || "none"}
-                      onChange={(e) => {
-                        setField("collectionType", e.target.value as "theme" | "series" | "none");
-                        setField("collectionId", ""); // Reset collection ID when type changes
-                      }}
-                    >
-                      <option value="none">None</option>
-                      <option value="theme">Theme</option>
-                      <option value="series">Series</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                      <div className="bg-indigo-100 rounded-lg p-2">
-                        <svg className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-sm text-gray-600 flex items-center bg-gray-50 px-3 py-2 rounded-lg">
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    Associate this product with a theme or series
-                  </p>
-                </div>
-
-                {/* Collection Item Dropdown (Theme or Series) */}
-                {form.collectionType && form.collectionType !== "none" && (
-                  <div>
-                    <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">
-                      <span className="w-2 h-2 bg-pink-500 rounded-full mr-2"></span>
-                      Select {form.collectionType === "theme" ? "Theme" : "Series"}
-                    </label>
-                    <div className="relative">
-                      <select
-                        className="block w-full rounded-xl border-2 border-gray-200 shadow-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 px-5 py-4 text-lg font-medium text-gray-900 bg-white hover:border-gray-300 appearance-none"
-                        value={form.collectionId || ""}
-                        onChange={(e) => setField("collectionId", e.target.value)}
-                      >
-                        <option value="">Select a {form.collectionType}</option>
-                        {form.collectionType === "theme"
-                          ? themes.map((theme) => (
-                              <option key={theme._id} value={theme.id}>
-                                {theme.title}
-                              </option>
-                            ))
-                          : series.map((seriesItem) => (
-                              <option key={seriesItem._id} value={seriesItem.id}>
-                                {seriesItem.title}
-                              </option>
-                            ))}
-                      </select>
-                      <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                        <div className="bg-pink-100 rounded-lg p-2">
-                          <svg className="h-4 w-4 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">
-                    <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                    Price (£)
-                    {!isVariant && <span className="text-red-500 ml-1">*</span>}
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <div className="bg-green-100 rounded-lg px-2 py-1">
-                        <span className="text-green-700 text-lg font-bold">£</span>
-                      </div>
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      required={!isVariant}
-                      disabled={isVariant}
-                      placeholder="0.00"
-                      className={`block w-full pl-16 pr-5 py-4 rounded-xl border-2 shadow-lg focus:ring-4 transition-all duration-200 text-lg font-semibold ${
-                        isVariant
-                          ? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
-                          : 'border-gray-200 bg-white text-gray-900 focus:border-green-500 focus:ring-green-100 hover:border-gray-300'
-                      }`}
-                      value={form.price}
-                      onChange={(e) => setField("price", Number(e.target.value))}
-                    />
-                  </div>
-                  {errors.price && <p className="mt-3 text-sm text-red-600 flex items-center bg-red-50 px-3 py-2 rounded-lg">
-                    <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {errors.price}
-                  </p>}
-                  {isVariant && <p className="mt-3 text-sm text-indigo-600 flex items-center bg-indigo-50 px-3 py-2 rounded-lg">
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    Set individual prices for each variant below
-                  </p>}
-                </div>
-
-                <div>
-                  <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">
-                    <span className="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
-                    Discounted Price (£)
-                    <span className="ml-2 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">Optional</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <div className="bg-orange-100 rounded-lg px-2 py-1">
-                        <span className="text-orange-700 text-lg font-bold">£</span>
-                      </div>
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      disabled={isVariant}
-                      placeholder="0.00"
-                      className={`block w-full pl-16 pr-5 py-4 rounded-xl border-2 shadow-lg focus:ring-4 transition-all duration-200 text-lg font-semibold ${
-                        isVariant
-                          ? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
-                          : 'border-gray-200 bg-white text-gray-900 focus:border-orange-500 focus:ring-orange-100 hover:border-gray-300'
-                      }`}
-                      value={form.discountedPrice ?? ""}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setField("discountedPrice", val === "" ? undefined : Number(val));
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">
-                    <span className="w-2 h-2 bg-cyan-500 rounded-full mr-2"></span>
-                    Stock Quantity
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      disabled={isVariant}
-                      placeholder="0"
-                      className={`block w-full px-5 py-4 rounded-xl border-2 shadow-lg focus:ring-4 transition-all duration-200 text-lg font-semibold ${
-                        isVariant
-                          ? 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed'
-                          : 'border-gray-200 bg-white text-gray-900 focus:border-cyan-500 focus:ring-cyan-100 hover:border-gray-300'
-                      }`}
-                      value={form.stock}
-                      onChange={(e) => setField("stock", Number(e.target.value))}
-                    />
-                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                      <div className="bg-cyan-100 rounded-lg p-2">
-                        <svg className="h-4 w-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                  {errors.stock && <p className="mt-3 text-sm text-red-600 flex items-center bg-red-50 px-3 py-2 rounded-lg">
-                    <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {errors.stock}
-                  </p>}
-                  {isVariant && <p className="mt-3 text-sm text-cyan-600 flex items-center bg-cyan-50 px-3 py-2 rounded-lg">
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    Total stock will automatically sum from all variants
-                  </p>}
-                </div>
-
-                <div>
-                  <label className="block text-base font-bold text-gray-800 mb-3 flex items-center">
-                    <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                    Publication Status
-                  </label>
-                  <div className="relative">
-                    <select
-                      className="block w-full rounded-xl border-2 border-gray-200 shadow-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-200 px-5 py-4 text-lg font-semibold text-gray-900 bg-white hover:border-gray-300 appearance-none"
-                      value={form.status}
-                      onChange={(e) => setField("status", e.target.value as ProductFormData["status"])}
-                    >
-                      <option value="published" className="text-green-700">✅ Published - Live on store</option>
-                      <option value="draft" className="text-yellow-700">📝 Draft - Not visible</option>
-                      <option value="out_of_stock" className="text-red-700">📦 Out of Stock</option>
-                    </select>
-                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                      <div className="bg-yellow-100 rounded-lg p-2">
-                        <svg className="h-4 w-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <div className={`text-sm px-3 py-2 rounded-lg flex items-center ${
-                      form.status === 'published'
-                        ? 'bg-green-50 text-green-700'
-                        : form.status === 'draft'
-                        ? 'bg-yellow-50 text-yellow-700'
-                        : 'bg-red-50 text-red-700'
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full mr-2 ${
-                        form.status === 'published'
-                          ? 'bg-green-500'
-                          : form.status === 'draft'
-                          ? 'bg-yellow-500'
-                          : 'bg-red-500'
-                      }`}></div>
-                      {form.status === 'published' && 'Product will be visible to customers'}
-                      {form.status === 'draft' && 'Product is saved but not published'}
-                      {form.status === 'out_of_stock' && 'Product is visible but marked as unavailable'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Product Type Section */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-              <div className="flex items-center mb-4">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                </div>
-                <h4 className="text-lg font-semibold text-gray-900">Product Type</h4>
-              </div>
-              {mode === 'edit' && (
-                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <div className="flex items-center">
-                    <svg className="w-4 h-4 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-sm text-amber-700 font-medium">
-                      Product type cannot be changed after creation to preserve data integrity
-                    </p>
-                  </div>
-                </div>
+              {form.collectionType && form.collectionType !== "none" && (
+                <FormField
+                  label={form.collectionType === "theme" ? "Theme" : "Series"}
+                  htmlFor="product-collection"
+                  hint={collectionItems.length === 0 ? `No ${form.collectionType === "theme" ? "themes" : "series"} found yet` : undefined}
+                >
+                  <Select
+                    id="product-collection"
+                    value={form.collectionId || ""}
+                    onChange={(e) => setField("collectionId", e.target.value)}
+                  >
+                    <option value="">Select a {form.collectionType}</option>
+                    {form.collectionType === "theme"
+                      ? themes.map((theme) => (
+                          <option key={theme._id} value={theme.id}>
+                            {theme.title}
+                          </option>
+                        ))
+                      : series.map((seriesItem) => (
+                          <option key={seriesItem._id} value={seriesItem.id}>
+                            {seriesItem.title}
+                          </option>
+                        ))}
+                  </Select>
+                </FormField>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <label className={`relative flex rounded-lg border p-4 transition-all duration-200 ${
-                  !isVariant
-                    ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-600'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
-                  } ${mode === 'edit' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
-                  <input
-                    type="radio"
-                    name="productType"
-                    value="single"
-                    checked={!isVariant}
-                    disabled={mode === 'edit'}
-                    onChange={() => {
+            </div>
+          </Section>
+
+          <Section
+            title="Pricing & inventory"
+            subtitle={isVariant ? "Pick colours and sizes, then price each variant" : "Price and stock in Pakistani rupees (Rs)"}
+            icon={<Tag className="h-5 w-5" />}
+          >
+            <div className="space-y-5">
+              <div>
+                <ProductTypePicker
+                  value={isVariant ? "variant" : "single"}
+                  disabled={mode === "edit"}
+                  onChange={(type) => {
+                    if (type === "single") {
                       setField("productType", "single");
                       setSelectedColors([]);
                       setSelectedSizes([]);
                       setField("variants", []);
-                    }}
-                    className="sr-only"
-                  />
-                  <div className="flex items-center">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 ${
-                      !isVariant ? 'border-indigo-600' : 'border-gray-300'
-                    }`}>
-                      {!isVariant && <div className="w-2 h-2 bg-indigo-600 rounded-full" />}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Single Product</div>
-                      <div className="text-sm text-gray-500">One price, one stock level</div>
-                    </div>
-                  </div>
-                </label>
-                <label className={`relative flex rounded-lg border p-4 transition-all duration-200 ${
-                  isVariant
-                    ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-600'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
-                  } ${mode === 'edit' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
-                  <input
-                    type="radio"
-                    name="productType"
-                    value="variant"
-                    checked={isVariant}
-                    disabled={mode === 'edit'}
-                    onChange={() => setField("productType", "variant")}
-                    className="sr-only"
-                  />
-                  <div className="flex items-center">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 ${
-                      isVariant ? 'border-indigo-600' : 'border-gray-300'
-                    }`}>
-                      {isVariant && <div className="w-2 h-2 bg-indigo-600 rounded-full" />}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">Variant Product</div>
-                      <div className="text-sm text-gray-500">Multiple colors & sizes</div>
-                    </div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Variant Configuration */}
-            {isVariant && (
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between items-center">
-                    <label className="block text-sm font-medium text-gray-700">Colors *</label>
-                    {onManageAttributes && (
-                      <button
-                        type="button"
-                        onClick={onManageAttributes}
-                        className="text-sm text-indigo-600 hover:text-indigo-500"
-                      >
-                        Manage Colors
-                      </button>
-                    )}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {colorOptions.map((color) => (
-                      <label key={color} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedColors.includes(color)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedColors([...selectedColors, color]);
-                            } else {
-                              setSelectedColors(selectedColors.filter(c => c !== color));
-                            }
-                          }}
-                          className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">{color}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {errors.colors && <p className="mt-1 text-sm text-red-600">{errors.colors}</p>}
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center">
-                    <label className="block text-sm font-medium text-gray-700">Sizes *</label>
-                    {onManageAttributes && (
-                      <button
-                        type="button"
-                        onClick={onManageAttributes}
-                        className="text-sm text-indigo-600 hover:text-indigo-500"
-                      >
-                        Manage Sizes
-                      </button>
-                    )}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {sizeOptions.map((size) => (
-                      <label key={size} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedSizes.includes(size)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedSizes([...selectedSizes, size]);
-                            } else {
-                              setSelectedSizes(selectedSizes.filter(s => s !== size));
-                            }
-                          }}
-                          className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">{size}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {errors.sizes && <p className="mt-1 text-sm text-red-600">{errors.sizes}</p>}
-                </div>
-
-                {/* Variants Table */}
-                {variantCombos.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Variant Pricing & Stock</label>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Color</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (£)</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {(form.variants as ProductVariant[] || []).map((variant: ProductVariant, index: number) => (
-                            <tr key={`${variant.color}-${variant.size}`}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{variant.color}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{variant.size}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={variant.price || ""}
-                                  onChange={(e) => {
-                                    const newVariants = [...(form.variants as ProductVariant[] || [])];
-                                    newVariants[index] = { ...variant, price: Number(e.target.value) };
-                                    setField("variants", newVariants);
-                                  }}
-                                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                />
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={variant.stock || ""}
-                                  onChange={(e) => {
-                                    const newVariants = [...(form.variants as ProductVariant[] || [])];
-                                    newVariants[index] = { ...variant, stock: Number(e.target.value) };
-                                    setField("variants", newVariants);
-                                  }}
-                                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                    } else {
+                      setField("productType", "variant");
+                    }
+                  }}
+                />
+                {mode === "edit" && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-stone-500">
+                    <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    The product type can&apos;t be changed after the product is created.
+                  </p>
                 )}
               </div>
-            )}
 
-            {/* Images */}
-            {!isVariant && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Thumbnail Image *</label>
-                  <input
-                    ref={thumbInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, "thumbnail")}
-                    className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                  />
-                  {form.thumbnailUrl && (
-                    <div className="mt-2">
-                      <Image
-                        src={form.thumbnailUrl.toString()}
-                        alt="Thumbnail preview"
-                        width={150}
-                        height={150}
-                        className="object-cover rounded"
-                        unoptimized
-                      />
+              {!isVariant ? (
+                <div className="grid grid-cols-1 gap-4 border-t border-stone-100 pt-5 sm:grid-cols-3 sm:gap-5">
+                  <FormField label="Price (Rs)" htmlFor="product-price" required error={errors.price}>
+                    <Input
+                      id="product-price"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="any"
+                      required
+                      prefix="Rs"
+                      placeholder="0"
+                      value={form.price || ""}
+                      invalid={!!errors.price}
+                      onChange={(e) => {
+                        setField("price", Number(e.target.value));
+                        clearError("price", "discountedPrice");
+                      }}
+                    />
+                  </FormField>
+
+                  <FormField
+                    label="Discounted price (Rs)"
+                    htmlFor="product-discounted-price"
+                    error={errors.discountedPrice}
+                    hint={hasDiscount ? `${discountPercent}% off · saves ${formatPrice(form.price - (form.discountedPrice as number))}` : "Leave empty for no discount"}
+                  >
+                    <Input
+                      id="product-discounted-price"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="any"
+                      prefix="Rs"
+                      placeholder="Optional"
+                      value={form.discountedPrice ?? ""}
+                      invalid={!!errors.discountedPrice}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setField("discountedPrice", val === "" ? undefined : Number(val));
+                        clearError("discountedPrice");
+                      }}
+                    />
+                  </FormField>
+
+                  <FormField label="Stock quantity" htmlFor="product-stock" error={errors.stock} hint="Units available to sell">
+                    <Input
+                      id="product-stock"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      placeholder="0"
+                      value={form.stock}
+                      invalid={!!errors.stock}
+                      onChange={(e) => {
+                        setField("stock", Number(e.target.value));
+                        clearError("stock");
+                      }}
+                    />
+                  </FormField>
+                </div>
+              ) : (
+                <div className="space-y-5 border-t border-stone-100 pt-5">
+                  <div>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-stone-700">
+                        Colours <span className="ml-0.5 text-red-500">*</span>
+                      </span>
+                      {manageButton("Manage colours")}
                     </div>
+                    {colorOptions.length > 0 ? (
+                      <OptionChips
+                        label="Colours"
+                        options={colorOptions}
+                        selected={selectedColors}
+                        onToggle={toggleColor}
+                        swatches
+                        invalid={!!errors.colors}
+                      />
+                    ) : (
+                      <p className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2.5 text-sm text-stone-500">
+                        No colours yet. Add them under Products → Attributes.
+                      </p>
+                    )}
+                    {errors.colors && <p className="mt-1 text-xs text-red-600">{errors.colors}</p>}
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-stone-700">
+                        Sizes <span className="ml-0.5 text-red-500">*</span>
+                      </span>
+                      {manageButton("Manage sizes")}
+                    </div>
+                    {sizeOptions.length > 0 ? (
+                      <OptionChips
+                        label="Sizes"
+                        options={sizeOptions}
+                        selected={selectedSizes}
+                        onToggle={toggleSize}
+                        invalid={!!errors.sizes}
+                      />
+                    ) : (
+                      <p className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2.5 text-sm text-stone-500">
+                        No sizes yet. Add them under Products → Attributes.
+                      </p>
+                    )}
+                    {errors.sizes && <p className="mt-1 text-xs text-red-600">{errors.sizes}</p>}
+                  </div>
+
+                  {variantCombos.length > 0 && variantList.length > 0 ? (
+                    <div>
+                      <p className="mb-2 text-sm font-medium text-stone-700">Variant pricing & stock</p>
+                      <VariantEditor variants={variantList} onChange={updateVariant} errors={errors} />
+                    </div>
+                  ) : (
+                    <p className="rounded-lg bg-stone-50 px-3 py-2.5 text-sm text-stone-500">
+                      Select at least one colour and one size to create variants.
+                    </p>
                   )}
-                  {errors.thumbnail && <p className="mt-1 text-sm text-red-600">{errors.thumbnail}</p>}
+                </div>
+              )}
+            </div>
+          </Section>
+
+          <Section
+            title="Images"
+            subtitle={isVariant ? "A thumbnail and up to " + MAX_BANNERS + " banner images per colour" : "Thumbnail for listings and up to " + MAX_BANNERS + " banner images"}
+            icon={<ImageIcon className="h-5 w-5" />}
+          >
+            {!isVariant ? (
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-[minmax(0,200px)_minmax(0,1fr)] sm:gap-6">
+                <div data-field-error={errors.thumbnail ? "true" : undefined}>
+                  <p className="mb-1 text-sm font-medium text-stone-700">
+                    Thumbnail {mode === "create" && <span className="ml-0.5 text-red-500">*</span>}
+                  </p>
+                  <div className="max-w-[240px] sm:max-w-none">
+                    <SingleImageField
+                      id="product-thumbnail"
+                      inputRef={thumbInputRef}
+                      src={form.thumbnailUrl?.toString() || undefined}
+                      alt="Thumbnail"
+                      onFiles={handleThumbnailFiles}
+                      onRemove={mode === "create" ? (form.thumbnailUrl ? clearThumbnail : undefined) : thumbFile ? clearThumbnail : undefined}
+                      removeMode={mode === "edit" ? "undo" : "remove"}
+                      isNew={!!thumbFile}
+                      invalid={!!errors.thumbnail}
+                      title="Upload thumbnail"
+                      hint="Click or drop an image"
+                    />
+                  </div>
+                  {errors.thumbnail ? (
+                    <p className="mt-1 text-xs text-red-600">{errors.thumbnail}</p>
+                  ) : (
+                    <p className="mt-1 text-xs text-stone-500">Main photo in the shop and listings</p>
+                  )}
                 </div>
 
-                <div>
-                  <div className="flex justify-between items-center mb-3">
-                    <label className="block text-sm font-semibold text-gray-700">Banner Images</label>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                      {form.bannerUrls?.length || 0}/10 images
+                <div className="min-w-0">
+                  <p className="mb-1 flex items-center justify-between text-sm font-medium text-stone-700">
+                    <span>Banner images</span>
+                    <span className="text-xs font-normal tabular-nums text-stone-500">
+                      {form.bannerUrls?.length || 0}/{MAX_BANNERS} images
                     </span>
-                  </div>
-
-                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-indigo-400 transition-colors duration-200">
-                    <input
-                      ref={bannerInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={(e) => {
-                        if (e.target.files) {
-                          handleMultipleBannerFiles(e.target.files);
-                        }
-                      }}
-                      className="hidden"
-                    />
-                    <svg className="w-8 h-8 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    <p className="text-gray-500 mb-3">Add banner images to showcase your product</p>
-                    <button
-                      type="button"
-                      onClick={() => bannerInputRef.current?.click()}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-medium"
-                    >
-                      Add Banner Images
-                    </button>
-                    <p className="text-xs text-gray-400 mt-2">Select multiple files (Max 10 images)</p>
-                  </div>
-
-                  {form.bannerUrls && form.bannerUrls.length > 0 && (
-                    <div className="mt-6">
-                      <h5 className="text-sm font-semibold text-gray-700 mb-3">Uploaded Banners</h5>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        {form.bannerUrls.map((url, index) => (
-                          <div key={index} className="relative group bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden">
-                            <div className="aspect-square">
-                              <Image
-                                src={url.toString()}
-                                alt={`Banner ${index + 1}`}
-                                fill
-                                className="object-cover"
-                                unoptimized
-                              />
-                            </div>
-                            <div className="absolute top-2 right-2">
-                              <button
-                                type="button"
-                                onClick={() => removeBanner(index)}
-                                className="bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg transition-colors duration-200 opacity-80 hover:opacity-100"
-                                aria-label={`Remove banner image ${index + 1}`}
-                              >
-                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                </svg>
-                              </button>
-                            </div>
-                            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs py-1 px-2 text-center">
-                              Banner {index + 1}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  </p>
+                  <ImageGalleryField
+                    id="product-banners"
+                    inputRef={bannerInputRef}
+                    urls={(form.bannerUrls || []).map(String)}
+                    max={MAX_BANNERS}
+                    altPrefix="Banner image"
+                    onFiles={handleMultipleBannerFiles}
+                    onRemove={removeBanner}
+                    gridClassName="grid-cols-3 md:grid-cols-4"
+                    emptyClassName="h-36 sm:h-[200px]"
+                  />
+                  <p className="mt-1 text-xs text-stone-500">
+                    Extra photos for the product page. You can select several at once (max {MAX_BANNERS} images).
+                  </p>
                 </div>
               </div>
-            )}
-
-            {/* Color-specific images for variant products */}
-            {isVariant && selectedColors.length > 0 && (
-              <div className="space-y-4">
-                <h4 className="text-sm font-medium text-gray-900">Color-Specific Images</h4>
+            ) : selectedColors.length > 0 ? (
+              <div className="space-y-3 sm:space-y-4">
                 {selectedColors.map((color) => (
-                  <div key={color} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-all">
-                    <h5 className="font-medium text-gray-700 mb-3 flex items-center">
-                      <span className="inline-block w-4 h-4 rounded-full mr-2" style={{ backgroundColor: color.toLowerCase() }}></span>
-                      {color}
-                    </h5>
-                    
-                    <div className="space-y-3">
-                      <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700">Thumbnail</label>
-                        <input
-                          ref={(el) => { colorThumbRefs.current[color] = el; }}
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            if (e.target.files) {
-                              handleColorThumbFiles(color, e.target.files);
-                            }
-                          }}
-                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                        />
-                        {colorMedia[color]?.thumbnailUrl && (
-                          <div className="mt-3">
-                            <div className="relative bg-gray-50 p-2 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all inline-block">
-                              <div className="relative overflow-hidden rounded-md">
-                                <Image
-                                  src={colorMedia[color].thumbnailUrl!}
-                                  alt={`${color} thumbnail`}
-                                  width={120}
-                                  height={120}
-                                  className="object-cover rounded"
-                                  unoptimized
-                                />
-                              </div>
-                              <div className="mt-2 text-center text-xs text-gray-500">
-                                {color} Thumbnail
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <label className="block text-sm font-medium text-gray-700">Banners (Max 5)</label>
-                        <div className="flex items-center">
-                          <input
-                            ref={(el) => { colorBannerRefs.current[color] = el; }}
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            onChange={(e) => {
-                              if (e.target.files) {
-                                handleColorBannerFiles(color, e.target.files);
-                              }
-                            }}
-                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                          />
-                          {colorMedia[color]?.bannerUrls && colorMedia[color].bannerUrls.length > 0 && (
-                            <span className="ml-3 text-sm text-gray-500">
-                              {colorMedia[color].bannerUrls.length}/5 images
-                            </span>
-                          )}
-                        </div>
-                        {colorMedia[color]?.bannerUrls && colorMedia[color].bannerUrls.length > 0 && (
-                          <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5">
-                            {colorMedia[color].bannerUrls.map((url, index) => (
-                              <div key={index} className="relative group bg-white rounded border border-gray-200 hover:shadow-sm transition-all">
-                                <div className="relative aspect-square">
-                                  <Image
-                                    src={url}
-                                    alt={`${color} banner ${index + 1}`}
-                                    fill
-                                    className="object-cover"
-                                    unoptimized
-                                  />
-                                </div>
-                                <div className="absolute top-1 right-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => removeColorBanner(color, index)}
-                                    className="absolute -top-2 -right-2 bg-white hover:bg-red-50 text-red-600 rounded-full w-6 h-6 flex items-center justify-center border border-red-200 shadow-sm hover:shadow transition-all"
-                                    aria-label={`Remove ${color} banner image ${index + 1}`}
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                    </svg>
-                                  </button>
-                                </div>
-                                <div className="p-0.5 text-center text-[11px] leading-tight text-gray-500 truncate">
-                                  {color} {index + 1}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      
-                      <button
-                        type="button"
-                        onClick={() => clearColorMedia(color)}
-                        className="mt-2 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-full shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        Clear all {color} images
-                      </button>
-                    </div>
-                  </div>
+                  <ColorImagesCard
+                    key={color}
+                    color={color}
+                    thumbnailUrl={colorMedia[color]?.thumbnailUrl}
+                    bannerUrls={colorMedia[color]?.bannerUrls || []}
+                    hasNewThumbnail={!!colorMedia[color]?.thumbFile}
+                    maxBanners={MAX_BANNERS}
+                    thumbRef={(el) => { colorThumbRefs.current[color] = el; }}
+                    bannerRef={(el) => { colorBannerRefs.current[color] = el; }}
+                    onThumbnailFiles={(files) => handleColorThumbFiles(color, files)}
+                    onBannerFiles={(files) => handleColorBannerFiles(color, files)}
+                    onRemoveBanner={(index) => removeColorBanner(color, index)}
+                    onClear={() => clearColorMedia(color)}
+                  />
                 ))}
               </div>
+            ) : (
+              <p className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-6 text-center text-sm text-stone-500">
+                Select colours under Pricing &amp; inventory to add images for each colour.
+              </p>
             )}
-          </div>
-        )}
+            <p className="mt-4 flex items-start gap-1.5 border-t border-stone-100 pt-3 text-xs text-stone-500">
+              <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+              {IMAGE_HINT}
+            </p>
+          </Section>
 
-        {/* ENHANCED DESCRIPTION TAB */}
-        {activeTab === "description" && (
-          <div className="space-y-8">
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border-2 border-blue-200 shadow-lg">
-              <div className="flex items-center mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-xl font-bold text-gray-900 flex items-center">
-                    <span className="w-3 h-3 bg-blue-500 rounded-full mr-3"></span>
-                    Short Description
-                  </h4>
-                  <p className="text-base text-gray-700 mt-1">Brief product summary visible in listings and search results</p>
-                </div>
-              </div>
-
-              <div className="relative mb-4">
-                <textarea
-                  rows={4}
-                  placeholder="Enter a brief, compelling summary that highlights the key benefits and appeal of your product (2-3 sentences)"
-                  className="block w-full rounded-2xl border-2 border-gray-200 shadow-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 px-6 py-5 text-lg text-gray-900 placeholder-gray-500 bg-white hover:border-blue-300 resize-none font-medium leading-relaxed"
+          <Section title="Description" subtitle="What customers read about this product" icon={<AlignLeft className="h-5 w-5" />}>
+            <div className="space-y-4 sm:space-y-5">
+              <FormField
+                label="Short description"
+                htmlFor="product-short-description"
+                hint={<HintWithCount text="Shown on product cards and in search results" value={form.shortDescription || ""} max={500} />}
+              >
+                <Textarea
+                  id="product-short-description"
+                  rows={3}
+                  maxLength={500}
+                  placeholder="A brief summary of the product in 2-3 sentences"
+                  className="resize-y"
                   value={form.shortDescription || ""}
                   onChange={(e) => setField("shortDescription", e.target.value)}
-                  maxLength={500}
                 />
-                <div className="absolute bottom-3 right-3">
-                  <div className="bg-blue-100 rounded-lg p-2">
-                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+              </FormField>
 
-              <div className="flex justify-between items-center">
-                <div className="flex items-center text-sm text-blue-700 bg-blue-100 px-4 py-2 rounded-xl">
-                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                  Perfect for product cards and search results
-                </div>
-                <div className="flex items-center">
-                  <span className={`text-sm font-bold px-4 py-2 rounded-xl shadow-sm ${
-                    (form.shortDescription || "").length > 450
-                      ? 'bg-red-100 text-red-700 border-2 border-red-200'
-                      : (form.shortDescription || "").length > 300
-                      ? 'bg-yellow-100 text-yellow-700 border-2 border-yellow-200'
-                      : 'bg-green-100 text-green-700 border-2 border-green-200'
-                  }`}>
-                    <span className="mr-2">
-                      {(form.shortDescription || "").length > 450 ? '⚠️' :
-                       (form.shortDescription || "").length > 300 ? '⚡' : '✅'}
-                    </span>
-                    {(form.shortDescription || "").length}/500 characters
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 border-2 border-green-200 shadow-lg">
-              <div className="flex items-center mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-xl font-bold text-gray-900 flex items-center">
-                    <span className="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
-                    Full Description
-                  </h4>
-                  <p className="text-base text-gray-700 mt-1">Comprehensive product information for the product page</p>
-                </div>
-              </div>
-
-              <div className="relative mb-4">
-                <textarea
-                  rows={12}
-                  placeholder="Enter comprehensive product details including:&#10;&#10;• Materials and fabric composition&#10;• Fit and sizing information&#10;• Care and washing instructions&#10;• Key benefits and features&#10;• Usage recommendations&#10;• Any special technologies or treatments"
-                  className="block w-full rounded-2xl border-2 border-gray-200 shadow-lg focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-300 px-6 py-5 text-lg text-gray-900 placeholder-gray-500 bg-white hover:border-green-300 resize-y min-h-[300px] font-medium leading-relaxed"
+              <FormField label="Full description" htmlFor="product-description" hint="Materials, fit and sizing, care instructions and the story behind the design">
+                <Textarea
+                  id="product-description"
+                  rows={8}
+                  placeholder={"Materials and fabric\nFit and sizing\nCare instructions\nThe story behind the design"}
+                  className="min-h-[180px] resize-y"
                   value={form.description || ""}
                   onChange={(e) => setField("description", e.target.value)}
                 />
-                <div className="absolute bottom-4 right-4">
-                  <div className="bg-green-100 rounded-lg p-2">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+              </FormField>
 
-
+              <FormField label="Key features" htmlFor="product-features" hint="One feature per line">
+                <Textarea
+                  id="product-features"
+                  rows={5}
+                  placeholder={"100% combed cotton\nOversized fit\nScreen-printed calligraphy"}
+                  className="resize-y"
+                  value={form.features || ""}
+                  onChange={(e) => setField("features", e.target.value)}
+                />
+              </FormField>
             </div>
+          </Section>
 
-            <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl p-8 border-2 border-purple-200 shadow-lg">
-              <div className="flex items-center mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-xl font-bold text-gray-900 flex items-center">
-                    <span className="w-3 h-3 bg-purple-500 rounded-full mr-3"></span>
-                    Key Features & Benefits
-                  </h4>
-                  <p className="text-base text-gray-700 mt-1">Highlight what makes your product special</p>
-                </div>
-              </div>
+          <Section title="Search engine listing" subtitle="How this product appears in search results" icon={<Search className="h-5 w-5" />}>
+            <div className="space-y-4 sm:space-y-5">
+              <SeoPreview title={previewTitle} path={previewUrl} description={previewDesc} />
 
-              <div className="space-y-4 mb-6">
-                <div className="bg-white rounded-2xl p-6 border-2 border-purple-100 shadow-sm hover:shadow-md transition-all duration-200 hover:border-purple-300">
-                  <textarea
-                    value={form.features || ""}
-                    onChange={(e) => setField("features", e.target.value)}
-                    placeholder="Enter product features, one per line:&#10;• Moisture-wicking fabric technology&#10;• Anti-bacterial treatment for freshness&#10;• Four-way stretch for maximum mobility&#10;• Reinforced seams for durability&#10;• UPF 50+ sun protection"
-                    rows={6}
-                    className="w-full rounded-xl border-2 border-gray-200 shadow-sm focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 px-4 py-3 text-base font-medium text-gray-900 placeholder-gray-500 bg-white hover:border-gray-300 resize-vertical"
-                  />
-                </div>
-              </div>
+              <FormField
+                label="Meta title"
+                htmlFor="product-meta-title"
+                error={errors.metaTitle}
+                hint={<HintWithCount text="Defaults to the product name. Include the main keyword." value={form.metaTitle || ""} max={META_TITLE_LIMIT} />}
+              >
+                <Input
+                  id="product-meta-title"
+                  maxLength={120}
+                  placeholder="Keep it under 60 characters"
+                  value={form.metaTitle || ""}
+                  invalid={!!errors.metaTitle}
+                  onChange={(e) => {
+                    setField("metaTitle", e.target.value);
+                    clearError("metaTitle");
+                  }}
+                />
+              </FormField>
 
+              <FormField
+                label="Meta description"
+                htmlFor="product-meta-description"
+                error={errors.metaDescription}
+                hint={<HintWithCount text="A short pitch that encourages clicks" value={form.metaDescription || ""} max={META_DESC_LIMIT} />}
+              >
+                <Textarea
+                  id="product-meta-description"
+                  rows={3}
+                  maxLength={320}
+                  placeholder="Keep it under 155 characters"
+                  className="resize-y"
+                  value={form.metaDescription || ""}
+                  invalid={!!errors.metaDescription}
+                  onChange={(e) => {
+                    setField("metaDescription", e.target.value);
+                    clearError("metaDescription");
+                  }}
+                />
+              </FormField>
 
-            </div>
-          </div>
-        )}
-
-        {/* ENHANCED SEO & META TAB */}
-        {activeTab === "seo" && (
-          <div className="space-y-8">
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 border-2 border-indigo-200 shadow-lg">
-              <div className="flex items-center mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-xl font-bold text-gray-900 flex items-center">
-                    <span className="w-3 h-3 bg-indigo-500 rounded-full mr-3"></span>
-                    Search Engine Optimization
-                  </h4>
-                  <p className="text-base text-gray-700 mt-1">Optimize your product for search engines and social media</p>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between items-center mb-3">
-                    <label className="block text-base font-bold text-gray-800 flex items-center">
-                      <span className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></span>
-                      Meta Title
-                    </label>
-                    <div className="flex items-center">
-                      <span className={`text-sm font-bold px-3 py-1 rounded-xl shadow-sm ${
-                        (form.metaTitle || "").length > META_TITLE_LIMIT
-                          ? 'bg-red-100 text-red-700 border-2 border-red-200'
-                          : (form.metaTitle || "").length > META_TITLE_LIMIT - 10
-                          ? 'bg-yellow-100 text-yellow-700 border-2 border-yellow-200'
-                          : 'bg-green-100 text-green-700 border-2 border-green-200'
-                      }`}>
-                        <span className="mr-2">
-                          {(form.metaTitle || "").length > META_TITLE_LIMIT ? '⚠️' :
-                           (form.metaTitle || "").length > META_TITLE_LIMIT - 10 ? '⚡' : '✅'}
-                        </span>
-                        {(form.metaTitle || "").length}/{META_TITLE_LIMIT}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Keep it under ~60 characters, include primary keyword"
-                      className="block w-full rounded-2xl border-2 border-gray-200 shadow-lg focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition-all duration-300 px-6 py-4 text-lg font-medium text-gray-900 placeholder-gray-500 bg-white hover:border-indigo-300 pr-16"
-                      value={form.metaTitle || ""}
-                      onChange={(e) => setField("metaTitle", e.target.value)}
-                      maxLength={120}
-                    />
-                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                      <div className="bg-indigo-100 rounded-lg p-2">
-                        <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                  {errors.metaTitle && <p className="mt-3 text-sm text-red-600 flex items-center bg-red-50 px-3 py-2 rounded-lg">
-                    <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {errors.metaTitle}
-                  </p>}
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-3">
-                    <label className="block text-base font-bold text-gray-800 flex items-center">
-                      <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
-                      Meta Description
-                    </label>
-                    <div className="flex items-center">
-                      <span className={`text-sm font-bold px-3 py-1 rounded-xl shadow-sm ${
-                        (form.metaDescription || "").length > META_DESC_LIMIT
-                          ? 'bg-red-100 text-red-700 border-2 border-red-200'
-                          : (form.metaDescription || "").length > META_DESC_LIMIT - 20
-                          ? 'bg-yellow-100 text-yellow-700 border-2 border-yellow-200'
-                          : 'bg-green-100 text-green-700 border-2 border-green-200'
-                      }`}>
-                        <span className="mr-2">
-                          {(form.metaDescription || "").length > META_DESC_LIMIT ? '⚠️' :
-                           (form.metaDescription || "").length > META_DESC_LIMIT - 20 ? '⚡' : '✅'}
-                        </span>
-                        {(form.metaDescription || "").length}/{META_DESC_LIMIT}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <textarea
-                      rows={4}
-                      placeholder="Write a compelling summary that describes your product and encourages clicks. Keep it under 155 characters for best results."
-                      className="block w-full rounded-2xl border-2 border-gray-200 shadow-lg focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300 px-6 py-4 text-lg text-gray-900 placeholder-gray-500 bg-white hover:border-purple-300 resize-none font-medium leading-relaxed"
-                      value={form.metaDescription || ""}
-                      onChange={(e) => setField("metaDescription", e.target.value)}
-                      maxLength={320}
-                    />
-                    <div className="absolute bottom-3 right-3">
-                      <div className="bg-purple-100 rounded-lg p-2">
-                        <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                  {errors.metaDescription && <p className="mt-3 text-sm text-red-600 flex items-center bg-red-50 px-3 py-2 rounded-lg">
-                    <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    {errors.metaDescription}
-                  </p>}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-8 border-2 border-emerald-200 shadow-lg">
-              <div className="flex items-center mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-xl font-bold text-gray-900 flex items-center">
-                    <span className="w-3 h-3 bg-emerald-500 rounded-full mr-3"></span>
-                    Meta Keywords
-                  </h4>
-                  <p className="text-base text-gray-700 mt-1">Add relevant keywords separated by commas</p>
-                </div>
-              </div>
-
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="e.g., poetry tee, urdu calligraphy, oversized tee, streetwear pakistan"
-                  className="block w-full rounded-2xl border-2 border-gray-200 shadow-lg focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all duration-300 px-6 py-4 text-lg font-medium text-gray-900 placeholder-gray-500 bg-white hover:border-emerald-300 pr-16"
+              <FormField label="Meta keywords" htmlFor="product-meta-keywords" hint="Separate keywords with commas">
+                <Input
+                  id="product-meta-keywords"
+                  placeholder="e.g. poetry tee, urdu calligraphy, oversized tee, streetwear pakistan"
                   value={form.metaKeywords || ""}
                   onChange={(e) => setField("metaKeywords", e.target.value)}
                 />
-                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                  <div className="bg-emerald-100 rounded-lg p-2">
-                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
+              </FormField>
 
-
-            </div>
-
-            <div className="bg-gradient-to-br from-slate-50 to-gray-50 rounded-2xl p-8 border-2 border-slate-200 shadow-lg">
-              <div className="flex items-center mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-slate-600 to-gray-700 rounded-xl flex items-center justify-center mr-4 shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-xl font-bold text-gray-900 flex items-center">
-                    <span className="w-3 h-3 bg-slate-500 rounded-full mr-3"></span>
-                    Structured Data (JSON-LD)
-                  </h4>
-                  <p className="text-base text-gray-700 mt-1">Advanced schema markup for rich search results</p>
-                </div>
-              </div>
-
-              <div className="relative">
-                <textarea
-                  rows={10}
-                  placeholder='Paste valid JSON-LD schema here. Example:&#10;{&#10;  "@context": "https://schema.org",&#10;  "@type": "Product",&#10;  "name": "Your Product Name",&#10;  "description": "Product description",&#10;  "brand": "Your Brand",&#10;  "offers": {&#10;    "@type": "Offer",&#10;    "price": "29.99",&#10;    "priceCurrency": "GBP"&#10;  }&#10;}'
-                  className={`block w-full rounded-2xl border-2 shadow-lg transition-all duration-300 px-6 py-4 text-base text-gray-900 placeholder-gray-500 bg-white resize-y min-h-[200px] font-mono leading-relaxed ${
-                    errors.metaSchema
-                      ? "border-red-300 focus:border-red-400 focus:ring-4 focus:ring-red-100"
-                      : "border-gray-200 focus:border-slate-500 focus:ring-4 focus:ring-slate-100 hover:border-slate-300"
-                  }`}
-                  value={form.metaSchema || ""}
-                  onChange={(e) => setField("metaSchema", e.target.value)}
-                />
-                <div className="absolute bottom-4 right-4">
-                  <div className={`rounded-lg p-2 ${errors.metaSchema ? 'bg-red-100' : 'bg-slate-100'}`}>
-                    <svg className={`w-4 h-4 ${errors.metaSchema ? 'text-red-600' : 'text-slate-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              {errors.metaSchema && <p className="mt-3 text-sm text-red-600 flex items-center bg-red-50 px-3 py-2 rounded-lg">
-                <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                {errors.metaSchema}
-              </p>}
-
-            </div>
-
-            {/* Enhanced Google Preview */}
-            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-8 border-2 border-blue-200 shadow-lg">
-              <div className="flex items-center mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mr-4 shadow-lg">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-xl font-bold text-gray-900 flex items-center">
-                    <span className="w-3 h-3 bg-blue-500 rounded-full mr-3"></span>
-                    Search Engine Preview
-                  </h4>
-                  <p className="text-base text-gray-700 mt-1">See how your product will appear in Google search results</p>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border-2 border-gray-200 p-6 shadow-inner">
-                <div className="flex items-center mb-4">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-full flex items-center justify-center mr-3">
-                    <span className="text-white font-bold text-sm">G</span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-600 font-medium">Google Search Result</span>
-                    <div className="w-16 h-0.5 bg-gradient-to-r from-blue-500 to-green-500 rounded-full mt-1"></div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-start">
-                    <div className="flex-1">
-                      <h3 className="text-lg text-[#1a0dab] leading-snug hover:underline cursor-pointer font-medium">
-                        {previewTitle || "Your Product Title Here - Start typing to see changes"}
-                      </h3>
-                      <p className="text-sm text-[#006621] mt-1 flex items-center">
-                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                        </svg>
-                        {previewUrl}
-                      </p>
-                      <p className="text-sm text-gray-700 mt-2 leading-relaxed">
-                        {previewDesc || "Your meta description preview will appear here. Make it compelling to encourage clicks from search results."}
-                      </p>
-                    </div>
-                    <div className="ml-4">
-                      <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
-
-        </div>
-
-        {/* Enhanced Actions */}
-        <div className="bg-gray-50 px-6 py-4 rounded-b-xl border-t border-gray-200">
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              {mode === "create" ? "Ready to add this product?" : "Save your changes?"}
-            </div>
-            <div className="flex space-x-3">
-              {onCancel && (
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  disabled={isLoading}
-                  className="px-6 py-3 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors duration-200"
-                >
-                  Cancel
-                </button>
-              )}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="px-8 py-3 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-all duration-200 flex items-center"
+              <FormField
+                label="Structured data (JSON-LD)"
+                htmlFor="product-meta-schema"
+                error={errors.metaSchema}
+                hint="Optional. Advanced schema markup for rich search results; must be valid JSON."
               >
-                {isLoading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    {mode === "create" ? "Creating Product..." : "Updating Product..."}
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mode === "create" ? "M12 6v6m0 0v6m0-6h6m-6 0H6" : "M5 13l4 4L19 7"} />
-                    </svg>
-                    {mode === "create" ? "Create Product" : "Update Product"}
-                  </>
-                )}
-              </button>
+                <Textarea
+                  id="product-meta-schema"
+                  rows={8}
+                  spellCheck={false}
+                  placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "Product",\n  "name": "Product name",\n  "offers": {\n    "@type": "Offer",\n    "price": "3999",\n    "priceCurrency": "PKR"\n  }\n}'}
+                  className="resize-y font-mono text-xs leading-relaxed"
+                  value={form.metaSchema || ""}
+                  invalid={!!errors.metaSchema}
+                  onChange={(e) => {
+                    setField("metaSchema", e.target.value);
+                    clearError("metaSchema");
+                  }}
+                />
+              </FormField>
             </div>
+          </Section>
+        </div>
+
+        {/* ------------------------------------------------ Side column */}
+        <div className="min-w-0 space-y-4 sm:space-y-6 lg:sticky lg:top-0">
+          <Section title="Status" subtitle="Who can see this product" icon={<Settings2 className="h-5 w-5" />}>
+            <StatusPicker value={form.status} onChange={(status) => setField("status", status)} />
+          </Section>
+
+          <Section title="Summary" subtitle="Updates as you type" icon={<Eye className="h-5 w-5" />}>
+            <ProductSummary
+              name={form.name}
+              category={form.category}
+              status={form.status}
+              thumbnail={summaryThumb}
+              price={summaryPrice}
+              stock={summaryStock}
+              variantCount={isVariant ? variantList.length : undefined}
+              imageCount={summaryImages}
+              collection={collectionTitle}
+            />
+          </Section>
+        </div>
+      </div>
+
+      {/* ------------------------------------------------ Actions
+          Sticky inside the admin <main> scroll area. The negative bottom offset/margin + matching
+          padding cancel <main>'s bottom padding, so the bar sits on a page-coloured strip instead
+          of floating with the form visible underneath it. */}
+      <div className="sticky -bottom-4 z-10 -mb-4 bg-stone-50 pb-4 pt-1 sm:-bottom-6 sm:-mb-6 sm:pb-6 lg:-bottom-8 lg:-mb-8 lg:pb-8">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white p-3 shadow-sm sm:p-4">
+          <div className="hidden min-w-0 items-center gap-2 text-sm text-stone-500 sm:flex">
+            {errorCount > 0 ? (
+              <span className="text-red-600">
+                Fix {errorCount} highlighted field{errorCount === 1 ? "" : "s"} to continue
+              </span>
+            ) : (
+              <>
+                <span>{mode === "create" ? "Will be saved as" : "Status:"}</span>
+                <StatusBadge status={form.status} />
+              </>
+            )}
+          </div>
+          <div className="flex w-full gap-2 sm:w-auto sm:gap-3">
+            {onCancel && (
+              <Button variant="secondary" onClick={onCancel} disabled={isLoading} className="flex-1 sm:flex-none">
+                Cancel
+              </Button>
+            )}
+            <Button
+              type="submit"
+              loading={isLoading}
+              loadingText={mode === "create" ? "Creating..." : "Saving..."}
+              leftIcon={mode === "create" ? <Plus className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+              className="flex-1 sm:flex-none"
+            >
+              {mode === "create" ? "Create product" : "Save changes"}
+            </Button>
           </div>
         </div>
-      </form>
-    </div>
+      </div>
+    </form>
   );
 }

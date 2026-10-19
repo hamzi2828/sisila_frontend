@@ -17,6 +17,8 @@ export const FALLBACK_GALLERY: string[] = [
 /** Turn an API image path into something next/image can load. */
 export function resolveImage(url?: string | null, fallback: string = FALLBACK_IMAGE): string {
   if (!url) return fallback;
+  // An old admin bug saved some absolute URLs with a leading slash ("/https://...").
+  if (/^\/https?:\/\//i.test(url)) return url.slice(1);
   if (url.startsWith('http') || url.startsWith('/images/')) return url;
   return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
 }

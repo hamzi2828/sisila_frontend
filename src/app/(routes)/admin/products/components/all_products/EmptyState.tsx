@@ -1,43 +1,36 @@
 "use client";
 import React from "react";
-import { FiPackage } from "react-icons/fi";
+import { Package, Plus, X } from "lucide-react";
+import { Button, ButtonLink, EmptyState as AdminEmptyState } from "@/components/admin/ui";
 
 interface EmptyStateProps {
-  searchQuery: string;
-  statusFilter: string;
-  categoryFilter: string;
+  /** True when search/filters are hiding products (vs. an empty catalogue). */
+  hasFilters: boolean;
   onClearFilters: () => void;
 }
 
-export default function EmptyState({
-  searchQuery,
-  statusFilter,
-  categoryFilter,
-  onClearFilters
-}: EmptyStateProps) {
-  const hasFilters = searchQuery || statusFilter !== "all" || categoryFilter !== "all";
-
-  return (
-    <tr>
-      <td colSpan={7} className="px-4 py-12 text-center">
-        <div className="flex flex-col items-center">
-          <FiPackage className="h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-sm font-medium text-gray-900 mb-1">No products found</h3>
-          <p className="text-sm text-gray-500">
-            {hasFilters
-              ? "Try adjusting your search criteria or filters."
-              : "Get started by creating your first product."}
-          </p>
-          {hasFilters && (
-            <button
-              onClick={onClearFilters}
-              className="mt-2 text-indigo-600 hover:text-indigo-500 text-sm font-medium"
-            >
-              Clear all filters
-            </button>
-          )}
-        </div>
-      </td>
-    </tr>
+export default function EmptyState({ hasFilters, onClearFilters }: EmptyStateProps) {
+  return hasFilters ? (
+    <AdminEmptyState
+      icon={Package}
+      title="No products match"
+      description="Try adjusting your search or filters."
+      action={
+        <Button variant="secondary" size="sm" leftIcon={<X className="h-4 w-4" />} onClick={onClearFilters}>
+          Clear filters
+        </Button>
+      }
+    />
+  ) : (
+    <AdminEmptyState
+      icon={Package}
+      title="No products yet"
+      description="Create your first product to start selling."
+      action={
+        <ButtonLink href="/admin/products/create" leftIcon={<Plus className="h-4 w-4" />}>
+          Add product
+        </ButtonLink>
+      }
+    />
   );
 }

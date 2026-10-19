@@ -1,7 +1,22 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import Image from "next/image";
-import { FiEdit2, FiTrash2, FiSearch, FiChevronLeft, FiChevronRight, FiX, FiEye, FiStar } from "react-icons/fi";
+import { Edit2, Eye, EyeOff, FileText, Plus, Star, Trash2 } from "lucide-react";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  IconButton,
+  LoadingState,
+  Pagination,
+  SearchInput,
+  Select,
+  StatusBadge,
+} from "@/components/admin/ui";
+import { cn } from "@/lib/utils";
+import { assetUrl } from "@/lib/productMedia";
 
 export interface Blog {
   id: string;
@@ -41,9 +56,16 @@ interface AllBlogsProps {
   onToggleStatus?: (id: string, status: 'published' | 'draft') => void;
   loading?: boolean;
   error?: string | null;
+  onRetry?: () => void;
+  onCreate?: () => void;
   pagination?: PaginationInfo;
   onPageChange?: (page: number) => void;
 }
+
+const formatDate = (value?: string) =>
+  value
+    ? new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+    : "Unknown date";
 
 export default function AllBlogs({
   blogs,
@@ -53,27 +75,30 @@ export default function AllBlogs({
   onToggleStatus,
   loading = false,
   error = null,
+  onRetry,
+  onCreate,
   pagination,
   onPageChange
 }: AllBlogsProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  // Rows whose publish / feature toggle is in flight
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
 
   // Get unique categories for filter dropdown
   const availableCategories = useMemo(() => {
-    const categories = Array.from(new Set(blogs.map(b => b.category))).sort();
-    return categories;
+    return Array.from(new Set(blogs.map(b => b.category).filter(Boolean))).sort();
   }, [blogs]);
 
-  // For now, we'll do client-side filtering but display all blogs from current page
-  // In a production app, you'd want to send these filters to the API
+  // Client-side filtering of the current page
   const filteredBlogs = useMemo(() => {
+    const q = searchQuery.toLowerCase();
     return blogs.filter((blog) => {
-      const matchesSearch = blog.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           blog.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           blog.author?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           blog.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesSearch = blog.title.toLowerCase().includes(q) ||
+                           blog.category.toLowerCase().includes(q) ||
+                           blog.author?.name?.toLowerCase().includes(q) ||
+                           blog.tags?.some(tag => tag.toLowerCase().includes(q));
 
       const matchesStatus = statusFilter === "all" || blog.status === statusFilter;
       const matchesCategory = categoryFilter === "all" || blog.category === categoryFilter;
@@ -86,402 +111,263 @@ export default function AllBlogs({
   const currentPage = pagination?.page || 1;
   const totalPages = pagination?.pages || 1;
   const totalItems = pagination?.total || blogs.length;
+  const hasFilters = Boolean(searchQuery) || statusFilter !== "all" || categoryFilter !== "all";
 
-  // Loading state
+  const runToggle = async (key: string, action: () => unknown) => {
+    setBusy((prev) => ({ ...prev, [key]: true }));
+    try {
+      await action();
+    } finally {
+      setBusy((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+    onPageChange?.(1);
+  };
+
   if (loading) {
-    return (
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="flex items-center justify-center space-x-2">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
-            <span className="text-sm text-gray-500">Loading blogs...</span>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingState card label="Loading blogs..." />;
   }
 
-  // Error state
   if (error) {
     return (
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <FiX className="h-5 w-5 text-red-400" />
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error loading blogs</h3>
-                <div className="mt-2 text-sm text-red-700">
-                  <p>{error}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Alert tone="error" title="Error loading blogs" onRetry={onRetry}>
+        {error}
+      </Alert>
     );
   }
 
+  if (blogs.length === 0) {
+    return (
+      <EmptyState
+        card
+        icon={FileText}
+        title="No blogs yet"
+        description="Write your first post to start the journal."
+        action={
+          onCreate && (
+            <Button leftIcon={<Plus className="h-4 w-4" />} onClick={onCreate}>
+              Create Blog
+            </Button>
+          )
+        }
+      />
+    );
+  }
+
+  const publishedCount = blogs.filter(b => b.status === 'published').length;
+  const draftCount = blogs.filter(b => b.status === 'draft').length;
+
   return (
-    <div className="space-y-6">
-      {/* Header with Statistics */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg leading-6 font-medium text-gray-900">Blog Management</h3>
-              <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                {filteredBlogs.length} of {totalItems} blogs
-              </p>
+    <Card padding="none">
+      <div className="space-y-4 p-3 sm:space-y-6 sm:p-6">
+        {/* Stats & Filters */}
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 rounded-lg bg-stone-100 px-3 py-1.5">
+              <FileText className="h-4 w-4 text-stone-500" aria-hidden />
+              <span className="text-xs font-medium text-stone-700 sm:text-sm">{totalItems} Total</span>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <FiEye className="h-4 w-4" />
-                <span>{totalItems} Total</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-green-600">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span>{blogs.filter(b => b.status === 'published').length} Published</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-yellow-600">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span>{blogs.filter(b => b.status === 'draft').length} Draft</span>
-              </div>
+            <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+              <span className="text-xs font-medium text-emerald-700 sm:text-sm">{publishedCount} Published</span>
             </div>
+            <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-1.5">
+              <span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden />
+              <span className="text-xs font-medium text-amber-700 sm:text-sm">{draftCount} Draft</span>
+            </div>
+            {filteredBlogs.length !== blogs.length && (
+              <span className="text-xs text-stone-500 sm:text-sm">
+                Showing {filteredBlogs.length} of {blogs.length} on this page
+              </span>
+            )}
           </div>
-          
-          {/* Search and Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Search */}
-            <div>
-              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
-                Search blogs
-              </label>
-              <div className="relative">
-                <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  name="search"
-                  id="search"
-                  aria-label="Search blogs"
-                  className="h-10 w-full rounded-md border border-gray-300 bg-white pl-10 pr-10 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
-                  placeholder="Search by title, author, category..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    onPageChange?.(1);
-                    setSearchQuery(e.target.value);
-                  }}
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery("");
-                      onPageChange?.(1);
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-gray-400 hover:text-gray-600"
-                    aria-label="Clear search"
-                  >
-                    <FiX className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </div>
 
-            {/* Status Filter */}
-            <div>
-              <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                id="status-filter"
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as "all" | "published" | "draft");
-                  onPageChange?.(1);
-                }}
-                className="h-10 w-full rounded-md border border-gray-300 bg-white text-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="all">All Status</option>
-                <option value="published">Published</option>
-                <option value="draft">Draft</option>
-              </select>
-            </div>
-
-            {/* Category Filter */}
-            <div>
-              <label htmlFor="category-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                Category
-              </label>
-              <select
-                id="category-filter"
-                value={categoryFilter}
-                onChange={(e) => {
-                  setCategoryFilter(e.target.value);
-                  onPageChange?.(1);
-                }}
-                className="h-10 w-full rounded-md border border-gray-300 bg-white text-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="all">All Categories</option>
-                {availableCategories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col">
-        <div className="-my-2">
-          <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-            <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Blog
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Category
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Views
-                    </th>
-
-                    <th scope="col" className="relative px-3 py-3">
-                      <span className="sr-only">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredBlogs.length > 0 ? (
-                    filteredBlogs.map((blog) => (
-                      <tr key={blog.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10 relative">
-                              {blog.thumbnail ? (
-                                <Image
-                                  src={blog.thumbnail.startsWith("http") ? blog.thumbnail : `${process.env.NEXT_PUBLIC_BACKEND_URL}${blog.thumbnail}`}
-                                  alt={blog.title}
-                                  fill
-                                  className="object-cover rounded-md"
-                                />
-                              ) : (
-                                <div className="h-10 w-10 rounded-md bg-gray-200 flex items-center justify-center">
-                                  <span className="text-xs text-gray-500">No img</span>
-                                </div>
-                              )}
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{blog.title}</div>
-                              <div className="text-sm text-gray-500">{blog.slug}</div>
-                              <div className="text-xs text-gray-400 mt-1">
-                                {blog.author?.name || 'Unknown Author'} • {blog.createdAt ? new Date(blog.createdAt).toLocaleDateString() : 'Unknown Date'}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{blog.category}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {onToggleStatus ? (
-                            <button
-                              onClick={() => onToggleStatus(blog.id, blog.status === 'published' ? 'draft' : 'published')}
-                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
-                                blog.status === 'published' ? 'bg-green-600' : 'bg-red-600'
-                              }`}
-                              title={`Click to ${blog.status === 'published' ? 'unpublish (draft)' : 'publish'}`}
-                            >
-                              <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                  blog.status === 'published' ? 'translate-x-6' : 'translate-x-1'
-                                }`}
-                              />
-                            </button>
-                          ) : (
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${blog.status === "published" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
-                              {blog.status}
-                            </span>
-                          )}
-                          <div className="text-xs text-gray-500 mt-1">
-                            {blog.status === 'published' ? 'Published' : 'Draft'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {blog.views || 0}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          {onToggleFeatured && (
-                            <button
-                              onClick={() => onToggleFeatured(blog.id, !blog.featured)}
-                              className={`mr-4 transition-colors ${
-                                blog.featured ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-gray-600'
-                              }`}
-                              title={blog.featured ? 'Remove from featured' : 'Mark as featured'}
-                            >
-                              <FiStar className={`h-5 w-5 ${blog.featured ? 'fill-current' : ''}`} />
-                            </button>
-                          )}
-                          <button className="text-indigo-600 hover:text-indigo-900 mr-4" onClick={() => onEdit?.(blog.id)}>
-                            <FiEdit2 className="h-5 w-5" />
-                          </button>
-                          <button className="text-red-600 hover:text-red-900" onClick={() => onDelete?.(blog.id)}>
-                            <FiTrash2 className="h-5 w-5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                        No blogs found. Try adjusting your search.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {filteredBlogs.length > 0 && (
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-          <div className="flex-1 flex justify-between sm:hidden">
-            <button
-              onClick={() => onPageChange?.(Math.max(currentPage - 1, 1))}
-              disabled={!pagination?.hasPreviousPage}
-              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          <div className="grid grid-cols-1 gap-2 sm:gap-4 md:grid-cols-3">
+            <SearchInput
+              value={searchQuery}
+              onChange={(value) => {
+                onPageChange?.(1);
+                setSearchQuery(value);
+              }}
+              placeholder="Search by title, author, category, tag..."
+              aria-label="Search blogs"
+              wrapperClassName="sm:max-w-none"
+            />
+            <Select
+              aria-label="Filter by status"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as "all" | "published" | "draft");
+                onPageChange?.(1);
+              }}
             >
-              Previous
-            </button>
-            <button
-              onClick={() => onPageChange?.(Math.min(currentPage + 1, totalPages))}
-              disabled={!pagination?.hasNextPage}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              <option value="all">All Status</option>
+              <option value="published">Published</option>
+              <option value="draft">Draft</option>
+            </Select>
+            <Select
+              aria-label="Filter by category"
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                onPageChange?.(1);
+              }}
             >
-              Next
-            </button>
-          </div>
-          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-gray-700">
-                Showing <span className="font-medium">{blogs.length === 0 ? 0 : ((currentPage - 1) * (pagination?.limit || 10)) + 1}</span> to {" "}
-                <span className="font-medium">{Math.min(currentPage * (pagination?.limit || 10), totalItems)}</span> of {" "}
-                <span className="font-medium">{totalItems}</span> results
-              </p>
-            </div>
-            <div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                <button
-                  onClick={() => onPageChange?.(Math.max(currentPage - 1, 1))}
-                  disabled={!pagination?.hasPreviousPage}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="sr-only">Previous</span>
-                  <FiChevronLeft className="h-5 w-5" />
-                </button>
-
-                {/* Show page numbers with ellipsis for large page counts */}
-                {(() => {
-                  const pageNumbers = [];
-                  const showEllipsisStart = currentPage > 3;
-                  const showEllipsisEnd = currentPage < totalPages - 2;
-
-                  // Always show first page
-                  pageNumbers.push(
-                    <button
-                      key={1}
-                      onClick={() => onPageChange?.(1)}
-                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                        currentPage === 1
-                          ? "z-10 bg-indigo-50 border-indigo-500 text-indigo-600"
-                          : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                      }`}
-                    >
-                      1
-                    </button>
-                  );
-
-                  // Show ellipsis if needed
-                  if (showEllipsisStart) {
-                    pageNumbers.push(
-                      <span key="ellipsis-start" className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                        ...
-                      </span>
-                    );
-                  }
-
-                  // Show current page and neighbors
-                  for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-                    if (i === 1 || i === totalPages) continue;
-                    pageNumbers.push(
-                      <button
-                        key={i}
-                        onClick={() => onPageChange?.(i)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          currentPage === i
-                            ? "z-10 bg-indigo-50 border-indigo-500 text-indigo-600"
-                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                        }`}
-                      >
-                        {i}
-                      </button>
-                    );
-                  }
-
-                  // Show ellipsis if needed
-                  if (showEllipsisEnd) {
-                    pageNumbers.push(
-                      <span key="ellipsis-end" className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                        ...
-                      </span>
-                    );
-                  }
-
-                  // Always show last page if more than 1 page
-                  if (totalPages > 1) {
-                    pageNumbers.push(
-                      <button
-                        key={totalPages}
-                        onClick={() => onPageChange?.(totalPages)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          currentPage === totalPages
-                            ? "z-10 bg-indigo-50 border-indigo-500 text-indigo-600"
-                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                        }`}
-                      >
-                        {totalPages}
-                      </button>
-                    );
-                  }
-
-                  return pageNumbers;
-                })()}
-
-                <button
-                  onClick={() => onPageChange?.(Math.min(currentPage + 1, totalPages))}
-                  disabled={!pagination?.hasNextPage}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="sr-only">Next</span>
-                  <FiChevronRight className="h-5 w-5" />
-                </button>
-              </nav>
-            </div>
+              <option value="all">All Categories</option>
+              {availableCategories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
-      )}
-    </div>
+
+        {/* Blog list */}
+        {filteredBlogs.length > 0 ? (
+          <div className="space-y-2 sm:space-y-3">
+            {filteredBlogs.map((blog) => {
+              const cover = blog.thumbnail || blog.image;
+              const published = blog.status === "published";
+              return (
+                <div
+                  key={blog.id}
+                  className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-3 transition-all duration-200 hover:shadow-md sm:flex-row sm:items-center sm:gap-4 sm:p-4"
+                >
+                  <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
+                    {/* Thumbnail */}
+                    <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-stone-100 sm:h-20 sm:w-20">
+                      {cover ? (
+                        <Image src={assetUrl(cover)} alt={blog.title} fill sizes="80px" className="object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <FileText className="h-7 w-7 text-stone-300" aria-hidden />
+                        </div>
+                      )}
+                      {blog.featured && (
+                        <span className="absolute right-1 top-1 rounded-full bg-stone-900/90 p-1" title="Featured">
+                          <Star className="h-3 w-3 fill-current text-white" aria-hidden />
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-sm font-semibold text-stone-900 sm:text-base">{blog.title}</h3>
+                          <p className="mt-0.5 truncate text-xs text-stone-500 sm:text-sm">
+                            {blog.author?.name || 'Unknown Author'} • {formatDate(blog.createdAt)}
+                          </p>
+                        </div>
+                        <StatusBadge status={blog.status} className="shrink-0" />
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 sm:mt-3">
+                        {blog.category && (
+                          <span className="rounded-md bg-stone-100 px-2 py-1 text-xs text-stone-600">{blog.category}</span>
+                        )}
+                        {blog.featured && (
+                          <Badge size="sm" tone="neutral">
+                            <Star className="h-3 w-3 fill-current" aria-hidden />
+                            Featured
+                          </Badge>
+                        )}
+                        <span className="flex items-center gap-1 text-xs text-stone-500">
+                          <Eye className="h-3 w-3" aria-hidden />
+                          {blog.views || 0} views
+                        </span>
+                        <span className="hidden truncate text-xs text-stone-400 md:inline">/blog/{blog.slug}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-end gap-1.5 border-t border-stone-100 pt-2 sm:border-0 sm:pt-0">
+                    {onToggleStatus && (
+                      <IconButton
+                        label={published ? 'Unpublish (move to drafts)' : 'Publish'}
+                        icon={published ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                        loading={busy[`status-${blog.id}`]}
+                        onClick={() =>
+                          runToggle(`status-${blog.id}`, () => onToggleStatus(blog.id, published ? 'draft' : 'published'))
+                        }
+                        className={cn(
+                          published
+                            ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700'
+                            : 'bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-700'
+                        )}
+                      />
+                    )}
+                    {onToggleFeatured && (
+                      <IconButton
+                        label={blog.featured ? 'Remove from featured' : 'Mark as featured'}
+                        icon={<Star className={cn('h-4 w-4', blog.featured && 'fill-current')} />}
+                        loading={busy[`featured-${blog.id}`]}
+                        onClick={() => runToggle(`featured-${blog.id}`, () => onToggleFeatured(blog.id, !blog.featured))}
+                        className={cn(
+                          blog.featured
+                            ? 'bg-stone-900 text-white hover:bg-stone-800 hover:text-white'
+                            : 'bg-stone-100 text-stone-400 hover:bg-stone-200 hover:text-stone-700'
+                        )}
+                      />
+                    )}
+                    <IconButton
+                      label="Edit"
+                      icon={<Edit2 className="h-4 w-4" />}
+                      onClick={() => onEdit?.(blog.id)}
+                      className="bg-stone-100 text-stone-600 hover:bg-stone-200"
+                    />
+                    <IconButton
+                      label="Delete"
+                      tone="danger"
+                      icon={<Trash2 className="h-4 w-4" />}
+                      onClick={() => onDelete?.(blog.id)}
+                      className="bg-stone-100 text-red-500 hover:bg-red-50 hover:text-red-600"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={FileText}
+            title="No blogs found"
+            description={hasFilters ? "Try adjusting your search or filters." : "There are no blogs on this page."}
+            action={
+              hasFilters && (
+                <Button variant="secondary" size="sm" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              )
+            }
+          />
+        )}
+
+        {/* Pagination */}
+        {filteredBlogs.length > 0 && (
+          <div className="border-t border-stone-200 pt-4">
+            <Pagination
+              page={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => onPageChange?.(page)}
+              totalItems={totalItems}
+              pageSize={pagination?.limit || 10}
+              itemLabel="blogs"
+            />
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }

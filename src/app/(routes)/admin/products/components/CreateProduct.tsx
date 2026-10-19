@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { useRouter } from "next/navigation";
 import ProductForm from "./ProductForm";
 import type { Category } from "./CategoriesTab";
 
@@ -9,6 +10,8 @@ interface CreateProductProps {
   sizeOptions: string[];
   onManageAttributes?: () => void;
   onSuccess?: () => void;
+  /** Defaults to going back to the product list. */
+  onCancel?: () => void;
 }
 
 export default function CreateProduct({
@@ -16,8 +19,10 @@ export default function CreateProduct({
   colorOptions,
   sizeOptions,
   onManageAttributes,
-  onSuccess
+  onSuccess,
+  onCancel
 }: CreateProductProps) {
+  const router = useRouter();
   return (
     <ProductForm
       mode="create"
@@ -26,6 +31,7 @@ export default function CreateProduct({
       sizeOptions={sizeOptions}
       onManageAttributes={onManageAttributes}
       onSuccess={onSuccess}
+      onCancel={onCancel ?? (() => router.push("/admin/products"))}
     />
   );
 }

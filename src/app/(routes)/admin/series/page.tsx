@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { FiPlus } from 'react-icons/fi';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ArrowLeft, BookOpen, Eye, EyeOff, ListTree, Plus } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { AdminPage, Button, ConfirmDialog, PageHeader, StatCard, StatGrid } from '@/components/admin/ui';
+import { getApiErrorMessage } from '@/app/(routes)/admin/themes/components/collection/apiError';
 import AllSeries from './components/AllSeries';
 import SeriesForm from './components/SeriesForm';
 import { seriesAdminService, type Series, type SeriesInput } from './services/seriesAdminService';
@@ -14,6 +16,9 @@ const SeriesPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingSeries, setEditingSeries] = useState<Series | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Series | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const firstRender = useRef(true);
 
   const fetchSeries = useCallback(async () => {
     try {
@@ -23,8 +28,9 @@ const SeriesPage = () => {
       setSeries(data);
     } catch (error) {
       console.error('Error fetching series:', error);
-      setError('Failed to load series. Please try again.');
-      toast.error('Failed to load series');
+      const message = getApiErrorMessage(error, 'Failed to load series. Please try again.');
+      setError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -34,8 +40,17 @@ const SeriesPage = () => {
     fetchSeries();
   }, [fetchSeries]);
 
+  // Bring the header back into view when switching between the list and the form.
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    document.getElementById('series-page-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [activeView]);
+
   const handleEdit = (id: string) => {
-    const seriesItem = series.find(s => s._id === id);
+    const seriesItem = series.find((s) => s._id === id);
     if (seriesItem) {
       setEditingSeries(seriesItem);
       setActiveView('edit');
@@ -53,7 +68,7 @@ const SeriesPage = () => {
 
       if (editingSeries) {
         const updatedSeries = await seriesAdminService.updateSeries(editingSeries._id, data);
-        setSeries((prev) => prev.map(s => s._id === editingSeries._id ? updatedSeries : s));
+        setSeries((prev) => prev.map((s) => (s._id === editingSeries._id ? updatedSeries : s)));
         toast.success('Series updated successfully');
       } else {
         const newSeries = await seriesAdminService.createSeries(data);
@@ -65,7 +80,7 @@ const SeriesPage = () => {
       setEditingSeries(null);
     } catch (error) {
       console.error('Error saving series:', error);
-      toast.error('Failed to save series');
+      toast.error(getApiErrorMessage(error, 'Failed to save series'));
       throw error;
     } finally {
       setFormLoading(false);
@@ -77,25 +92,31 @@ const SeriesPage = () => {
     setActiveView('list');
   };
 
-  const handleDelete = async (id: string) => {
-    const seriesItem = series.find(s => s._id === id);
-    if (!seriesItem) return;
+  const handleDelete = (id: string) => {
+    const seriesItem = series.find((s) => s._id === id);
+    if (seriesItem) setDeleteTarget(seriesItem);
+  };
 
-    if (!confirm(`Are you sure you want to delete "${seriesItem.title}"?`)) return;
-
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const id = deleteTarget._id;
     try {
+      setDeleting(true);
       await seriesAdminService.deleteSeries(id);
       setSeries((prev) => prev.filter((s) => s._id !== id));
       toast.success('Series deleted successfully');
+      setDeleteTarget(null);
     } catch (error) {
       console.error('Error deleting series:', error);
-      toast.error('Failed to delete series');
+      toast.error(getApiErrorMessage(error, 'Failed to delete series'));
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleToggleStatus = async (id: string, newStatus: boolean) => {
     const prev = series;
-    setSeries((p) => p.map((s) => s._id === id ? { ...s, isActive: newStatus } : s));
+    setSeries((p) => p.map((s) => (s._id === id ? { ...s, isActive: newStatus } : s)));
 
     try {
       await seriesAdminService.toggleSeriesStatus(id, newStatus);
@@ -103,27 +124,49 @@ const SeriesPage = () => {
     } catch (error) {
       console.error('Failed to toggle series status', error);
       setSeries(prev);
-      toast.error('Failed to update series status');
+      toast.error(getApiErrorMessage(error, 'Failed to update series status'));
     }
   };
 
+  const activeCount = series.filter((s) => s.isActive).length;
+  const subitemCount = series.reduce((sum, s) => sum + (s.subitems?.length || 0), 0);
+  const isForm = activeView === 'create' || activeView === 'edit';
+
   return (
-    <div className="space-y-6 overflow-x-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Editorial Series</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage your cultural and literary design capsules</p>
-        </div>
-        {activeView === 'list' && (
-          <button
-            onClick={handleCreate}
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <FiPlus className="-ml-1 mr-2 h-5 w-5" />
-            Create Series
-          </button>
-        )}
-      </div>
+    <AdminPage>
+      <PageHeader
+        id="series-page-top"
+        className="scroll-mt-4"
+        title={isForm ? (editingSeries ? 'Edit Series' : 'Create Series') : 'Editorial Series'}
+        subtitle={
+          isForm
+            ? editingSeries
+              ? `Update “${editingSeries.title}”`
+              : 'Add a new cultural or literary design capsule'
+            : 'Manage your cultural and literary design capsules'
+        }
+        actions={
+          isForm ? (
+            <Button variant="secondary" onClick={handleFormCancel} disabled={formLoading} leftIcon={<ArrowLeft className="h-4 w-4" />}>
+              Back to list
+            </Button>
+          ) : (
+            <Button onClick={handleCreate} leftIcon={<Plus className="h-4 w-4" />}>
+              <span className="hidden sm:inline">Create Series</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          )
+        }
+      />
+
+      {activeView === 'list' && !isLoading && !error && series.length > 0 && (
+        <StatGrid cols={4}>
+          <StatCard size="sm" label="Total series" value={series.length} icon={BookOpen} tone="neutral" />
+          <StatCard size="sm" label="Active" value={activeCount} icon={Eye} tone="success" />
+          <StatCard size="sm" label="Inactive" value={series.length - activeCount} icon={EyeOff} tone="warning" />
+          <StatCard size="sm" label="Subitems" value={subitemCount} icon={ListTree} tone="info" />
+        </StatGrid>
+      )}
 
       {activeView === 'list' && (
         <AllSeries
@@ -131,20 +174,38 @@ const SeriesPage = () => {
           onDelete={handleDelete}
           onEdit={handleEdit}
           onToggleStatus={handleToggleStatus}
+          onCreate={handleCreate}
+          onRetry={fetchSeries}
           loading={isLoading}
           error={error}
         />
       )}
 
-      {(activeView === 'create' || activeView === 'edit') && (
+      {isForm && (
         <SeriesForm
+          key={editingSeries?._id ?? 'new'}
           series={editingSeries || undefined}
           onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
           loading={formLoading}
         />
       )}
-    </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete series?"
+        message={
+          <>
+            <span className="font-medium text-stone-900">“{deleteTarget?.title}”</span> and its gallery will be removed from the
+            storefront. This can&apos;t be undone.
+          </>
+        }
+        confirmLabel="Delete series"
+        loading={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+      />
+    </AdminPage>
   );
 };
 

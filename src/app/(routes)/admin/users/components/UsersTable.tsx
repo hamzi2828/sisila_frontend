@@ -1,14 +1,51 @@
-import { FiTrash2 } from 'react-icons/fi';
+import { Trash2 } from 'lucide-react';
+import { IconButton, Select, StatusBadge, Table, TBody, TD, TH, THead, TR } from '@/components/admin/ui';
 import type { User, UserRole } from '../types';
 
 type Props = {
   users: User[];
   onRoleUpdate: (userId: string, role: UserRole) => void | Promise<void>;
   onStatusToggle: (userId: string, isActive: boolean) => void | Promise<void>;
-  onDelete: (userId: string) => void | Promise<void>;
+  onDelete: (user: User) => void;
   formatDate: (iso: string) => string;
   formatLastLogin: (lastLogin?: string | null) => string;
 };
+
+function Avatar({ name, className = 'h-10 w-10 text-sm' }: { name: string; className?: string }) {
+  return (
+    <div className={`flex shrink-0 items-center justify-center rounded-full bg-stone-900 font-semibold text-white ${className}`}>
+      {name?.charAt(0)?.toUpperCase() || 'U'}
+    </div>
+  );
+}
+
+function RoleSelect({ user, onRoleUpdate }: { user: User; onRoleUpdate: Props['onRoleUpdate'] }) {
+  return (
+    <Select
+      value={user.role}
+      onChange={(e) => onRoleUpdate(user._id, e.target.value as UserRole)}
+      aria-label={`Role for ${user.name || user.email}`}
+      className="w-auto py-1.5 pl-2.5 text-xs font-medium"
+    >
+      <option value="user">User</option>
+      <option value="admin">Admin</option>
+      <option value="moderator">Moderator</option>
+    </Select>
+  );
+}
+
+function StatusToggle({ user, onStatusToggle }: { user: User; onStatusToggle: Props['onStatusToggle'] }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onStatusToggle(user._id, !user.isActive)}
+      title={user.isActive ? 'Click to deactivate' : 'Click to activate'}
+      className="rounded-full transition-opacity hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900/30"
+    >
+      <StatusBadge status={user.isActive ? 'active' : 'inactive'} />
+    </button>
+  );
+}
 
 export default function UsersTable({
   users,
@@ -19,104 +56,82 @@ export default function UsersTable({
   formatLastLogin,
 }: Props) {
   return (
-    <div className="overflow-hidden bg-white rounded-lg shadow">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                User
-              </th>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                Role
-              </th>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                Status
-              </th>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                Last Login
-              </th>
-              <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                Joined Date
-              </th>
-              <th className="relative px-6 py-3">
-                <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
+    <>
+      {/* Mobile: stacked cards */}
+      <ul className="space-y-2 p-3 sm:hidden">
+        {users.map((user) => (
+          <li key={user._id} className="rounded-xl border border-stone-200 bg-white p-3">
+            <div className="flex items-start gap-3">
+              <Avatar name={user.name} />
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-sm font-semibold text-stone-900">{user.name || 'Unknown User'}</h3>
+                <p className="truncate text-xs text-stone-500">{user.email}</p>
+              </div>
+              <StatusToggle user={user} onStatusToggle={onStatusToggle} />
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-stone-200 pt-2">
+              <RoleSelect user={user} onRoleUpdate={onRoleUpdate} />
+              <p className="min-w-0 truncate text-[11px] text-stone-500">Joined {formatDate(user.createdAt)}</p>
+              <IconButton
+                label="Delete user"
+                tone="danger"
+                size="sm"
+                icon={<Trash2 className="h-4 w-4" />}
+                onClick={() => onDelete(user)}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
 
-          <tbody className="bg-white divide-y divide-gray-200">
-            {users.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">
-                  No users found.
-                </td>
-              </tr>
-            ) : (
-              users.map((user) => (
-                <tr key={user._id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 w-10 h-10">
-                        <div className="flex items-center justify-center w-10 h-10 text-white bg-indigo-600 rounded-full">
-                          {user.name?.charAt(0)?.toUpperCase() || 'U'}
-                        </div>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={user.role}
-                      onChange={(e) => onRoleUpdate(user._id, e.target.value as UserRole)}
-                      className="text-xs font-medium rounded border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="user">User</option>
-                      <option value="admin">Admin</option>
-                      <option value="moderator">Moderator</option>
-                    </select>
-                  </td>
-
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => onStatusToggle(user._id, !user.isActive)}
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        user.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {user.isActive ? 'Active' : 'Inactive'}
-                    </button>
-                  </td>
-
-                  <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                    {formatLastLogin(user.lastLogin)}
-                  </td>
-
-                  <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                    {formatDate(user.createdAt)}
-                  </td>
-
-                  <td className="px-6 py-4 text-sm font-medium text-right whitespace-nowrap">
-                    <button
-                      onClick={() => onDelete(user._id)}
-                      className="text-red-600 hover:text-red-900"
-                      title="Delete user"
-                    >
-                      <FiTrash2 className="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {/* sm and up: table */}
+      <Table wrapperClassName="hidden sm:block">
+        <THead>
+          <tr>
+            <TH>User</TH>
+            <TH>Role</TH>
+            <TH>Status</TH>
+            <TH className="hidden md:table-cell">Last Login</TH>
+            <TH className="hidden lg:table-cell">Joined Date</TH>
+            <TH align="right">
+              <span className="sr-only">Actions</span>
+            </TH>
+          </tr>
+        </THead>
+        <TBody>
+          {users.map((user) => (
+            <TR key={user._id}>
+              <TD>
+                <div className="flex items-center gap-3">
+                  <Avatar name={user.name} />
+                  <div className="min-w-0">
+                    <div className="font-medium text-stone-900">{user.name || 'Unknown User'}</div>
+                    <div className="text-xs text-stone-500">{user.email}</div>
+                  </div>
+                </div>
+              </TD>
+              <TD>
+                <RoleSelect user={user} onRoleUpdate={onRoleUpdate} />
+              </TD>
+              <TD>
+                <StatusToggle user={user} onStatusToggle={onStatusToggle} />
+              </TD>
+              <TD className="hidden text-stone-500 md:table-cell">{formatLastLogin(user.lastLogin)}</TD>
+              <TD className="hidden text-stone-500 lg:table-cell">{formatDate(user.createdAt)}</TD>
+              <TD align="right">
+                <div className="flex items-center justify-end gap-1">
+                  <IconButton
+                    label="Delete user"
+                    tone="danger"
+                    icon={<Trash2 className="h-4 w-4" />}
+                    onClick={() => onDelete(user)}
+                  />
+                </div>
+              </TD>
+            </TR>
+          ))}
+        </TBody>
+      </Table>
+    </>
   );
 }

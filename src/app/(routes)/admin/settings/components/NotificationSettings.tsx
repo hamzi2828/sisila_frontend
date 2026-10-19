@@ -1,91 +1,75 @@
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import { Bell, Check } from 'lucide-react';
+import { Button, Switch } from '@/components/admin/ui';
+import { type SettingsData } from '../services/settingsService';
+import { PanelFooter, PanelHeader, PanelSection } from './SettingsPanel';
 
 interface NotificationSettingsProps {
-  settings: any;
-  onUpdate: (data: any) => void;
+  settings: SettingsData;
+  onUpdate: (data: Partial<SettingsData>) => Promise<boolean>;
   isLoading?: boolean;
 }
 
+const fromSettings = (settings?: SettingsData) => ({
+  emailNotifications: settings?.emailNotifications ?? true,
+  marketingEmails: settings?.marketingEmails ?? false,
+  securityAlerts: settings?.securityAlerts ?? true,
+});
+
+type NotificationField = keyof ReturnType<typeof fromSettings>;
+
+const OPTIONS: { field: NotificationField; label: string; description: string }[] = [
+  { field: 'emailNotifications', label: 'Email Notifications', description: 'Receive general notifications via email' },
+  { field: 'marketingEmails', label: 'Marketing Emails', description: 'Receive promotional and marketing emails' },
+  { field: 'securityAlerts', label: 'Security Alerts', description: 'Receive important security notifications' },
+];
+
 export default function NotificationSettings({ settings, onUpdate, isLoading }: NotificationSettingsProps) {
-  const [formData, setFormData] = useState({
-    emailNotifications: settings?.emailNotifications ?? true,
-    marketingEmails: settings?.marketingEmails ?? false,
-    securityAlerts: settings?.securityAlerts ?? true,
-  });
+  const [formData, setFormData] = useState(() => fromSettings(settings));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Keep the form in sync after a save or a reset to defaults.
+  useEffect(() => {
+    setFormData(fromSettings(settings));
+  }, [settings]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdate(formData);
+    await onUpdate(formData);
   };
 
-  const handleToggle = (field: string, value: boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleToggle = (field: NotificationField, value: boolean) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  const dirty = JSON.stringify(formData) !== JSON.stringify(fromSettings(settings));
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Notification Settings</CardTitle>
-        <CardDescription>
-          Manage your notification preferences and alerts
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Email Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive general notifications via email
-                </p>
-              </div>
-              <Switch
-                checked={formData.emailNotifications}
-                onCheckedChange={(checked) => handleToggle('emailNotifications', checked)}
-              />
-            </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <PanelSection>
+        <PanelHeader icon={Bell} title="Notification Settings" description="Manage your notification preferences and alerts" />
+        <div className="divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 bg-white">
+          {OPTIONS.map((option) => (
+            <Switch
+              key={option.field}
+              id={option.field}
+              checked={formData[option.field]}
+              onChange={(checked) => handleToggle(option.field, checked)}
+              label={option.label}
+              description={option.description}
+              className="px-4 py-4 transition-colors hover:bg-stone-50/60"
+            />
+          ))}
+        </div>
+      </PanelSection>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Marketing Emails</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive promotional and marketing emails
-                </p>
-              </div>
-              <Switch
-                checked={formData.marketingEmails}
-                onCheckedChange={(checked) => handleToggle('marketingEmails', checked)}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Security Alerts</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive important security notifications
-                </p>
-              </div>
-              <Switch
-                checked={formData.securityAlerts}
-                onCheckedChange={(checked) => handleToggle('securityAlerts', checked)}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+      <PanelFooter>
+        {dirty && <p className="text-xs text-stone-500 sm:mr-auto">You have unsaved changes</p>}
+        <Button type="submit" loading={isLoading} loadingText="Saving..." leftIcon={<Check className="h-4 w-4" />}>
+          Save Changes
+        </Button>
+      </PanelFooter>
+    </form>
   );
 }

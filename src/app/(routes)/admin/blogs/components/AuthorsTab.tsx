@@ -1,10 +1,34 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { FiPlus, FiEdit2, FiTrash2, FiToggleLeft, FiToggleRight, FiX, FiUpload } from "react-icons/fi";
 import Image from "next/image";
-import authorService, { Author } from "../services/authorService";
+import { Check, Edit2, FileText, Plus, ToggleLeft, ToggleRight, Trash2, Users } from "lucide-react";
 import { toast } from 'react-hot-toast';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  ConfirmDialog,
+  EmptyState,
+  FormField,
+  IconButton,
+  Input,
+  LoadingState,
+  Modal,
+  Pagination,
+  SearchInput,
+  Select,
+  StatCard,
+  StatGrid,
+  StatusBadge,
+  Textarea,
+} from "@/components/admin/ui";
+import { cn } from "@/lib/utils";
 import { assetUrl } from '@/lib/productMedia';
+import authorService, { Author } from "../services/authorService";
+import ImageDropzone from "../_shared/ImageDropzone";
+import { getErrorMessage } from "../_shared/apiError";
 
 interface AuthorFormData {
   name: string;
@@ -22,12 +46,17 @@ const initialFormData: AuthorFormData = {
 
 export default function AuthorsTab() {
   const [authors, setAuthors] = useState<Author[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAuthor, setEditingAuthor] = useState<Author | null>(null);
   const [formData, setFormData] = useState<AuthorFormData>(initialFormData);
   const [avatar, setAvatar] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const [currentAvatar, setCurrentAvatar] = useState<string>("");
+  const [pendingDelete, setPendingDelete] = useState<Author | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -36,28 +65,49 @@ export default function AuthorsTab() {
     hasNextPage: false,
     hasPreviousPage: false
   });
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<boolean | undefined>(undefined);
+
+  // Debounce the search box so we don't hit the API on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (searchInput !== searchQuery) {
+        setSearchQuery(searchInput);
+        setPagination(p => ({ ...p, page: 1 }));
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput, searchQuery]);
 
   useEffect(() => {
     fetchAuthors();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page, searchQuery, activeFilter]);
 
+  // The page header's "Add Author" button opens the create modal
+  useEffect(() => {
+    const handleOpenCreate = () => openCreate();
+    window.addEventListener("openCreateAuthor", handleOpenCreate);
+    return () => window.removeEventListener("openCreateAuthor", handleOpenCreate);
+  }, []);
+
   const fetchAuthors = async () => {
     try {
       setIsLoading(true);
+      setLoadError(null);
       const response = await authorService.getAllAuthors({
         page: pagination.page,
         limit: pagination.limit,
         search: searchQuery || undefined,
         active: activeFilter
       });
-      
+
       setAuthors(response.authors);
       setPagination(response.pagination);
     } catch (error) {
       console.error("Error fetching authors:", error);
+      setLoadError(getErrorMessage(error, "Failed to load authors. Please try again."));
     } finally {
       setIsLoading(false);
     }
@@ -65,17 +115,17 @@ export default function AuthorsTab() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
-      setIsLoading(true);
+      setIsSaving(true);
       const formDataToSend = new FormData();
-      
+
       // Add basic fields
       formDataToSend.append("name", formData.name);
       formDataToSend.append("email", formData.email);
       formDataToSend.append("bio", formData.bio);
       formDataToSend.append("active", formData.active.toString());
-      
+
       // Add avatar file if selected
       if (avatar) {
         formDataToSend.append("avatar", avatar);
@@ -83,17 +133,28 @@ export default function AuthorsTab() {
 
       if (editingAuthor) {
         await authorService.updateAuthor(editingAuthor.id, formDataToSend);
+        toast.success("Author updated successfully");
       } else {
         await authorService.createAuthor(formDataToSend);
+        toast.success("Author created successfully");
       }
-      
+
       await fetchAuthors();
       handleCloseModal();
     } catch (error) {
       console.error("Error saving author:", error);
+      toast.error(getErrorMessage(error, "Failed to save author", { upload: Boolean(avatar) }));
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
+  };
+
+  const openCreate = () => {
+    setEditingAuthor(null);
+    setFormData(initialFormData);
+    setAvatar(null);
+    setCurrentAvatar("");
+    setIsModalOpen(true);
   };
 
   const handleEdit = (author: Author) => {
@@ -104,38 +165,39 @@ export default function AuthorsTab() {
       bio: author.bio || "",
       active: author.active
     });
-    
-    if (author.avatar) {
-      setAvatarPreview(assetUrl(author.avatar));
-    }
-    
+    setAvatar(null);
+    setCurrentAvatar(author.avatar ? assetUrl(author.avatar) : "");
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (authorId: string) => {
-    if (!confirm("Are you sure you want to delete this author?")) return;
-    
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
+
     try {
-      setIsLoading(true);
-      await authorService.deleteAuthor(authorId);
+      setIsDeleting(true);
+      await authorService.deleteAuthor(pendingDelete.id);
+      toast.success("Author deleted successfully");
+      setPendingDelete(null);
       await fetchAuthors();
     } catch (error) {
       console.error("Error deleting author:", error);
-      toast.error("Failed to delete author. They may have blogs associated with them.");
+      toast.error(getErrorMessage(error, "Failed to delete author. They may have blogs associated with them."), { duration: 6000 });
     } finally {
-      setIsLoading(false);
+      setIsDeleting(false);
     }
   };
 
   const handleToggleActive = async (authorId: string) => {
     try {
-      setIsLoading(true);
+      setTogglingId(authorId);
       await authorService.toggleAuthorActive(authorId);
       await fetchAuthors();
+      toast.success("Author status updated");
     } catch (error) {
       console.error("Error toggling author status:", error);
+      toast.error(getErrorMessage(error, "Failed to update author status"));
     } finally {
-      setIsLoading(false);
+      setTogglingId(null);
     }
   };
 
@@ -144,317 +206,269 @@ export default function AuthorsTab() {
     setEditingAuthor(null);
     setFormData(initialFormData);
     setAvatar(null);
-    setAvatarPreview("");
+    setCurrentAvatar("");
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAvatar(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
+  const hasFilters = Boolean(searchQuery) || activeFilter !== undefined;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Authors</h2>
-          <p className="text-gray-600">Manage blog authors</p>
-        </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          <FiPlus className="mr-2 h-4 w-4" />
-          Add Author
-        </button>
-      </div>
+    <>
+      <StatGrid cols={3}>
+        <StatCard size="sm" label="Total" value={pagination.total} icon={Users} />
+        <StatCard size="sm" label="Active" value={authors.filter(a => a.active).length} icon={ToggleRight} tone="success" />
+        <StatCard size="sm" label="Blogs" value={authors.reduce((acc, a) => acc + (a.blogCount || 0), 0)} icon={FileText} tone="info" />
+      </StatGrid>
 
-      {/* Filters */}
-      <div className="bg-white shadow rounded-lg p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
-              Search
-            </label>
-            <input
-              type="text"
-              id="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+      <Card padding="none">
+        <div className="p-3 sm:p-6">
+          {/* Filters */}
+          <div className="mb-4 grid grid-cols-1 gap-2 sm:mb-6 sm:grid-cols-2 sm:gap-4">
+            <SearchInput
+              value={searchInput}
+              onChange={setSearchInput}
               placeholder="Search by name or email..."
+              aria-label="Search authors"
+              wrapperClassName="sm:max-w-none"
             />
-          </div>
-          
-          <div>
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
-            <select
-              id="status"
+            <Select
+              aria-label="Filter by status"
               value={activeFilter === undefined ? "" : activeFilter.toString()}
-              onChange={(e) => setActiveFilter(e.target.value === "" ? undefined : e.target.value === "true")}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              onChange={(e) => {
+                setActiveFilter(e.target.value === "" ? undefined : e.target.value === "true");
+                setPagination(p => ({ ...p, page: 1 }));
+              }}
             >
-              <option value="">All</option>
+              <option value="">All Status</option>
               <option value="true">Active</option>
               <option value="false">Inactive</option>
-            </select>
+            </Select>
           </div>
+
+          {/* Authors List */}
+          {loadError ? (
+            <Alert tone="error" title="Error loading authors" onRetry={fetchAuthors}>
+              {loadError}
+            </Alert>
+          ) : isLoading && authors.length === 0 ? (
+            <LoadingState label="Loading authors..." />
+          ) : authors.length > 0 ? (
+            <div className={cn("space-y-2 sm:space-y-3", isLoading && "opacity-60 transition-opacity")}>
+              {authors.map((author) => (
+                <div
+                  key={author.id}
+                  className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3 transition-all duration-200 hover:shadow-md sm:flex-row sm:items-center sm:gap-4 sm:p-4"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+                    {/* Avatar */}
+                    {author.avatar ? (
+                      <Image
+                        src={assetUrl(author.avatar)}
+                        alt={author.name}
+                        width={56}
+                        height={56}
+                        className="h-11 w-11 flex-shrink-0 rounded-full border-2 border-stone-200 object-cover sm:h-14 sm:w-14"
+                      />
+                    ) : (
+                      <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border-2 border-stone-200 bg-stone-200 sm:h-14 sm:w-14">
+                        <span className="text-base font-semibold text-stone-600 sm:text-xl">
+                          {author.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-sm font-semibold text-stone-900 sm:text-base">{author.name}</h3>
+                      <p className="truncate text-xs text-stone-500 sm:text-sm">
+                        {author.email}
+                        {author.slug && <span className="hidden text-stone-400 md:inline"> · @{author.slug}</span>}
+                      </p>
+                      <p className="mt-0.5 line-clamp-1 text-xs text-stone-600 sm:text-sm">
+                        {author.bio || <span className="text-stone-400">No bio available</span>}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 border-t border-stone-200 pt-2 sm:justify-end sm:border-0 sm:pt-0">
+                    {/* Badges */}
+                    <div className="flex items-center gap-2">
+                      <Badge size="sm">
+                        {author.blogCount || 0} {(author.blogCount || 0) === 1 ? "blog" : "blogs"}
+                      </Badge>
+                      <StatusBadge size="sm" status={author.active ? "active" : "inactive"} />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1.5">
+                      <IconButton
+                        label={author.active ? "Deactivate" : "Activate"}
+                        icon={author.active ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
+                        loading={togglingId === author.id}
+                        onClick={() => handleToggleActive(author.id)}
+                        className={cn(
+                          author.active
+                            ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700"
+                            : "bg-white text-stone-400 ring-1 ring-stone-200 hover:bg-stone-100 hover:text-stone-700"
+                        )}
+                      />
+                      <IconButton
+                        label="Edit"
+                        icon={<Edit2 className="h-4 w-4" />}
+                        onClick={() => handleEdit(author)}
+                        className="bg-white text-stone-600 ring-1 ring-stone-200 hover:bg-stone-100"
+                      />
+                      <IconButton
+                        label="Delete"
+                        tone="danger"
+                        icon={<Trash2 className="h-4 w-4" />}
+                        onClick={() => setPendingDelete(author)}
+                        className="bg-white text-red-500 ring-1 ring-stone-200 hover:bg-red-50 hover:text-red-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={Users}
+              title="No authors found"
+              description={hasFilters ? "Try adjusting your search or filters." : "Get started by adding your first author."}
+              action={
+                !hasFilters && (
+                  <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>
+                    Add Author
+                  </Button>
+                )
+              }
+            />
+          )}
+
+          {/* Pagination */}
+          {!loadError && pagination.pages > 1 && (
+            <div className="mt-4 border-t border-stone-200 pt-4 sm:mt-6">
+              <Pagination
+                page={pagination.page}
+                totalPages={pagination.pages}
+                onPageChange={(page) => setPagination(p => ({ ...p, page }))}
+                totalItems={pagination.total}
+                pageSize={pagination.limit}
+                itemLabel="authors"
+              />
+            </div>
+          )}
         </div>
-      </div>
+      </Card>
 
-      {/* Authors Table */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Author</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bio</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blogs</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {authors.map((author) => (
-              <tr key={author.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10">
-                      {author.avatar ? (
-                        <Image
-                          className="h-10 w-10 rounded-full object-cover"
-                          src={assetUrl(author.avatar)}
-                          alt={author.name}
-                          width={40}
-                          height={40}
-                        />
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-700">
-                            {author.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{author.name}</div>
-                      <div className="text-sm text-gray-500">@{author.slug}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{author.email}</div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-500 max-w-xs truncate">
-                    {author.bio || 'No bio available'}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {author.blogCount || 0}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    author.active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                  }`}>
-                    {author.active ? "Active" : "Inactive"}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex justify-end space-x-2">
-                    <button
-                      onClick={() => handleToggleActive(author.id)}
-                      className={`${
-                        author.active ? "text-orange-600 hover:text-orange-900" : "text-green-600 hover:text-green-900"
-                      }`}
-                    >
-                      {author.active ? <FiToggleRight className="h-5 w-5" /> : <FiToggleLeft className="h-5 w-5" />}
-                    </button>
-                    <button
-                      onClick={() => handleEdit(author)}
-                      className="text-indigo-600 hover:text-indigo-900"
-                    >
-                      <FiEdit2 className="h-5 w-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(author.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <FiTrash2 className="h-5 w-5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        
-        {authors.length === 0 && !isLoading && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No authors found</p>
-          </div>
-        )}
-      </div>
+      {/* Add / edit modal */}
+      <Modal
+        open={isModalOpen}
+        onClose={isSaving ? () => {} : handleCloseModal}
+        title={editingAuthor ? "Edit Author" : "Add New Author"}
+        description={editingAuthor ? "Update this author's profile." : "Authors can be assigned to blog posts."}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={handleCloseModal} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="blog-author-form"
+              loading={isSaving}
+              loadingText="Saving..."
+              leftIcon={<Check className="h-4 w-4" />}
+            >
+              {editingAuthor ? "Update" : "Create"}
+            </Button>
+          </>
+        }
+      >
+        <form id="blog-author-form" onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+          {/* Avatar Upload */}
+          <ImageDropzone
+            id="blog-author-avatar"
+            name="Avatar"
+            label="Avatar"
+            file={avatar}
+            onFileChange={setAvatar}
+            currentUrl={currentAvatar}
+            circle
+            disabled={isSaving}
+          />
 
-      {/* Pagination */}
-      {pagination.pages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200 sm:px-6">
-          <div className="flex-1 flex justify-between sm:hidden">
-            <button
-              onClick={() => setPagination(p => ({ ...p, page: Math.max(p.page - 1, 1) }))}
-              disabled={!pagination.hasPreviousPage}
-              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => setPagination(p => ({ ...p, page: Math.min(p.page + 1, p.pages) }))}
-              disabled={!pagination.hasNextPage}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-            >
-              Next
-            </button>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label="Name" htmlFor="blog-author-name" required>
+              <Input
+                id="blog-author-name"
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Enter author name"
+                disabled={isSaving}
+              />
+            </FormField>
+
+            <FormField label="Email" htmlFor="blog-author-email" required>
+              <Input
+                id="blog-author-email"
+                type="email"
+                required
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="Enter email address"
+                disabled={isSaving}
+              />
+            </FormField>
           </div>
-          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-gray-700">
-                Showing <span className="font-medium">{((pagination.page - 1) * pagination.limit) + 1}</span> to{" "}
-                <span className="font-medium">
-                  {Math.min(pagination.page * pagination.limit, pagination.total)}
-                </span>{" "}
-                of <span className="font-medium">{pagination.total}</span> results
+
+          {/* Bio */}
+          <FormField label="Bio" htmlFor="blog-author-bio">
+            <Textarea
+              id="blog-author-bio"
+              rows={3}
+              value={formData.bio}
+              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+              className="resize-none"
+              placeholder="Brief description about the author..."
+              disabled={isSaving}
+            />
+          </FormField>
+
+          {/* Active Status */}
+          <Checkbox
+            id="blog-author-active"
+            checked={formData.active}
+            onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+            label="Active author"
+            description="Active authors can be assigned to blogs."
+            disabled={isSaving}
+          />
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete author?"
+        message={
+          <div className="space-y-2">
+            <p>
+              <span className="font-medium text-stone-900">{pendingDelete?.name}</span> will be removed permanently.
+            </p>
+            {pendingDelete && (pendingDelete.blogCount || 0) > 0 && (
+              <p className="text-amber-700">
+                This author has {pendingDelete.blogCount} {pendingDelete.blogCount === 1 ? "blog" : "blogs"}. Authors with
+                blogs can&apos;t be deleted until those posts are reassigned or deleted.
               </p>
-            </div>
+            )}
           </div>
-        </div>
-      )}
-
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900">
-                {editingAuthor ? "Edit Author" : "Add New Author"}
-              </h3>
-              <button
-                onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <FiX className="h-6 w-6" />
-              </button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Avatar Upload */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Avatar</label>
-                <div className="flex items-center space-x-4">
-                  {avatarPreview ? (
-                    <Image
-                      src={avatarPreview}
-                      alt="Avatar preview"
-                      width={80}
-                      height={80}
-                      className="h-20 w-20 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-20 w-20 rounded-full bg-gray-300 flex items-center justify-center">
-                      <FiUpload className="h-8 w-8 text-gray-400" />
-                    </div>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarChange}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                  />
-                </div>
-              </div>
-
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                  <input
-                    type="email"
-                    required
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* Bio */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-                <textarea
-                  rows={3}
-                  value={formData.bio}
-                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Brief description about the author..."
-                />
-              </div>
-
-
-              {/* Active Status */}
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={formData.active}
-                  onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                />
-                <label className="ml-2 block text-sm text-gray-900">
-                  Active author (can be assigned to blogs)
-                </label>
-              </div>
-
-              {/* Actions */}
-              <div className="flex justify-end space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                  {isLoading ? "Saving..." : editingAuthor ? "Update" : "Create"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+        }
+        confirmLabel="Delete author"
+        loading={isDeleting}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={handleDelete}
+      />
+    </>
   );
 }

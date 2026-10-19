@@ -1,8 +1,8 @@
 export type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
 
-export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded' | 'cancelled';
+export type PaymentStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'refunded' | 'cancelled';
 
-export type PaymentMethod = 'card' | 'paypal' | 'stripe' | 'cash_on_delivery';
+export type PaymentMethod = 'card' | 'paypal' | 'stripe' | 'cod' | 'cash_on_delivery';
 
 export interface ColorMedia {
   color: string;
@@ -162,37 +162,14 @@ export function isValidOrderStatus(status: string): status is OrderStatus {
 }
 
 export function isValidPaymentStatus(status: string): status is PaymentStatus {
-  return ['pending', 'completed', 'failed', 'refunded', 'cancelled'].includes(status);
+  return ['pending', 'processing', 'completed', 'failed', 'refunded', 'cancelled'].includes(status);
 }
 
 export function isValidPaymentMethod(method: string): method is PaymentMethod {
-  return ['card', 'paypal', 'stripe', 'cash_on_delivery'].includes(method);
+  return ['card', 'paypal', 'stripe', 'cod', 'cash_on_delivery'].includes(method);
 }
 
 // Utility functions
-export function getOrderStatusColor(status: OrderStatus): string {
-  switch (status) {
-    case 'delivered': return 'bg-green-100 text-green-800';
-    case 'shipped': return 'bg-blue-100 text-blue-800';
-    case 'processing': return 'bg-yellow-100 text-yellow-800';
-    case 'cancelled': return 'bg-red-100 text-red-800';
-    case 'refunded': return 'bg-purple-100 text-purple-800';
-    case 'pending': return 'bg-yellow-100 text-yellow-800';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-}
-
-export function getPaymentStatusColor(status: PaymentStatus): string {
-  switch (status) {
-    case 'completed': return 'bg-green-100 text-green-800';
-    case 'pending': return 'bg-yellow-100 text-yellow-800';
-    case 'failed': return 'bg-red-100 text-red-800';
-    case 'refunded': return 'bg-purple-100 text-purple-800';
-    case 'cancelled': return 'bg-gray-100 text-gray-800';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-}
-
 export function formatOrderStatus(status: OrderStatus): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
@@ -200,6 +177,7 @@ export function formatOrderStatus(status: OrderStatus): string {
 export function formatPaymentMethod(method?: PaymentMethod): string {
   if (!method) return 'N/A';
   switch (method) {
+    case 'cod':
     case 'cash_on_delivery': return 'Cash on Delivery';
     default: return method.charAt(0).toUpperCase() + method.slice(1);
   }
@@ -266,41 +244,12 @@ export interface BulkOrderUpdateResponse {
 }
 
 // Component Props interfaces
-export interface TabItem {
-  key: string;
-  label: string;
-  count?: number;
-}
-
-export interface OrdersTabsProps {
-  tabs: TabItem[];
-  activeKey: string;
-  onChange: (key: string) => void;
-}
-
-export interface OrdersSearchProps {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-}
-
 export interface OrdersTableProps {
   orders: Order[];
   onView: (order: Order) => void;
-  onUpdateStatus: (orderId: string, status: OrderStatus) => void;
+  onUpdateStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   formatCurrency: (amount: number) => string;
   formatDate: (dateString: string) => string;
-  getStatusColor: (status: OrderStatus) => string;
-  loading?: boolean;
-}
-
-export interface OrdersPaginationProps {
-  currentPage: number;
-  totalPages: number;
-  indexOfFirstOrder: number;
-  indexOfLastOrder: number;
-  totalCount: number;
-  setCurrentPage: (page: number) => void;
 }
 
 export interface OrderDetailsModalProps {
@@ -308,13 +257,5 @@ export interface OrderDetailsModalProps {
   onClose: () => void;
   formatCurrency: (amount: number) => string;
   formatDate: (dateString: string) => string;
-  getStatusColor: (status: OrderStatus) => string;
-  onUpdateStatus?: (orderId: string, newStatus: OrderStatus) => void;
-}
-
-export interface AllOrdersProps {
-  orders: Order[];
-  filter?: "all" | OrderStatus;
-  onOrderSelect?: (order: Order) => void;
-  onStatusUpdate?: (orderId: string, status: OrderStatus) => void;
+  onUpdateStatus?: (orderId: string, newStatus: OrderStatus) => Promise<void>;
 }

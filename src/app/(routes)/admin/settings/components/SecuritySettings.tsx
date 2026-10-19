@@ -1,15 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, Shield } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, Check, Shield } from 'lucide-react';
+import { Alert, Button, Switch } from '@/components/admin/ui';
+import { type SettingsData } from '../services/settingsService';
+import { PanelFooter, PanelHeader, PanelSection } from './SettingsPanel';
 
 interface SecuritySettingsProps {
-  settings: any;
-  onUpdate: (data: any) => void;
+  settings: SettingsData;
+  onUpdate: (data: Partial<SettingsData>) => Promise<boolean>;
   isLoading?: boolean;
 }
 
@@ -18,68 +17,58 @@ export default function SecuritySettings({ settings, onUpdate, isLoading }: Secu
     twoFactorAuth: settings?.twoFactorAuth ?? false,
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Keep the form in sync after a save or a reset to defaults.
+  useEffect(() => {
+    setFormData({ twoFactorAuth: settings?.twoFactorAuth ?? false });
+  }, [settings]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdate(formData);
+    await onUpdate(formData);
   };
 
-  const handleToggle = (field: string, value: boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleToggle = (field: 'twoFactorAuth', value: boolean) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  const dirty = formData.twoFactorAuth !== (settings?.twoFactorAuth ?? false);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          Security Settings
-        </CardTitle>
-        <CardDescription>
-          Manage your account security and authentication preferences
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium flex items-center gap-2">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <PanelSection>
+        <PanelHeader icon={Shield} title="Security Settings" description="Manage your account security and authentication preferences" />
+        <div className="space-y-4">
+          <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+            <Switch
+              id="twoFactorAuth"
+              checked={formData.twoFactorAuth}
+              onChange={(checked) => handleToggle('twoFactorAuth', checked)}
+              label={
+                <span className="inline-flex items-center gap-2">
                   Two-Factor Authentication
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Add an extra layer of security to your account with 2FA
-                </p>
-              </div>
-              <Switch
-                checked={formData.twoFactorAuth}
-                onCheckedChange={(checked) => handleToggle('twoFactorAuth', checked)}
-              />
-            </div>
-
-            {formData.twoFactorAuth && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start gap-2">
-                  <Shield className="h-4 w-4 text-blue-600 mt-0.5" />
-                  <div className="text-sm text-blue-800">
-                    <p className="font-medium">Two-Factor Authentication Enabled</p>
-                    <p className="mt-1">
-                      Your account is now protected with 2FA. You'll need to enter a verification code
-                      from your authenticator app when signing in.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+                  <AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden />
+                </span>
+              }
+              description="Add an extra layer of security to your account with 2FA"
+              className="px-4 py-4"
+            />
           </div>
 
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+          {formData.twoFactorAuth && (
+            <Alert tone="info" title="Two-Factor Authentication Enabled">
+              Your account is now protected with 2FA. You&apos;ll need to enter a verification code from your authenticator app
+              when signing in.
+            </Alert>
+          )}
+        </div>
+      </PanelSection>
+
+      <PanelFooter>
+        {dirty && <p className="text-xs text-stone-500 sm:mr-auto">You have unsaved changes</p>}
+        <Button type="submit" loading={isLoading} loadingText="Saving..." leftIcon={<Check className="h-4 w-4" />}>
+          Save Changes
+        </Button>
+      </PanelFooter>
+    </form>
   );
 }

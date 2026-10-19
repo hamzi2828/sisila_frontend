@@ -1,72 +1,61 @@
 // src/app/(routes)/admin/products/page.tsx
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { FiPlus } from 'react-icons/fi';
-import Tabs from './components/Tabs';
+import { Plus } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import {
+  AdminPage,
+  Button,
+  ButtonLink,
+  Card,
+  ConfirmDialog,
+  PageHeader,
+} from '@/components/admin/ui';
+import Tabs, { PRODUCT_TAB_KEYS, type ProductsTabKey } from './components/Tabs';
 import AllProducts, { type Product } from './components/AllProducts';
+import { ProductStats, type ProductStatusFilter } from './components/all_products';
 import CategoriesTab, { type Category, type CategoryWithCount } from './components/CategoriesTab';
 import ColorsSizesTab from './components/ColorsSizesTab';
 import CategoryModal, { type CategoryInput } from './components/CategoryModal';
 import { categoryService } from './services/categoryService';
-import { slugify } from './services/productCreateService';
 import { productService } from './services/productService';
-import { toast } from 'react-hot-toast';
 
 const ProductsPage = () => {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'all' | 'categories' | 'attributes'>('all');
+  const [activeTab, setActiveTab] = useState<ProductsTabKey>('all');
+  const [statusFilter, setStatusFilter] = useState<ProductStatusFilter>('all');
 
   // Products state
   const [products, setProducts] = useState<Product[]>([]);
-  const [prodLoading, setProdLoading] = useState(false);
+  const [prodLoading, setProdLoading] = useState(true);
   const [prodError, setProdError] = useState<string | null>(null);
 
   // Categories state (dynamic from API)
   const [categories, setCategories] = useState<Category[]>([]);
-  const [catLoading, setCatLoading] = useState(false);
+  const [catLoading, setCatLoading] = useState(true);
   const [catError, setCatError] = useState<string | null>(null);
 
-  // Toast state
-  const [toast, setToast] = useState<{ show: boolean; msg: string; type: 'success' | 'error' | 'info' }>({
-    show: false,
-    msg: '',
-    type: 'success',
-  });
-  const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ show: true, msg, type });
-    setTimeout(() => setToast({ show: false, msg: '', type }), 2500);
-  };
+  // Delete confirmations
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState(false);
 
+  // Open the tab requested in the URL (e.g. /admin/products?tab=attributes from the product form)
   useEffect(() => {
-    const load = async () => {
-      setCatLoading(true);
-      setCatError(null);
-      try {
-        const list = await categoryService.listCategories();
-        setCategories(list as unknown as Category[]);
-      } catch (e) {
-        console.error('Failed to load categories', e);
-        // Fallback seed from product categories so UI still works
-        const unique = Array.from(new Set(products.map((p) => p.category)));
-        setCategories(
-          unique.map((name, i) => ({
-            id: `c-${i + 1}`,
-            name,
-            slug: slugify(name),
-            description: '',
-            active: true,
-          }))
-        );
-        setCatError('Could not fetch categories from server. Using local fallback.');
-      } finally {
-        setCatLoading(false);
-      }
-    };
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab && (PRODUCT_TAB_KEYS as string[]).includes(tab)) setActiveTab(tab as ProductsTabKey);
   }, []);
+
+  const changeTab = (key: ProductsTabKey) => {
+    setActiveTab(key);
+    const url = new URL(window.location.href);
+    if (key === 'all') url.searchParams.delete('tab');
+    else url.searchParams.set('tab', key);
+    window.history.replaceState(window.history.state, '', url.pathname + url.search);
+  };
 
   // Loader to fetch products
   const loadProducts = useCallback(async () => {
@@ -83,36 +72,33 @@ const ProductsPage = () => {
     }
   }, []);
 
-  // Load products on mount
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
+  const loadCategories = useCallback(async () => {
+    setCatLoading(true);
+    setCatError(null);
+    try {
+      const list = await categoryService.listCategories();
+      setCategories(list as unknown as Category[]);
+    } catch (e) {
+      console.error('Failed to load categories', e);
+      setCatError('Could not fetch categories from server.');
+    } finally {
+      setCatLoading(false);
+    }
+  }, []);
 
-  // Refetch whenever switching to the All Products tab
+  // Load both lists once (stats + tab counts), then refetch whenever the
+  // All Products / Categories tab is opened again.
+  const loaded = useRef({ products: false, categories: false });
   useEffect(() => {
-    if (activeTab === 'all') {
+    if (activeTab === 'all' || !loaded.current.products) {
+      loaded.current.products = true;
       loadProducts();
     }
-  }, [activeTab, loadProducts]);
-
-  // Refetch categories when switching to the Categories tab
-  useEffect(() => {
-    const loadCategories = async () => {
-      if (activeTab !== 'categories') return;
-      setCatLoading(true);
-      setCatError(null);
-      try {
-        const list = await categoryService.listCategories();
-        setCategories(list as unknown as Category[]);
-      } catch (e) {
-        console.error('Failed to load categories', e);
-        setCatError('Could not fetch categories from server.');
-      } finally {
-        setCatLoading(false);
-      }
-    };
-    loadCategories();
-  }, [activeTab]);
+    if (activeTab === 'categories' || !loaded.current.categories) {
+      loaded.current.categories = true;
+      loadCategories();
+    }
+  }, [activeTab, loadProducts, loadCategories]);
 
   const categoriesWithCount: CategoryWithCount[] = useMemo(
     () =>
@@ -130,19 +116,26 @@ const ProductsPage = () => {
     [categories, products]
   );
 
-  // Calculate active and inactive product counts
-  const productCounts = useMemo(() => {
-    const activeCount = products.filter(p => p.status === 'published').length;
-    const inactiveCount = products.filter(p => p.status === 'draft').length;
-    return { active: activeCount, inactive: inactiveCount, total: products.length };
-  }, [products]);
-
-  
-
   // Category modal state and handlers
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [categoryModalMode, setCategoryModalMode] = useState<'create' | 'edit'>('create');
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+
+  // Memoised so the modal doesn't reset its fields on unrelated re-renders
+  const categoryModalInitial = useMemo<Partial<CategoryInput> | undefined>(
+    () =>
+      editingCategory
+        ? {
+            name: editingCategory.name,
+            description: editingCategory.description,
+            active: editingCategory.active,
+            featured: editingCategory.featured,
+            thumbnailUrl: editingCategory.thumbnailUrl,
+            bannerUrl: editingCategory.bannerUrl,
+          }
+        : undefined,
+    [editingCategory]
+  );
 
   const openCreateCategory = () => {
     setEditingCategory(null);
@@ -162,27 +155,33 @@ const ProductsPage = () => {
       if (categoryModalMode === 'create') {
         const created = await categoryService.createCategory(data);
         setCategories((prev) => [(created as unknown as Category), ...prev]);
+        toast.success('Category created');
       } else if (editingCategory) {
         const updated = await categoryService.updateCategory(editingCategory.id, data);
         setCategories((prev) => prev.map((c) => (c.id === editingCategory.id ? ((updated as unknown as Category)) : c)));
+        toast.success('Category updated');
       }
+      setCategoryModalOpen(false);
     } catch (e) {
       console.error('Failed to save category', e);
       toast.error('Failed to save category');
-    } finally {
-      setCategoryModalOpen(false);
     }
   };
 
-  const handleDeleteCategory = async (id: string) => {
-    const prev = categories;
-    setCategories((p) => p.filter((c) => c.id !== id));
+  const handleDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    const { id, name } = categoryToDelete;
+    setDeletingCategory(true);
     try {
       await categoryService.deleteCategory(id);
+      setCategories((p) => p.filter((c) => c.id !== id));
+      toast.success(`Category "${name}" deleted`);
+      setCategoryToDelete(null);
     } catch (e) {
       console.error('Failed to delete category', e);
-      setCategories(prev);
       toast.error('Failed to delete category');
+    } finally {
+      setDeletingCategory(false);
     }
   };
 
@@ -193,6 +192,7 @@ const ProductsPage = () => {
     setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, active: nextActive } : c)));
     try {
       await categoryService.setActive(id, nextActive);
+      toast.success(`"${target.name}" is now ${nextActive ? 'active' : 'inactive'}`);
     } catch (e) {
       console.error('Failed to update category status', e);
       // revert on error
@@ -208,6 +208,7 @@ const ProductsPage = () => {
     setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, featured: nextFeatured } : c)));
     try {
       await categoryService.setFeatured(id, nextFeatured);
+      toast.success(nextFeatured ? `"${target.name}" marked as featured` : `"${target.name}" removed from featured`);
     } catch (e) {
       console.error('Failed to update category featured status', e);
       // revert on error
@@ -221,20 +222,22 @@ const ProductsPage = () => {
     router.push(`/admin/products/edit/${id}`);
   };
 
-  // Delete product with confirm, optimistic UI, and refetch
-  const handleDeleteProduct = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
-    const prev = products;
-    setProducts((p) => p.filter((x) => x.id !== id));
+  // Delete product (after ConfirmDialog), then refetch
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    const { id, name } = productToDelete;
+    setDeletingProduct(true);
     try {
       await productService.deleteProduct(id);
-      await loadProducts();
-      showToast('Product deleted successfully', 'success');
+      setProducts((p) => p.filter((x) => x.id !== id));
+      setProductToDelete(null);
+      toast.success(`"${name}" deleted`);
+      loadProducts();
     } catch (e) {
       console.error('Failed to delete product', e);
-      setProducts(prev);
-      showToast('Failed to delete product', 'error');
       toast.error('Failed to delete product');
+    } finally {
+      setDeletingProduct(false);
     }
   };
 
@@ -244,11 +247,11 @@ const ProductsPage = () => {
     setProducts((p) => p.map((x) => x.id === id ? { ...x, status: newStatus } : x));
     try {
       await productService.toggleProductStatus(id, newStatus);
-      showToast(`Product ${newStatus === 'published' ? 'published' : 'unpublished'} successfully`, 'success');
+      toast.success(`Product ${newStatus === 'published' ? 'published' : 'moved to draft'}`);
     } catch (e) {
       console.error('Failed to toggle product status', e);
       setProducts(prev);
-      showToast('Failed to update product status', 'error');
+      toast.error('Failed to update product status');
     }
   };
 
@@ -260,122 +263,135 @@ const ProductsPage = () => {
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, featured: nextFeatured } : p)));
     try {
       await productService.toggleFeatured(id, nextFeatured);
-      showToast(`Product ${nextFeatured ? 'marked as featured' : 'removed from featured'} successfully`, 'success');
+      toast.success(nextFeatured ? 'Product marked as featured' : 'Product removed from featured');
     } catch (e) {
       console.error('Failed to toggle product featured status', e);
       // revert on error
       setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, featured: !nextFeatured } : p)));
-      showToast('Failed to update product featured status', 'error');
+      toast.error('Failed to update product featured status');
     }
   };
 
-  return (
-    <div className="space-y-6 overflow-x-hidden">
-      {toast.show && (
-        <div
-          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow ${
-            toast.type === 'success'
-              ? 'bg-green-50 text-gray-800 border-l-4 border-green-400'
-              : toast.type === 'error'
-              ? 'bg-red-50 text-red-700 border-l-4 border-red-500'
-              : 'bg-blue-50 text-blue-700 border-l-4 border-blue-500'
-          }`}
-        >
-          <div className="flex items-center">
-            <span className="font-medium">{toast.msg}</span>
-            <button onClick={() => setToast({ show: false, msg: '', type: toast.type })} className="ml-3 text-gray-400 hover:text-gray-600">
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage your product inventory and listings</p>
-        </div>
-        {activeTab === 'categories' ? (
-          <button
-            onClick={openCreateCategory}
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <FiPlus className="-ml-1 mr-2 h-5 w-5" />
-            Add Category
-          </button>
-        ) : (
-          <button
-            onClick={() => router.push('/admin/products/create')}
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <FiPlus className="-ml-1 mr-2 h-5 w-5" />
-            Add Product
-          </button>
-        )}
-      </div>
+  const headerActions =
+    activeTab === 'categories' ? (
+      <Button onClick={openCreateCategory} leftIcon={<Plus className="h-4 w-4" />}>
+        <span className="hidden sm:inline">Add category</span>
+        <span className="sm:hidden">Add</span>
+      </Button>
+    ) : (
+      <ButtonLink href="/admin/products/create" leftIcon={<Plus className="h-4 w-4" />}>
+        <span className="hidden sm:inline">Add product</span>
+        <span className="sm:hidden">Add</span>
+      </ButtonLink>
+    );
 
-      <Tabs
-        tabs={[
-          {
-            key: 'all',
-            label: 'All Products',
-            count: productCounts.total,
-            additionalInfo: `${productCounts.active} Active • ${productCounts.inactive} Inactive`
-          },
-          { key: 'categories', label: 'Categories', count: categories.length },
-          { key: 'attributes', label: 'Colors & Sizes' },
-        ]}
-        activeKey={activeTab}
-        onChange={(key) => setActiveTab(key as 'all' | 'categories' | 'attributes')}
+  return (
+    <AdminPage>
+      <PageHeader
+        title="Products"
+        subtitle="Manage your catalogue, categories, colors and sizes"
+        actions={headerActions}
       />
 
-      {catError && (
-        <div className="rounded-md bg-yellow-50 p-4 border border-yellow-200">
-          <p className="text-sm text-yellow-800">{catError}</p>
-        </div>
-      )}
+      {/* Stats (status tiles act as quick filters) */}
+      <ProductStats
+        products={products}
+        loading={prodLoading && products.length === 0}
+        statusFilter={statusFilter}
+        highlight={activeTab === 'all'}
+        onStatusSelect={(status) => {
+          setStatusFilter(status);
+          if (activeTab !== 'all') changeTab('all');
+        }}
+      />
 
-      {activeTab === 'all' && (
-        <AllProducts
-          products={products}
-          onEdit={handleEditProduct}
-          onDelete={handleDeleteProduct}
-          onToggleStatus={handleToggleProductStatus}
-          onToggleFeatured={handleToggleFeaturedProduct}
-          loading={prodLoading}
-          error={prodError}
+      <Card padding="none" className="overflow-hidden">
+        <Tabs
+          value={activeTab}
+          onChange={changeTab}
+          productCount={prodLoading && products.length === 0 ? undefined : products.length}
+          categoryCount={catLoading && categories.length === 0 ? undefined : categories.length}
         />
-      )}
-      {activeTab === 'categories' && (
-        catLoading ? (
-          <div className="bg-white shadow sm:rounded-lg px-4 py-5 sm:p-6 text-sm text-gray-500">Loading categories…</div>
-        ) : (
+
+        {activeTab === 'all' && (
+          <AllProducts
+            products={products}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            onEdit={handleEditProduct}
+            onDelete={(id) => setProductToDelete(products.find((p) => p.id === id) ?? null)}
+            onToggleStatus={handleToggleProductStatus}
+            onToggleFeatured={handleToggleFeaturedProduct}
+            onRetry={loadProducts}
+            loading={prodLoading}
+            error={prodError}
+          />
+        )}
+        {activeTab === 'categories' && (
           <CategoriesTab
             categories={categoriesWithCount}
+            loading={catLoading}
+            error={catError}
+            onRetry={loadCategories}
+            onCreate={openCreateCategory}
             onEdit={openEditCategory}
-            onDelete={handleDeleteCategory}
+            onDelete={(id) => setCategoryToDelete(categories.find((c) => c.id === id) ?? null)}
             onToggleActive={handleToggleActiveCategory}
             onToggleFeatured={handleToggleFeaturedCategory}
           />
-        )
-      )}
-      {activeTab === 'attributes' && (
-        <ColorsSizesTab />
-      )}
+        )}
+        {activeTab === 'attributes' && <ColorsSizesTab />}
+      </Card>
 
       <CategoryModal
         open={categoryModalOpen}
         mode={categoryModalMode}
-        initial={editingCategory ? { 
-          name: editingCategory.name, 
-          description: editingCategory.description, 
-          active: editingCategory.active,
-          thumbnailUrl: editingCategory.thumbnailUrl,
-          bannerUrl: editingCategory.bannerUrl
-        } : undefined}
+        initial={categoryModalInitial}
         onClose={() => setCategoryModalOpen(false)}
         onSubmit={handleSubmitCategory}
       />
-    </div>
+
+      <ConfirmDialog
+        open={!!productToDelete}
+        title="Delete product?"
+        message={
+          productToDelete ? (
+            <>
+              <span className="font-semibold text-stone-900">{productToDelete.name}</span> will be permanently removed
+              from the catalogue and the storefront. This can&apos;t be undone.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete product"
+        loading={deletingProduct}
+        onCancel={() => setProductToDelete(null)}
+        onConfirm={handleDeleteProduct}
+      />
+
+      <ConfirmDialog
+        open={!!categoryToDelete}
+        title="Delete category?"
+        message={
+          categoryToDelete ? (
+            <>
+              <span className="font-semibold text-stone-900">{categoryToDelete.name}</span> will be permanently
+              deleted.
+              {(() => {
+                const count = products.filter((p) => p.category === categoryToDelete.name).length;
+                return count > 0
+                  ? ` ${count} ${count === 1 ? 'product uses' : 'products use'} this category and will keep its name until you reassign ${count === 1 ? 'it' : 'them'}.`
+                  : '';
+              })()}{' '}
+              This can&apos;t be undone.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete category"
+        loading={deletingCategory}
+        onCancel={() => setCategoryToDelete(null)}
+        onConfirm={handleDeleteCategory}
+      />
+    </AdminPage>
   );
 };
 

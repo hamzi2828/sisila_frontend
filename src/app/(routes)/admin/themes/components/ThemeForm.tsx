@@ -1,8 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { FiX, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { Eye, FileText, Image as ImageIcon, Images, Palette, Save } from 'lucide-react';
+import { Button, FormField, Input, Section, Switch, Textarea } from '@/components/admin/ui';
 import { type Theme, type ThemeInput, type GalleryImage } from '../services/themeAdminService';
+import { AccentField, DEFAULT_ACCENT } from './collection/AccentField';
+import { CoverImageField } from './collection/CoverImageField';
+import { GalleryEditor } from './collection/GalleryEditor';
+import { focusFirstError } from './collection/focusFirstError';
 
 interface ThemeFormProps {
   theme?: Theme;
@@ -11,6 +16,11 @@ interface ThemeFormProps {
   loading?: boolean;
 }
 
+// Mirrors sisila_backend/src/models/themeModel.js
+const LIMITS = { title: 100, tagline: 200, description: 500, galleryMin: 4, galleryMax: 12 };
+
+const counter = (value: string, max: number) => `${value.length}/${max}`;
+
 export default function ThemeForm({ theme, onSubmit, onCancel, loading = false }: ThemeFormProps) {
   const [formData, setFormData] = useState<ThemeInput>({
     id: theme?.id || '',
@@ -18,49 +28,46 @@ export default function ThemeForm({ theme, onSubmit, onCancel, loading = false }
     tagline: theme?.tagline || '',
     description: theme?.description || '',
     cover: theme?.cover || '',
-    accent: theme?.accent || 'from-stone-900/90 to-stone-500/10',
+    accent: theme?.accent || DEFAULT_ACCENT,
     gallery: theme?.gallery || [],
     isActive: theme?.isActive ?? true,
-    order: theme?.order || 0
+    order: theme?.order || 0,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    const checked = (e.target as HTMLInputElement).checked;
+  const clearError = (key: string) => {
+    if (errors[key]) setErrors((prev) => ({ ...prev, [key]: '' }));
+  };
 
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : type === 'number' ? parseInt(value) || 0 : value
-    }));
-
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
+  const setField = <K extends keyof ThemeInput>(field: K, value: ThemeInput[K]) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    clearError(field as string);
   };
 
   const handleAddGalleryImage = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      gallery: [...prev.gallery, { title: '', image: '' }]
+      gallery: [...prev.gallery, { title: '', image: '' }],
     }));
+    clearError('gallery');
   };
 
   const handleRemoveGalleryImage = (index: number) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      gallery: prev.gallery.filter((_, i) => i !== index)
+      gallery: prev.gallery.filter((_, i) => i !== index),
     }));
+    // Indices shift after a removal, so per-image errors no longer line up.
+    setErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith('gallery-'))));
   };
 
   const handleGalleryImageChange = (index: number, field: keyof GalleryImage, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      gallery: prev.gallery.map((img, i) =>
-        i === index ? { ...img, [field]: value } : img
-      )
+      gallery: prev.gallery.map((img, i) => (i === index ? { ...img, [field]: value } : img)),
     }));
+    clearError(`gallery-${index}-${field}`);
   };
 
   const validateForm = (): boolean => {
@@ -88,8 +95,8 @@ export default function ThemeForm({ theme, onSubmit, onCancel, loading = false }
       newErrors.cover = 'Cover image URL is required';
     }
 
-    if (formData.gallery.length < 4 || formData.gallery.length > 12) {
-      newErrors.gallery = 'Gallery must contain between 4 and 12 images';
+    if (formData.gallery.length < LIMITS.galleryMin || formData.gallery.length > LIMITS.galleryMax) {
+      newErrors.gallery = `Gallery must contain between ${LIMITS.galleryMin} and ${LIMITS.galleryMax} images`;
     }
 
     formData.gallery.forEach((img, index) => {
@@ -109,267 +116,160 @@ export default function ThemeForm({ theme, onSubmit, onCancel, loading = false }
     e.preventDefault();
 
     if (!validateForm()) {
+      focusFirstError();
       return;
     }
 
     try {
       await onSubmit(formData);
     } catch (error) {
+      // The page shows the backend's error message in a toast; keep the form open.
       console.error('Form submission error:', error);
     }
   };
 
   return (
-    <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-      <div className="px-4 py-5 sm:p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
-            {theme ? 'Edit Theme' : 'Create Theme'}
-          </h3>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <FiX className="h-6 w-6" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column */}
-            <div className="space-y-6">
-              {/* Theme ID */}
-              <div>
-                <label htmlFor="id" className="block text-sm font-medium text-gray-700">
-                  Theme ID <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="id"
+    <form onSubmit={handleSubmit} noValidate className="space-y-4 sm:space-y-6">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
+        {/* Main column */}
+        <div className="space-y-4 sm:space-y-6 lg:col-span-2">
+          <Section title="Basic information" subtitle="How this theme is introduced on the storefront" icon={<FileText className="h-5 w-5" />}>
+            <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2">
+              <FormField
+                label="Theme ID"
+                htmlFor="id"
+                required
+                error={errors.id}
+                hint={theme ? "The ID can't be changed after the theme is created." : 'Lowercase letters, numbers and dashes, e.g. southeastern-hymns.'}
+              >
+                <Input
                   id="id"
                   value={formData.id}
-                  onChange={handleInputChange}
+                  onChange={(e) => setField('id', e.target.value)}
                   disabled={!!theme}
-                  className={`mt-1 block w-full rounded-md border ${
-                    errors.id ? 'border-red-300' : 'border-gray-300'
-                  } px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100`}
+                  invalid={!!errors.id}
                   placeholder="southeastern-hymns"
+                  className="font-mono"
+                  spellCheck={false}
+                  autoComplete="off"
                 />
-                {errors.id && <p className="mt-1 text-sm text-red-600">{errors.id}</p>}
-              </div>
+              </FormField>
 
-              {/* Title */}
-              <div>
-                <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                  Title <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="title"
+              <FormField label="Title" htmlFor="title" required error={errors.title} hint={counter(formData.title, LIMITS.title)}>
+                <Input
                   id="title"
                   value={formData.title}
-                  onChange={handleInputChange}
-                  className={`mt-1 block w-full rounded-md border ${
-                    errors.title ? 'border-red-300' : 'border-gray-300'
-                  } px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500`}
+                  onChange={(e) => setField('title', e.target.value)}
+                  maxLength={LIMITS.title}
+                  invalid={!!errors.title}
                   placeholder="Southeastern Hymns"
                 />
-                {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
-              </div>
+              </FormField>
 
-              {/* Tagline */}
-              <div>
-                <label htmlFor="tagline" className="block text-sm font-medium text-gray-700">
-                  Tagline <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="tagline"
+              <FormField
+                label="Tagline"
+                htmlFor="tagline"
+                required
+                error={errors.tagline}
+                hint={counter(formData.tagline, LIMITS.tagline)}
+                className="md:col-span-2"
+              >
+                <Input
                   id="tagline"
                   value={formData.tagline}
-                  onChange={handleInputChange}
-                  className={`mt-1 block w-full rounded-md border ${
-                    errors.tagline ? 'border-red-300' : 'border-gray-300'
-                  } px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500`}
+                  onChange={(e) => setField('tagline', e.target.value)}
+                  maxLength={LIMITS.tagline}
+                  invalid={!!errors.tagline}
                   placeholder="Regional heritage, harmony, and timeless song."
                 />
-                {errors.tagline && <p className="mt-1 text-sm text-red-600">{errors.tagline}</p>}
-              </div>
+              </FormField>
 
-              {/* Description */}
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                  Description <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  name="description"
+              <FormField
+                label="Description"
+                htmlFor="description"
+                required
+                error={errors.description}
+                hint={counter(formData.description, LIMITS.description)}
+                className="md:col-span-2"
+              >
+                <Textarea
                   id="description"
                   rows={4}
                   value={formData.description}
-                  onChange={handleInputChange}
-                  className={`mt-1 block w-full rounded-md border ${
-                    errors.description ? 'border-red-300' : 'border-gray-300'
-                  } px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500`}
+                  onChange={(e) => setField('description', e.target.value)}
+                  maxLength={LIMITS.description}
+                  invalid={!!errors.description}
                   placeholder="A warm tribute to Southern roots..."
+                  className="resize-y"
                 />
-                {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
-              </div>
+              </FormField>
             </div>
+          </Section>
 
-            {/* Right Column */}
-            <div className="space-y-6">
-              {/* Cover Image */}
-              <div>
-                <label htmlFor="cover" className="block text-sm font-medium text-gray-700">
-                  Cover Image URL <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="cover"
-                  id="cover"
-                  value={formData.cover}
-                  onChange={handleInputChange}
-                  className={`mt-1 block w-full rounded-md border ${
-                    errors.cover ? 'border-red-300' : 'border-gray-300'
-                  } px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500`}
-                  placeholder="https://..."
+          <Section
+            title="Gallery"
+            subtitle={`${LIMITS.galleryMin}–${LIMITS.galleryMax} images shown with this theme on the storefront`}
+            icon={<Images className="h-5 w-5" />}
+          >
+            <div data-field-error={errors.gallery ? 'true' : undefined}>
+              {errors.gallery && (
+                <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errors.gallery}</p>
+              )}
+              <GalleryEditor
+                items={formData.gallery}
+                onAdd={handleAddGalleryImage}
+                onRemove={handleRemoveGalleryImage}
+                onChangeItem={handleGalleryImageChange}
+                errors={errors}
+                min={LIMITS.galleryMin}
+                max={LIMITS.galleryMax}
+              />
+            </div>
+          </Section>
+        </div>
+
+        {/* Side column */}
+        <div className="space-y-4 sm:space-y-6">
+          <Section title="Cover image" icon={<ImageIcon className="h-5 w-5" />}>
+            <CoverImageField value={formData.cover} onChange={(v) => setField('cover', v)} error={errors.cover} />
+          </Section>
+
+          <Section title="Accent" subtitle="Gradient behind the title on the storefront" icon={<Palette className="h-5 w-5" />}>
+            <AccentField value={formData.accent || ''} onChange={(v) => setField('accent', v)} previewTitle={formData.title} />
+          </Section>
+
+          <Section title="Visibility" icon={<Eye className="h-5 w-5" />}>
+            <div className="space-y-5">
+              <FormField label="Display order" htmlFor="order" hint="Lower numbers appear first. Leave 0 on a new theme to add it at the end.">
+                <Input
+                  id="order"
+                  type="number"
+                  min={0}
+                  value={formData.order}
+                  onChange={(e) => setField('order', Math.max(0, parseInt(e.target.value) || 0))}
                 />
-                {errors.cover && <p className="mt-1 text-sm text-red-600">{errors.cover}</p>}
-                {formData.cover && (
-                  <img src={formData.cover} alt="Cover preview" className="mt-2 h-32 w-full object-cover rounded" />
-                )}
-              </div>
-
-              {/* Accent */}
-              <div>
-                <label htmlFor="accent" className="block text-sm font-medium text-gray-700">
-                  Accent Gradient (Tailwind classes)
-                </label>
-                <input
-                  type="text"
-                  name="accent"
-                  id="accent"
-                  value={formData.accent}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  placeholder="from-amber-900/90 to-amber-500/10"
-                />
-              </div>
-
-              {/* Order & Active */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="order" className="block text-sm font-medium text-gray-700">
-                    Order
-                  </label>
-                  <input
-                    type="number"
-                    name="order"
-                    id="order"
-                    min="0"
-                    value={formData.order}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div className="flex items-end">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      name="isActive"
-                      checked={formData.isActive}
-                      onChange={handleInputChange}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                    <span className="ml-2 text-sm text-gray-900">Active</span>
-                  </label>
-                </div>
-              </div>
+              </FormField>
+              <Switch
+                id="isActive"
+                checked={!!formData.isActive}
+                onChange={(checked) => setField('isActive', checked)}
+                label="Active"
+                description="Show this theme on the storefront"
+              />
             </div>
-          </div>
-
-          {/* Gallery */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <label className="block text-sm font-medium text-gray-700">
-                Gallery Images <span className="text-red-500">*</span>
-                <span className="ml-2 text-xs text-gray-500">(4-12 images required)</span>
-              </label>
-              <button
-                type="button"
-                onClick={handleAddGalleryImage}
-                disabled={formData.gallery.length >= 12}
-                className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none disabled:opacity-50"
-              >
-                <FiPlus className="mr-1 h-3 w-3" />
-                Add Image
-              </button>
-            </div>
-
-            {errors.gallery && <p className="mb-2 text-sm text-red-600">{errors.gallery}</p>}
-
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {formData.gallery.map((img, index) => (
-                <div key={index} className="flex gap-2 p-3 border border-gray-200 rounded">
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div>
-                      <input
-                        type="text"
-                        value={img.title}
-                        onChange={(e) => handleGalleryImageChange(index, 'title', e.target.value)}
-                        className={`block w-full rounded-md border ${
-                          errors[`gallery-${index}-title`] ? 'border-red-300' : 'border-gray-300'
-                        } px-2 py-1 text-sm focus:border-indigo-500 focus:ring-indigo-500`}
-                        placeholder="Image title"
-                      />
-                    </div>
-                    <div>
-                      <input
-                        type="text"
-                        value={img.image}
-                        onChange={(e) => handleGalleryImageChange(index, 'image', e.target.value)}
-                        className={`block w-full rounded-md border ${
-                          errors[`gallery-${index}-image`] ? 'border-red-300' : 'border-gray-300'
-                        } px-2 py-1 text-sm focus:border-indigo-500 focus:ring-indigo-500`}
-                        placeholder="Image URL"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveGalleryImage(index)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
-                  >
-                    <FiTrash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-            >
-              {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>}
-              {theme ? 'Update Theme' : 'Create Theme'}
-            </button>
-          </div>
-        </form>
+          </Section>
+        </div>
       </div>
-    </div>
+
+      {/* Actions */}
+      <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-2 rounded-xl border border-stone-200 bg-white/95 p-3 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:p-4">
+        <Button variant="secondary" onClick={onCancel} disabled={loading}>
+          Cancel
+        </Button>
+        <Button type="submit" loading={loading} loadingText={theme ? 'Updating...' : 'Creating...'} leftIcon={<Save className="h-4 w-4" />}>
+          {theme ? 'Update Theme' : 'Create Theme'}
+        </Button>
+      </div>
+    </form>
   );
 }

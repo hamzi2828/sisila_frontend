@@ -1,8 +1,8 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { FiArrowLeft, FiSave, FiLoader } from "react-icons/fi";
+import { ArrowLeft, BarChart3, Calendar, Eye, RefreshCw } from "lucide-react";
+import { ConfirmDialog, StatusBadge } from "@/components/admin/ui";
 import BlogForm, { BlogFormData } from "./BlogForm";
-import { toast } from "react-hot-toast";
 import { Blog } from "./AllBlogs";
 
 interface EditBlogProps {
@@ -11,47 +11,44 @@ interface EditBlogProps {
   onCancel: () => void;
 }
 
+const formatDate = (value?: string, fallback = "Unknown") =>
+  value ? new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : fallback;
+
 export default function EditBlog({ blog, onUpdate, onCancel }: EditBlogProps) {
-  const [isUpdating, setIsUpdating] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-console.log(blog);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
   const handleBlogUpdated = (updatedBlog: BlogFormData) => {
-    setIsUpdating(true);
-    
-    setTimeout(() => {
-      toast.success(`Blog "${updatedBlog.title}" has been updated successfully!`);
-      
-      // Transform the updated blog to match the Blog interface
-      const transformedBlog: Blog = {
-        id: updatedBlog.id!,
-        title: updatedBlog.title,
-        content: updatedBlog.content,
-        category: updatedBlog.category || blog.category,
-        categoryId: updatedBlog.categoryId,
-        status: updatedBlog.status,
-        image: updatedBlog.image,
-        thumbnail: updatedBlog.thumbnail,
-        slug: updatedBlog.slug,
-        views: blog.views,
-        tags: updatedBlog.tags,
-        createdAt: blog.createdAt,
-        updatedAt: new Date().toISOString(),
-        author: {
-          _id: updatedBlog.authorId,
-          name: updatedBlog.authorName
-        }
-      };
-      
-      onUpdate(transformedBlog);
-    }, 500);
+    // Transform the updated blog to match the Blog interface
+    const transformedBlog: Blog = {
+      id: updatedBlog.id!,
+      title: updatedBlog.title,
+      content: updatedBlog.content,
+      category: updatedBlog.category || blog.category,
+      categoryId: updatedBlog.categoryId,
+      status: updatedBlog.status,
+      featured: blog.featured,
+      image: updatedBlog.image,
+      thumbnail: updatedBlog.thumbnail,
+      slug: updatedBlog.slug,
+      views: blog.views,
+      tags: updatedBlog.tags,
+      createdAt: blog.createdAt,
+      updatedAt: new Date().toISOString(),
+      author: {
+        _id: updatedBlog.authorId,
+        name: updatedBlog.authorName
+      }
+    };
+
+    setHasChanges(false);
+    onUpdate(transformedBlog);
   };
 
   const handleCancel = () => {
     if (hasChanges) {
-      const confirmed = window.confirm(
-        "You have unsaved changes. Are you sure you want to cancel?"
-      );
-      if (!confirmed) return;
+      setConfirmLeave(true);
+      return;
     }
     onCancel();
   };
@@ -74,104 +71,93 @@ console.log(blog);
     };
   }, [hasChanges]);
 
+  const infoTiles = [
+    { label: "Created", value: formatDate(blog.createdAt), icon: Calendar },
+    { label: "Last Updated", value: formatDate(blog.updatedAt, "Never"), icon: RefreshCw },
+    { label: "Views", value: String(blog.views || 0), icon: Eye },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={handleCancel}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
-                disabled={isUpdating}
-              >
-                <FiArrowLeft className="mr-2 h-4 w-4" />
-                Back to Blogs
-              </button>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Edit Blog</h1>
-                <p className="text-sm text-gray-600 mt-1">
-                  Editing: <span className="font-medium">{blog.title}</span>
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {hasChanges && (
-                <div className="flex items-center space-x-2 text-sm text-amber-600">
-                  <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                  <span>Unsaved changes</span>
-                </div>
-              )}
-              
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <FiSave className="h-4 w-4" />
-                <span>Auto-save enabled</span>
-              </div>
-            </div>
+    <>
+      {/* Header (same shape as PageHeader, with a back button that checks for unsaved changes) */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={handleCancel}
+            aria-label="Back to blogs"
+            title="Back to blogs"
+            className="shrink-0 rounded-lg p-2 text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-stone-900 sm:text-2xl">Edit Blog</h1>
+            <p className="mt-0.5 truncate text-xs text-stone-500 sm:mt-1 sm:text-sm">
+              Editing: <span className="font-medium text-stone-700">{blog.title}</span>
+            </p>
           </div>
         </div>
-
-        {/* Progress Indicator */}
-        {isUpdating && (
-          <div className="mb-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <FiLoader className="animate-spin rounded-full h-5 w-5 text-blue-600 mr-3" />
-                <p className="text-blue-700">Updating blog...</p>
-              </div>
-            </div>
-          </div>
+        {hasChanges && (
+          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" aria-hidden />
+            Unsaved changes
+          </span>
         )}
+      </div>
 
-        {/* Main Form Section */}
-        <div className="bg-white shadow-xl rounded-lg overflow-hidden">
-          <BlogForm 
-            mode="edit"
-            initialData={{
-              ...blog,
-              author: blog.author || { _id: "", name: "" }
-            }}
-            onSubmit={handleBlogUpdated}
-            onChangeDetected={setHasChanges}
-          />
-        </div>
+      <BlogForm
+        mode="edit"
+        initialData={{
+          ...blog,
+          author: blog.author || { _id: "", name: "" }
+        }}
+        onSubmit={handleBlogUpdated}
+        onChangeDetected={setHasChanges}
+        onCancel={handleCancel}
+      />
 
-        {/* Blog Info Section */}
-        <div className="mt-8 bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Blog Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <span className="text-gray-500">Created:</span>
-              <p className="font-medium">
-                {blog.createdAt ? new Date(blog.createdAt).toLocaleDateString() : 'Unknown'}
-              </p>
+      {/* Blog Information */}
+      <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-6">
+        <h3 className="mb-4 text-base font-semibold text-stone-900">Blog Information</h3>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
+          {infoTiles.map(({ label, value, icon: Icon }) => (
+            <div key={label} className="flex items-center gap-3 rounded-lg border border-stone-200 bg-stone-50 p-3">
+              <span className="rounded-lg bg-white p-2 text-stone-600 ring-1 ring-stone-200">
+                <Icon className="h-4 w-4" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-stone-500">{label}</p>
+                <p className="truncate text-sm font-medium text-stone-900">{value}</p>
+              </div>
             </div>
-            <div>
-              <span className="text-gray-500">Last Updated:</span>
-              <p className="font-medium">
-                {blog.updatedAt ? new Date(blog.updatedAt).toLocaleDateString() : 'Never'}
-              </p>
-            </div>
-            <div>
-              <span className="text-gray-500">Views:</span>
-              <p className="font-medium">{blog.views || 0}</p>
+          ))}
+          <div className="flex items-center gap-3 rounded-lg border border-stone-200 bg-stone-50 p-3">
+            <span className="rounded-lg bg-white p-2 text-stone-600 ring-1 ring-stone-200">
+              <BarChart3 className="h-4 w-4" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs text-stone-500">Status</p>
+              <StatusBadge status={blog.status} size="sm" className="mt-0.5" />
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="mt-8 flex items-center justify-between text-sm text-gray-500">
-          <p>
-            Need help? Check our{" "}
-            <a href="#" className="text-indigo-600 hover:text-indigo-500">
-              documentation
-            </a>
-          </p>
-          <p>Blog ID: {blog.id}</p>
-        </div>
+        <p className="mt-4 text-xs text-stone-400">Blog ID: {blog.id}</p>
       </div>
-    </div>
+
+      <ConfirmDialog
+        open={confirmLeave}
+        title="Discard unsaved changes?"
+        message="You have unsaved changes to this blog. If you leave now they will be lost."
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        onCancel={() => setConfirmLeave(false)}
+        onConfirm={() => {
+          setConfirmLeave(false);
+          setHasChanges(false);
+          onCancel();
+        }}
+      />
+    </>
   );
 }

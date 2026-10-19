@@ -1,7 +1,10 @@
 export { default as ProductStats } from './ProductStats';
+export type { ProductStatusFilter } from './ProductStats';
 export { default as ProductFilters } from './ProductFilters';
-export { default as ProductCard } from './ProductCard';
+export { default as ProductCard, ProductRow } from './ProductCard';
+export { default as ProductThumb } from './ProductThumb';
 export { default as ProductPagination } from './ProductPagination';
 export { default as EmptyState } from './EmptyState';
 export { default as LoadingState } from './LoadingState';
 export { default as ErrorState } from './ErrorState';
+export { resolveImageUrl, getProductImage } from './productImage';

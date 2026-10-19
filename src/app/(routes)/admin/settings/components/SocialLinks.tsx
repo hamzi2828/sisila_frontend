@@ -1,16 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Youtube, Facebook, Instagram, Globe, Link2 } from 'lucide-react';
+import { AlertCircle, Check, ExternalLink, Facebook, Instagram, Link2, Youtube } from 'lucide-react';
+import { Button, Input } from '@/components/admin/ui';
 import { SettingsData } from '../services/settingsService';
+import { PanelFooter, PanelHeader, PanelSection } from './SettingsPanel';
 
 interface SocialLinksProps {
   settings: SettingsData;
-  onUpdate: (data: Partial<SettingsData>) => Promise<void>;
+  onUpdate: (data: Partial<SettingsData>) => Promise<boolean>;
   isLoading: boolean;
 }
 
@@ -20,194 +18,138 @@ interface SocialLinksData {
   instagramUrl: string;
 }
 
-export default function SocialLinks({ settings, onUpdate, isLoading }: SocialLinksProps) {
-  const [socialLinks, setSocialLinks] = useState<SocialLinksData>({
-    youtubeUrl: '',
-    facebookUrl: '',
-    instagramUrl: '',
-  });
+const fromSettings = (settings?: SettingsData): SocialLinksData => ({
+  youtubeUrl: settings?.youtubeUrl || '',
+  facebookUrl: settings?.facebookUrl || '',
+  instagramUrl: settings?.instagramUrl || '',
+});
 
+const PLATFORMS: { id: keyof SocialLinksData; label: string; icon: typeof Youtube; placeholder: string }[] = [
+  { id: 'youtubeUrl', label: 'YouTube Channel', icon: Youtube, placeholder: 'https://youtube.com/@yourchannel' },
+  { id: 'facebookUrl', label: 'Facebook Page', icon: Facebook, placeholder: 'https://facebook.com/yourpage' },
+  { id: 'instagramUrl', label: 'Instagram Profile', icon: Instagram, placeholder: 'https://instagram.com/youraccount' },
+];
+
+const validateUrl = (url: string) => {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+export default function SocialLinks({ settings, onUpdate, isLoading }: SocialLinksProps) {
+  const [socialLinks, setSocialLinks] = useState<SocialLinksData>(() => fromSettings(settings));
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     if (settings) {
-      setSocialLinks({
-        youtubeUrl: (settings as any).youtubeUrl || '',
-        facebookUrl: (settings as any).facebookUrl || '',
-        instagramUrl: (settings as any).instagramUrl || '',
-      });
+      setSocialLinks(fromSettings(settings));
+      setHasChanges(false);
     }
   }, [settings]);
 
   const handleInputChange = (field: keyof SocialLinksData, value: string) => {
-    setSocialLinks(prev => ({
+    setSocialLinks((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
     setHasChanges(true);
   };
 
   const handleSave = async () => {
-    try {
-      await onUpdate(socialLinks);
-      setHasChanges(false);
-    } catch (error) {
-      console.error('Error saving social links:', error);
-    }
+    const ok = await onUpdate(socialLinks);
+    if (ok) setHasChanges(false);
   };
 
   const handleReset = () => {
-    setSocialLinks({
-      youtubeUrl: (settings as any).youtubeUrl || '',
-      facebookUrl: (settings as any).facebookUrl || '',
-      instagramUrl: (settings as any).instagramUrl || '',
-    });
+    setSocialLinks(fromSettings(settings));
     setHasChanges(false);
   };
 
-  const validateUrl = (url: string) => {
-    if (!url) return true;
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const getUrlPlaceholder = (platform: string) => {
-    switch (platform) {
-      case 'youtube':
-        return 'https://youtube.com/@yourchannel';
-      case 'facebook':
-        return 'https://facebook.com/yourpage';
-      case 'instagram':
-        return 'https://instagram.com/youraccount';
-      default:
-        return '';
-    }
-  };
+  const allValid = PLATFORMS.every((p) => validateUrl(socialLinks[p.id]));
+  const configured = PLATFORMS.filter((p) => socialLinks[p.id] && validateUrl(socialLinks[p.id]));
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Link2 className="h-5 w-5" />
-          Social Media Links
-        </CardTitle>
-        <CardDescription>
-          Add your social media profiles to display on your website
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="youtube" className="flex items-center gap-2">
-              <Youtube className="h-4 w-4 text-red-600" />
-              YouTube Channel
-            </Label>
-            <Input
-              id="youtube"
-              type="url"
-              placeholder={getUrlPlaceholder('youtube')}
-              value={socialLinks.youtubeUrl}
-              onChange={(e) => handleInputChange('youtubeUrl', e.target.value)}
-              className={!validateUrl(socialLinks.youtubeUrl) ? 'border-red-500' : ''}
-            />
-            {socialLinks.youtubeUrl && !validateUrl(socialLinks.youtubeUrl) && (
-              <p className="text-sm text-red-500">Please enter a valid URL</p>
-            )}
-          </div>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (hasChanges && allValid) handleSave();
+      }}
+      noValidate
+      className="space-y-6"
+    >
+      <PanelSection>
+        <PanelHeader icon={Link2} title="Social Media Links" description="Add your social media profiles to display on your website" />
 
-          <div className="space-y-2">
-            <Label htmlFor="facebook" className="flex items-center gap-2">
-              <Facebook className="h-4 w-4 text-blue-600" />
-              Facebook Page
-            </Label>
-            <Input
-              id="facebook"
-              type="url"
-              placeholder={getUrlPlaceholder('facebook')}
-              value={socialLinks.facebookUrl}
-              onChange={(e) => handleInputChange('facebookUrl', e.target.value)}
-              className={!validateUrl(socialLinks.facebookUrl) ? 'border-red-500' : ''}
-            />
-            {socialLinks.facebookUrl && !validateUrl(socialLinks.facebookUrl) && (
-              <p className="text-sm text-red-500">Please enter a valid URL</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="instagram" className="flex items-center gap-2">
-              <Instagram className="h-4 w-4 text-pink-600" />
-              Instagram Profile
-            </Label>
-            <Input
-              id="instagram"
-              type="url"
-              placeholder={getUrlPlaceholder('instagram')}
-              value={socialLinks.instagramUrl}
-              onChange={(e) => handleInputChange('instagramUrl', e.target.value)}
-              className={!validateUrl(socialLinks.instagramUrl) ? 'border-red-500' : ''}
-            />
-            {socialLinks.instagramUrl && !validateUrl(socialLinks.instagramUrl) && (
-              <p className="text-sm text-red-500">Please enter a valid URL</p>
-            )}
-          </div>
+        <div className="space-y-4">
+          {PLATFORMS.map((platform) => {
+            const Icon = platform.icon;
+            const value = socialLinks[platform.id];
+            const invalid = !!value && !validateUrl(value);
+            return (
+              <div key={platform.id}>
+                <label htmlFor={platform.id} className="mb-2 flex items-center gap-2 text-sm font-medium text-stone-700">
+                  <span className="rounded-md bg-stone-100 p-1">
+                    <Icon className="h-4 w-4 text-stone-700" />
+                  </span>
+                  {platform.label}
+                </label>
+                <Input
+                  id={platform.id}
+                  type="url"
+                  inputMode="url"
+                  placeholder={platform.placeholder}
+                  value={value}
+                  onChange={(e) => handleInputChange(platform.id, e.target.value)}
+                  invalid={invalid}
+                  suffix={invalid ? <AlertCircle className="h-5 w-5 text-red-500" /> : undefined}
+                />
+                {invalid && <p className="mt-1 text-xs text-red-600">Please enter a valid URL (starting with https://)</p>}
+              </div>
+            );
+          })}
         </div>
+      </PanelSection>
 
-        <div className="bg-muted/50 p-4 rounded-lg">
-          <h4 className="font-medium mb-2 flex items-center gap-2">
-            <Globe className="h-4 w-4" />
-            Preview
-          </h4>
-          <div className="flex gap-4">
-            {socialLinks.youtubeUrl && validateUrl(socialLinks.youtubeUrl) && (
-              <div className="flex items-center gap-2 text-sm">
-                <Youtube className="h-4 w-4 text-red-600" />
-                YouTube
-              </div>
-            )}
-            {socialLinks.facebookUrl && validateUrl(socialLinks.facebookUrl) && (
-              <div className="flex items-center gap-2 text-sm">
-                <Facebook className="h-4 w-4 text-blue-600" />
-                Facebook
-              </div>
-            )}
-            {socialLinks.instagramUrl && validateUrl(socialLinks.instagramUrl) && (
-              <div className="flex items-center gap-2 text-sm">
-                <Instagram className="h-4 w-4 text-pink-600" />
-                Instagram
-              </div>
-            )}
-            {!socialLinks.youtubeUrl && !socialLinks.facebookUrl && !socialLinks.instagramUrl && (
-              <p className="text-sm text-muted-foreground">No social links configured</p>
-            )}
+      <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 sm:p-5">
+        <h4 className="mb-3 text-sm font-medium text-stone-900">Preview</h4>
+        {configured.length > 0 ? (
+          <div className="flex flex-wrap gap-2 sm:gap-3">
+            {configured.map((platform) => {
+              const Icon = platform.icon;
+              return (
+                <a
+                  key={platform.id}
+                  href={socialLinks[platform.id]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 transition-colors hover:border-stone-300 hover:text-stone-900"
+                >
+                  <Icon className="h-4 w-4" />
+                  {platform.label.split(' ')[0]}
+                  <ExternalLink className="h-3.5 w-3.5 text-stone-400" />
+                </a>
+              );
+            })}
           </div>
-        </div>
-
-        {hasChanges && (
-          <div className="flex justify-between pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={handleReset}
-              disabled={isLoading}
-            >
-              Reset Changes
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={isLoading ||
-                !validateUrl(socialLinks.youtubeUrl) ||
-                !validateUrl(socialLinks.facebookUrl) ||
-                !validateUrl(socialLinks.instagramUrl)
-              }
-            >
-              {isLoading ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
+        ) : (
+          <p className="text-sm text-stone-500">No social links configured</p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+
+      {hasChanges && (
+        <PanelFooter className="sm:justify-between">
+          <Button variant="secondary" onClick={handleReset} disabled={isLoading}>
+            Discard Changes
+          </Button>
+          <Button type="submit" loading={isLoading} loadingText="Saving..." disabled={!allValid} leftIcon={<Check className="h-4 w-4" />}>
+            Save Changes
+          </Button>
+        </PanelFooter>
+      )}
+    </form>
   );
 }

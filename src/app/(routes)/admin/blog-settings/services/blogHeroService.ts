@@ -1,5 +1,6 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 import { getAuthHeader } from "@/helper/helper";
+import { errorFromResponse } from "../../blogs/_shared/apiError";
 
 export interface BlogHeroData {
   id?: string;
@@ -28,7 +29,7 @@ class BlogHeroService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch blog heroes: ${response.statusText}`);
+        throw await errorFromResponse(response, 'Failed to fetch blog heroes');
       }
 
       const data = await response.json();
@@ -55,7 +56,7 @@ class BlogHeroService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch blog hero: ${response.statusText}`);
+        throw await errorFromResponse(response, 'Failed to fetch blog hero');
       }
 
       const data = await response.json();
@@ -76,6 +77,9 @@ class BlogHeroService {
 
       // Append all text fields
       Object.entries(heroData).forEach(([key, value]) => {
+        // The create endpoint reads isActive with Boolean(), which turns the string "false"
+        // into true, so leave it out for an inactive hero (missing = inactive).
+        if (key === 'isActive' && !value) return;
         if (key !== 'backgroundImage' || !file) {
           formData.append(key, String(value));
         }
@@ -95,7 +99,7 @@ class BlogHeroService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to create blog hero: ${response.statusText}`);
+        throw await errorFromResponse(response, 'Failed to create blog hero');
       }
 
       const data = await response.json();
@@ -135,7 +139,7 @@ class BlogHeroService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to update blog hero: ${response.statusText}`);
+        throw await errorFromResponse(response, 'Failed to update blog hero');
       }
 
       const data = await response.json();
@@ -161,7 +165,7 @@ class BlogHeroService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to delete blog hero: ${response.statusText}`);
+        throw await errorFromResponse(response, 'Failed to delete blog hero');
       }
     } catch (error) {
       console.error('Error deleting blog hero:', error);
@@ -180,7 +184,7 @@ class BlogHeroService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to toggle blog hero status: ${response.statusText}`);
+        throw await errorFromResponse(response, 'Failed to toggle blog hero status');
       }
 
       const data = await response.json();
@@ -209,7 +213,7 @@ class BlogHeroService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to upload image: ${response.statusText}`);
+        throw await errorFromResponse(response, 'Failed to upload image');
       }
 
       const data = await response.json();

@@ -1,10 +1,22 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, Clock, Download, Filter, MessageSquare, RefreshCw } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import {
-  FiSearch, FiFilter, FiRefreshCw, FiDownload,
-  FiMessageSquare, FiClock, FiCheckCircle, FiAlertCircle
-} from 'react-icons/fi';
+  AdminPage,
+  Alert,
+  Button,
+  Card,
+  LoadingState,
+  PageHeader,
+  Pagination,
+  SearchInput,
+  Select,
+  StatCard,
+  StatGrid,
+} from '@/components/admin/ui';
+import { cn } from '@/lib/utils';
 import ContactQueryTable from './components/ContactQueryTable';
 import ContactQueryModal from './components/ContactQueryModal';
 import {
@@ -13,6 +25,16 @@ import {
   ContactQueryStats,
   contactQueriesService
 } from './services/contactQueriesService';
+import { CATEGORY_OPTIONS, PRIORITY_OPTIONS, STATUS_OPTIONS, STATUS_TONES, capitalize, statusLabel } from './components/queryBadges';
+
+const STATUS_ICONS = {
+  new: MessageSquare,
+  in_progress: Clock,
+  resolved: CheckCircle2,
+  closed: AlertCircle,
+} as const;
+
+const csvCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
 const ContactQueriesClient = () => {
   const [queries, setQueries] = useState<ContactQuery[]>([]);
@@ -28,6 +50,7 @@ const ContactQueriesClient = () => {
     page: 1,
     limit: 20,
   });
+  const [searchInput, setSearchInput] = useState('');
 
   const [pagination, setPagination] = useState({
     current: 1,
@@ -36,7 +59,7 @@ const ContactQueriesClient = () => {
     limit: 20,
   });
 
-  const fetchQueries = async () => {
+  const fetchQueries = useCallback(async () => {
     try {
       setRefreshing(true);
       const response = await contactQueriesService.getContactQueries(filters);
@@ -50,33 +73,44 @@ const ContactQueriesClient = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [filters]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const statsData = await contactQueriesService.getContactQueryStats();
       setStats(statsData);
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchQueries();
+  }, [fetchQueries]);
+
+  useEffect(() => {
     fetchStats();
-  }, [filters]);
+  }, [fetchStats]);
+
+  const handleFilterChange = useCallback((key: keyof ContactQueryFilters, value: string | number | undefined) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value,
+      page: key !== 'page' ? 1 : (value as number), // Reset page when other filters change
+    }));
+  }, []);
+
+  // Debounce the search box so we don't query on every keystroke
+  useEffect(() => {
+    const next = searchInput.trim() || undefined;
+    if (next === filters.search) return;
+    const t = setTimeout(() => handleFilterChange('search', next), 300);
+    return () => clearTimeout(t);
+  }, [searchInput, filters.search, handleFilterChange]);
 
   const handleRefresh = () => {
     fetchQueries();
     fetchStats();
-  };
-
-  const handleFilterChange = (key: keyof ContactQueryFilters, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value,
-      page: key !== 'page' ? 1 : value, // Reset page when other filters change
-    }));
   };
 
   const handleViewQuery = (query: ContactQuery) => {
@@ -95,6 +129,7 @@ const ContactQueriesClient = () => {
   const handleDeleteQuery = (queryId: string) => {
     setQueries(prev => prev.filter(q => q._id !== queryId));
     fetchStats(); // Refresh stats after delete
+    fetchQueries(); // Refill the current page / pagination totals
   };
 
   const handlePageChange = (page: number) => {
@@ -102,332 +137,238 @@ const ContactQueriesClient = () => {
   };
 
   const clearFilters = () => {
+    setSearchInput('');
     setFilters({
       page: 1,
       limit: 20,
     });
   };
 
-  const getStatsByStatus = () => {
-    if (!stats) return [];
+  const hasFilters = !!(filters.search || filters.status || filters.priority || filters.category);
 
-    const statusLabels = {
-      new: { label: 'New', color: 'text-blue-600 bg-blue-100', icon: FiMessageSquare },
-      in_progress: { label: 'In Progress', color: 'text-yellow-600 bg-yellow-100', icon: FiClock },
-      resolved: { label: 'Resolved', color: 'text-green-600 bg-green-100', icon: FiCheckCircle },
-      closed: { label: 'Closed', color: 'text-gray-600 bg-gray-100', icon: FiAlertCircle },
-    };
-
-    return stats.byStatus.map(stat => ({
-      ...stat,
-      ...statusLabels[stat._id as keyof typeof statusLabels] || statusLabels.new,
-    }));
+  const handleExport = () => {
+    if (queries.length === 0) {
+      toast.error('No contact queries to export');
+      return;
+    }
+    const header = ['Name', 'Email', 'Phone', 'Subject', 'Message', 'Status', 'Priority', 'Category', 'Response sent', 'Created'];
+    const lines = queries.map(q =>
+      [
+        q.fullName,
+        q.emailAddress,
+        q.phoneNumber,
+        q.subject,
+        q.message,
+        statusLabel(q.status),
+        capitalize(q.priority),
+        capitalize(q.category),
+        q.responseEmailSent ? 'Yes' : 'No',
+        new Date(q.createdAt).toISOString(),
+      ].map(csvCell).join(',')
+    );
+    const csv = '﻿' + [header.map(csvCell).join(','), ...lines].join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `contact-queries-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${queries.length} ${queries.length === 1 ? 'query' : 'queries'}`);
   };
+
+  const countFor = (status: string) => stats?.byStatus.find(s => s._id === status)?.count ?? 0;
+
+  const header = (
+    <PageHeader
+      title="Contact Queries"
+      subtitle="Manage customer inquiries and support requests"
+      actions={
+        <>
+          <Button
+            variant="secondary"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            leftIcon={<RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />}
+          >
+            Refresh
+          </Button>
+          <Button onClick={handleExport} disabled={loading || !!error} leftIcon={<Download className="h-4 w-4" />}>
+            Export
+          </Button>
+        </>
+      }
+    />
+  );
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-center h-96">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-lg mb-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-indigo-600 border-t-transparent"></div>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Contact Queries</h3>
-              <p className="text-gray-500">Please wait while we fetch your data...</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AdminPage>
+        {header}
+        <LoadingState label="Loading contact queries..." card />
+      </AdminPage>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-center h-96">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
-                <FiAlertCircle className="w-8 h-8 text-red-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Data</h3>
-              <p className="text-gray-500 mb-4">{error}</p>
-              <button
-                onClick={handleRefresh}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200"
-              >
-                <FiRefreshCw className="w-4 h-4 mr-2" />
-                Try Again
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AdminPage>
+        {header}
+        <Alert tone="error" title="Error loading data" onRetry={handleRefresh}>
+          {error}
+        </Alert>
+      </AdminPage>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex flex-col justify-between md:flex-row md:items-center">
-            <div>
-              <div className="flex items-center space-x-3 mb-2">
-                <div className="flex items-center justify-center w-10 h-10 bg-indigo-100 rounded-lg">
-                  <FiMessageSquare className="w-5 h-5 text-indigo-600" />
-                </div>
-                <h1 className="text-3xl font-bold text-gray-900">Contact Queries</h1>
-              </div>
-              <p className="text-gray-600">Manage customer inquiries and support requests efficiently</p>
-            </div>
-            <div className="flex items-center mt-6 space-x-3 md:mt-0">
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors duration-200 shadow-sm"
-              >
-                <FiRefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
-              <button className="flex items-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 shadow-sm">
-                <FiDownload className="w-4 h-4 mr-2" />
-                Export
-              </button>
-            </div>
+    <AdminPage>
+      {header}
+
+      {/* Stats */}
+      {stats && (
+        <StatGrid cols={5} className="gap-1.5 sm:grid-cols-5 sm:gap-3">
+          <StatCard
+            size="sm"
+            label="Total Queries"
+            value={stats.total.toLocaleString()}
+            icon={MessageSquare}
+            className="col-span-2 sm:col-span-1"
+            active={!filters.status}
+            onClick={() => handleFilterChange('status', undefined)}
+          />
+          {STATUS_OPTIONS.map((s) => (
+            <StatCard
+              key={s.value}
+              size="sm"
+              label={s.label}
+              value={countFor(s.value)}
+              icon={STATUS_ICONS[s.value]}
+              tone={STATUS_TONES[s.value]}
+              active={filters.status === s.value}
+              onClick={() => handleFilterChange('status', filters.status === s.value ? undefined : s.value)}
+            />
+          ))}
+        </StatGrid>
+      )}
+
+      {/* Filters */}
+      <Card padding="sm">
+        <div className="mb-3 flex items-center justify-between sm:mb-4">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-900 sm:text-base">
+            <Filter className="h-4 w-4 text-stone-500" />
+            Filters &amp; Search
+          </h3>
+          <Button variant="ghost" size="sm" onClick={clearFilters} disabled={!hasFilters && !searchInput}>
+            Clear All
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+          <div className="sm:col-span-2">
+            <label htmlFor="cq-search" className="mb-1 block text-xs font-medium text-stone-600 sm:text-sm">Search</label>
+            <SearchInput
+              id="cq-search"
+              value={searchInput}
+              onChange={setSearchInput}
+              placeholder="Search by name, email, or message..."
+              wrapperClassName="sm:max-w-none"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="cq-filter-status" className="mb-1 block text-xs font-medium text-stone-600 sm:text-sm">Status</label>
+            <Select
+              id="cq-filter-status"
+              value={filters.status || ''}
+              onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
+              className="py-2 sm:py-2.5"
+            >
+              <option value="">All Status</option>
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label htmlFor="cq-filter-priority" className="mb-1 block text-xs font-medium text-stone-600 sm:text-sm">Priority</label>
+            <Select
+              id="cq-filter-priority"
+              value={filters.priority || ''}
+              onChange={(e) => handleFilterChange('priority', e.target.value || undefined)}
+              className="py-2 sm:py-2.5"
+            >
+              <option value="">All Priorities</option>
+              {PRIORITY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </Select>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-            <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-200 hover:shadow-md transition-shadow duration-200">
-              <div className="p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-sm">
-                      <FiMessageSquare className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                  <div className="ml-4 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Queries</dt>
-                      <dd className="text-2xl font-bold text-gray-900">{stats.total.toLocaleString()}</dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {getStatsByStatus().map((stat) => (
-              <div key={stat._id} className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className={`flex items-center justify-center w-12 h-12 rounded-xl shadow-sm ${stat.color}`}>
-                        <stat.icon className="h-6 w-6" />
-                      </div>
-                    </div>
-                    <div className="ml-4 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">{stat.label}</dt>
-                        <dd className="text-2xl font-bold text-gray-900">{stat.count}</dd>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <FiFilter className="w-5 h-5 mr-2 text-gray-600" />
-              Filters & Search
-            </h3>
-            <button
-              onClick={clearFilters}
-              className="px-3 py-1.5 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200"
-            >
-              Clear All
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-            <div className="lg:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FiSearch className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search by name, email, or message..."
-                  value={filters.search || ''}
-                  onChange={(e) => handleFilterChange('search', e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
-                value={filters.status || ''}
-                onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white transition-colors duration-200"
-              >
-                <option value="">All Status</option>
-                <option value="new">New</option>
-                <option value="in_progress">In Progress</option>
-                <option value="resolved">Resolved</option>
-                <option value="closed">Closed</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-              <select
-                value={filters.priority || ''}
-                onChange={(e) => handleFilterChange('priority', e.target.value || undefined)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white transition-colors duration-200"
-              >
-                <option value="">All Priorities</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-            <div className="flex flex-wrap gap-2">
-              {['general', 'support', 'returns', 'wholesale', 'technical', 'feedback'].map((category) => (
+        <div className="mt-3 sm:mt-4">
+          <p className="mb-1.5 text-xs font-medium text-stone-600 sm:text-sm">Category</p>
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            {CATEGORY_OPTIONS.map((category) => {
+              const active = filters.category === category;
+              return (
                 <button
                   key={category}
-                  onClick={() => handleFilterChange('category', filters.category === category ? undefined : category)}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                    filters.category === category
-                      ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-transparent'
-                  }`}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => handleFilterChange('category', active ? undefined : category)}
+                  className={cn(
+                    'rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900/30 sm:text-sm',
+                    active
+                      ? 'bg-stone-900 text-white shadow-sm'
+                      : 'border border-stone-200 bg-white text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+                  )}
                 >
-                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                  {capitalize(category)}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
+      </Card>
 
       {/* Table */}
       <ContactQueryTable
         queries={queries}
         loading={refreshing}
         onViewQuery={handleViewQuery}
+        totalCount={pagination.total}
+        hasFilters={hasFilters}
+        footer={
+          pagination.total > 0 ? (
+            <div className="border-t border-stone-200 px-4 py-3 sm:px-6">
+              <Pagination
+                page={pagination.current}
+                totalPages={pagination.pages}
+                onPageChange={handlePageChange}
+                totalItems={pagination.total}
+                pageSize={pagination.limit}
+                itemLabel="queries"
+              />
+            </div>
+          ) : null
+        }
       />
 
-        {/* Pagination */}
-        {pagination.pages > 1 && (
-          <div className="bg-white px-6 py-4 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-xl shadow-sm border border-gray-200">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => handlePageChange(pagination.current - 1)}
-                disabled={pagination.current <= 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => handlePageChange(pagination.current + 1)}
-                disabled={pagination.current >= pagination.pages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-              >
-                Next
-              </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing{' '}
-                  <span className="font-semibold text-gray-900">
-                    {(pagination.current - 1) * pagination.limit + 1}
-                  </span>{' '}
-                  to{' '}
-                  <span className="font-semibold text-gray-900">
-                    {Math.min(pagination.current * pagination.limit, pagination.total)}
-                  </span>{' '}
-                  of{' '}
-                  <span className="font-semibold text-gray-900">{pagination.total.toLocaleString()}</span>{' '}
-                  results
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-lg shadow-sm -space-x-px">
-                  <button
-                    onClick={() => handlePageChange(pagination.current - 1)}
-                    disabled={pagination.current <= 1}
-                    className="relative inline-flex items-center px-3 py-2 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                  >
-                    Previous
-                  </button>
-                  {[...Array(Math.min(pagination.pages, 7))].map((_, i) => {
-                    let page;
-                    if (pagination.pages <= 7) {
-                      page = i + 1;
-                    } else if (pagination.current <= 4) {
-                      page = i + 1;
-                    } else if (pagination.current >= pagination.pages - 3) {
-                      page = pagination.pages - 6 + i;
-                    } else {
-                      page = pagination.current - 3 + i;
-                    }
-
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => handlePageChange(page)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors duration-200 ${
-                          page === pagination.current
-                            ? 'z-10 bg-gradient-to-r from-indigo-500 to-indigo-600 border-indigo-500 text-white shadow-sm'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    );
-                  })}
-                  <button
-                    onClick={() => handlePageChange(pagination.current + 1)}
-                    disabled={pagination.current >= pagination.pages}
-                    className="relative inline-flex items-center px-3 py-2 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                  >
-                    Next
-                  </button>
-                </nav>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Modal */}
-        <ContactQueryModal
-          query={selectedQuery}
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false);
-            setSelectedQuery(null);
-          }}
-          onUpdate={handleUpdateQuery}
-          onDelete={handleDeleteQuery}
-        />
-      </div>
-    </div>
+      {/* Modal */}
+      <ContactQueryModal
+        query={selectedQuery}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedQuery(null);
+        }}
+        onUpdate={handleUpdateQuery}
+        onDelete={handleDeleteQuery}
+      />
+    </AdminPage>
   );
 };
 

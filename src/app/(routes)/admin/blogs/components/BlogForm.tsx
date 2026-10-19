@@ -1,13 +1,28 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import type { JSX } from "react";
-import Image from "next/image";
+import { FileText, Image as ImageIcon, Info, Loader2, Save, Search } from "lucide-react";
+import { toast } from "react-hot-toast";
+import {
+  Button,
+  Card,
+  CardFooter,
+  CardHeader,
+  FormField,
+  Input,
+  Select,
+  Tabs,
+  Textarea,
+} from "@/components/admin/ui";
+import { assetUrl } from "@/lib/productMedia";
 import blogCategoryService from "../services/blogCategoryService";
 import blogService from "../services/blogService";
 import authorService, { Author } from "../services/authorService";
-import { toast } from "react-hot-toast";
 import type { Blog as BaseBlog } from "./AllBlogs";
 import RichTextEditor from "./RichTextEditor";
+import ImageDropzone from "../_shared/ImageDropzone";
+import { getErrorMessage } from "../_shared/apiError";
+import { compressInlineImages, estimateRequestBytes, formatBytes, MAX_REQUEST_BYTES } from "../_shared/imageUpload";
 
 // Extend the Blog interface to include author property from blogService
 interface Blog extends BaseBlog {
@@ -29,11 +44,6 @@ interface BlogCategory {
   id: string;
   name: string;
 }
-
-type FileWithPreview = {
-  file: File;
-  preview: string;
-};
 
 export type BlogFormData = {
   id?: string;
@@ -59,13 +69,42 @@ interface BlogFormProps {
   initialData?: Blog;
   onSubmit: (data: BlogFormData) => void;
   onChangeDetected?: (hasChanges: boolean) => void;
+  /** Shows a Cancel button in the footer. */
+  onCancel?: () => void;
 }
 
-export default function BlogForm({ 
-  mode, 
-  initialData, 
-  onSubmit, 
-  onChangeDetected 
+type FormTab = "basic" | "content" | "media" | "seo";
+
+// Which tab each validation error lives on, so we can jump to it.
+const FIELD_TAB: Record<string, FormTab> = {
+  title: "basic",
+  slug: "basic",
+  categoryId: "basic",
+  authorId: "basic",
+  content: "content",
+  image: "media",
+  metaTitle: "seo",
+  metaDescription: "seo",
+  metaSchema: "seo",
+};
+
+const TAB_ORDER: FormTab[] = ["basic", "content", "media", "seo"];
+
+/** Plain-text version of the editor HTML (for meta description fallbacks and previews). */
+const htmlToText = (html: string) =>
+  html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export default function BlogForm({
+  mode,
+  initialData,
+  onSubmit,
+  onChangeDetected,
+  onCancel,
 }: BlogFormProps): JSX.Element {
   const [form, setForm] = useState<BlogFormData>({
     id: initialData?.id || "",
@@ -86,15 +125,15 @@ export default function BlogForm({
     metaSchema: ""
   });
 
-  console.log("initialData", initialData);
   const [originalForm, setOriginalForm] = useState<BlogFormData | null>(null);
-  const [coverImage, setCoverImage] = useState<FileWithPreview | null>(null);
-  const [thumbnailImage, setThumbnailImage] = useState<FileWithPreview | null>(null);
+  const [coverImage, setCoverImage] = useState<File | null>(null);
+  const [thumbnailImage, setThumbnailImage] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"content" | "seo">("content");
+  const [isFetching, setIsFetching] = useState(true);
+  const [activeTab, setActiveTab] = useState<FormTab>("basic");
 
   const META_TITLE_LIMIT = 60;
   const META_DESC_LIMIT = 155;
@@ -113,25 +152,25 @@ export default function BlogForm({
   useEffect(() => {
     const loadData = async () => {
       try {
+        setIsFetching(true);
         // Load categories and authors
         const [categoriesData, authorsData] = await Promise.all([
           blogCategoryService.getAllCategories(),
           authorService.getAuthorsForDropdown()
         ]);
-        
+
         setCategories(
           categoriesData.map((cat: BlogCategory) => ({
             id: cat.id,
             name: cat.name,
           }))
         );
-        
+
         setAuthors(authorsData);
 
         // If editing, load full blog details to get SEO fields
         if (mode === "edit" && initialData?.id) {
           const fullBlog = await blogService.getBlogById(initialData.id);
-          console.log("fullBlog", fullBlog);
           const updatedForm = {
             ...form,
             content: fullBlog.content || "",
@@ -143,7 +182,7 @@ export default function BlogForm({
             metaSchema: (fullBlog as ExtendedBlog).metaSchema || "",
             tags: fullBlog.tags || [],
           };
-          
+
           setForm(updatedForm);
           setOriginalForm(updatedForm);
         } else {
@@ -152,10 +191,12 @@ export default function BlogForm({
         }
       } catch (error) {
         console.error("Error loading data:", error);
-        toast.error("Failed to load data");
+        toast.error(getErrorMessage(error, "Failed to load categories, authors or blog details"));
+      } finally {
+        setIsFetching(false);
       }
     };
-    
+
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, initialData?.id]);
@@ -173,7 +214,7 @@ export default function BlogForm({
   // Check for changes
   useEffect(() => {
     if (originalForm && onChangeDetected) {
-      const hasChanges = JSON.stringify(form) !== JSON.stringify(originalForm) || 
+      const hasChanges = JSON.stringify(form) !== JSON.stringify(originalForm) ||
                         coverImage !== null || thumbnailImage !== null;
       onChangeDetected(hasChanges);
     }
@@ -205,71 +246,74 @@ export default function BlogForm({
     }
 
     setErrors(e);
-    return Object.keys(e).length === 0;
+    return e;
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: "cover" | "thumbnail") => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const fileWithPreview: FileWithPreview = { file, preview: reader.result as string };
-      if (type === "cover") {
-        setCoverImage(fileWithPreview);
-        setForm((prev) => ({ ...prev, image: file.name }));
-      } else {
-        setThumbnailImage(fileWithPreview);
-      }
-    };
-    reader.onerror = () => toast.error("Error reading file");
-    reader.readAsDataURL(file);
+  const handleCoverChange = (file: File | null) => {
+    setCoverImage(file);
+    // `image` mirrors the picked file name (used by validation); restore the saved image on remove
+    setForm((prev) => ({ ...prev, image: file ? file.name : initialData?.image || "" }));
+    if (file) setErrors((prev) => ({ ...prev, image: "" }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) {
-      if (errors.metaTitle || errors.metaDescription || errors.metaSchema) setActiveTab("seo");
+    const found = validate();
+    const errorTabs = Object.keys(found).filter((k) => found[k]).map((k) => FIELD_TAB[k]).filter(Boolean);
+    if (errorTabs.length > 0) {
+      if (!errorTabs.includes(activeTab)) {
+        setActiveTab(TAB_ORDER.find((t) => errorTabs.includes(t)) || activeTab);
+      }
+      toast.error("Please fix the highlighted fields");
       return;
     }
 
     setIsLoading(true);
     try {
+      // Pasted/dropped editor images are inline base64; shrink them before sending
+      const content = await compressInlineImages(form.content || "");
+
       // Auto-fill empty metaTitle/Description from Title/Content (best-effort)
       const fallbackMetaTitle = (form.metaTitle || form.title || "").slice(0, META_TITLE_LIMIT);
       const fallbackMetaDescription =
-        (form.metaDescription ||
-          (form.content || "")
-            .replace(/\s+/g, " ")
-            .slice(0, META_DESC_LIMIT)) ?? "";
+        (form.metaDescription || htmlToText(content).slice(0, META_DESC_LIMIT)) ?? "";
 
-      const formData = new FormData();
-      formData.append("title", form.title);
-      formData.append("slug", form.slug);
-      formData.append("content", form.content || "");
-      formData.append("categoryId", form.categoryId);
-      formData.append("authorId", form.authorId || "");
-      formData.append("status", form.status);
-
+      const fields: Array<[string, string]> = [
+        ["title", form.title],
+        ["slug", form.slug],
+        ["content", content],
+        ["categoryId", form.categoryId],
+        ["authorId", form.authorId || ""],
+        ["status", form.status],
+      ];
       // Handle tags
       if (form.tags && form.tags.length > 0) {
-        formData.append("tags", form.tags.join(","));
+        fields.push(["tags", form.tags.join(",")]);
+      }
+      // SEO fields
+      fields.push(
+        ["metaTitle", fallbackMetaTitle],
+        ["metaDescription", fallbackMetaDescription],
+        ["metaKeywords", form.metaKeywords || ""],
+        ["metaSchema", form.metaSchema || ""],
+      );
+
+      // The server rejects request bodies over ~4.5 MB; say so before uploading
+      const requestBytes = estimateRequestBytes([...fields.map(([, v]) => v), coverImage, thumbnailImage]);
+      if (requestBytes > MAX_REQUEST_BYTES) {
+        toast.error(
+          `This post is about ${formatBytes(requestBytes)} with its images, but the server accepts about ${formatBytes(MAX_REQUEST_BYTES)} per save. Use smaller images (images pasted into the content count too).`,
+          { duration: 7000 }
+        );
+        return;
       }
 
-      // SEO fields
-      formData.append("metaTitle", fallbackMetaTitle);
-      formData.append("metaDescription", fallbackMetaDescription);
-      formData.append("metaKeywords", form.metaKeywords || "");
-      formData.append("metaSchema", form.metaSchema || "");
+      const formData = new FormData();
+      fields.forEach(([key, value]) => formData.append(key, value));
 
       // Handle file uploads
-      if (coverImage) formData.append("image", coverImage.file);
-      if (thumbnailImage) formData.append("thumbnail", thumbnailImage.file);
+      if (coverImage) formData.append("image", coverImage);
+      if (thumbnailImage) formData.append("thumbnail", thumbnailImage);
 
       let result: ExtendedBlog;
       if (mode === "create") {
@@ -281,6 +325,7 @@ export default function BlogForm({
       // Prepare data for parent component
       const submitData: BlogFormData = {
         ...form,
+        content,
         category: categories.find((cat) => cat.id === form.categoryId)?.name || form.category,
         authorName: authors.find((author) => author.id === form.authorId)?.name || form.authorName,
         image: result.image || form.image,
@@ -288,8 +333,6 @@ export default function BlogForm({
         metaTitle: fallbackMetaTitle,
         metaDescription: fallbackMetaDescription,
       };
-
-      onSubmit(submitData);
 
       // Reset form for create mode
       if (mode === "create") {
@@ -312,12 +355,15 @@ export default function BlogForm({
         setCoverImage(null);
         setThumbnailImage(null);
       }
-      
+
       setErrors({});
-      toast.success(`Blog ${mode === "create" ? "created" : "updated"} successfully!`);
+      toast.success(
+        mode === "create" ? `Blog "${form.title}" created successfully` : `Blog "${form.title}" updated successfully`
+      );
+      onSubmit(submitData);
     } catch (error) {
       console.error(`Error ${mode === "create" ? "creating" : "updating"} blog:`, error);
-      toast.error(`Failed to ${mode} blog`);
+      toast.error(getErrorMessage(error, `Failed to ${mode} blog`, { upload: true }), { duration: 6000 });
     } finally {
       setIsLoading(false);
     }
@@ -341,6 +387,7 @@ export default function BlogForm({
       }
       return { ...prev, [key]: value };
     });
+    if (errors[key as string]) setErrors((prev) => ({ ...prev, [key as string]: "" }));
   };
 
   const handleTagsChange = (tagsString: string) => {
@@ -350,164 +397,156 @@ export default function BlogForm({
 
   const previewTitle = (form.metaTitle || form.title || "").slice(0, META_TITLE_LIMIT);
   const previewUrl = `/blog/${form.slug || "your-slug"}`;
-  const previewDesc = (form.metaDescription ||
-    (form.content || "").replace(/\s+/g, " ").slice(0, META_DESC_LIMIT)) as string;
+  const previewDesc = (form.metaDescription || htmlToText(form.content || "").slice(0, META_DESC_LIMIT)) as string;
 
-  const currentImageUrl = coverImage 
-    ? coverImage.preview 
-    : form.image 
-    ? form.image.startsWith('/') ? `${process.env.NEXT_PUBLIC_BACKEND_URL}${form.image}` : form.image
-    : '';
+  const savedCover = mode === "edit" && initialData?.image ? assetUrl(initialData.image) : "";
+  const savedThumbnail = form.thumbnail ? assetUrl(form.thumbnail) : "";
 
-  const currentThumbnailUrl = thumbnailImage
-    ? thumbnailImage.preview
-    : form.thumbnail
-    ? form.thumbnail.startsWith('/') ? `${process.env.NEXT_PUBLIC_BACKEND_URL}${form.thumbnail}` : form.thumbnail
-    : '';
+  const tabHasError = (tab: FormTab) => Object.keys(errors).some((k) => errors[k] && FIELD_TAB[k] === tab);
+  const tabLabel = (label: string, tab: FormTab) => (
+    <span className="inline-flex items-center gap-1.5">
+      {label}
+      {tabHasError(tab) && <span className="h-1.5 w-1.5 rounded-full bg-red-500" aria-label="has errors" />}
+    </span>
+  );
 
   return (
-    <div className="bg-white shadow sm:rounded-lg">
-      <form onSubmit={handleSubmit} className="px-4 py-5 sm:p-6 space-y-6">
-        <h3 className="text-lg leading-6 font-medium text-gray-900">
-          {mode === "create" ? "Create Blog" : "Edit Blog"}
-        </h3>
+    <form onSubmit={handleSubmit} noValidate>
+      <Card padding="none">
+        <CardHeader
+          title={mode === "create" ? "Create Blog" : "Edit Blog"}
+          subtitle={mode === "create" ? "Fill in the details, write the post, then add a cover image." : "Update the details, content, images and SEO of this post."}
+          icon={<FileText className="h-5 w-5" />}
+          actions={
+            isFetching ? (
+              <span className="inline-flex items-center gap-2 text-xs text-stone-500">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                {mode === "edit" ? "Loading post details…" : "Loading options…"}
+              </span>
+            ) : undefined
+          }
+          bordered={false}
+        />
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-            {[
-              { key: "content", label: "Content" },
-              { key: "seo", label: "SEO" },
-            ].map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setActiveTab(t.key as "content" | "seo")}
-                className={`whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium ${
-                  activeTab === t.key
-                    ? "border-indigo-500 text-indigo-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+        <Tabs<FormTab>
+          tabs={[
+            { key: "basic", label: tabLabel("Basic Info", "basic"), icon: Info },
+            { key: "content", label: tabLabel("Content", "content"), icon: FileText },
+            { key: "media", label: tabLabel("Media", "media"), icon: ImageIcon },
+            { key: "seo", label: tabLabel("SEO", "seo"), icon: Search },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
+          className="px-1 sm:px-2"
+        />
 
-        {/* CONTENT TAB */}
-        {activeTab === "content" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Title</label>
-              <input
-                type="text"
-                placeholder="e.g., Five Ways to Style an Oversized Tee"
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
-                value={form.title}
-                onChange={(e) => setField("title", e.target.value)}
-              />
-              {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">URL Slug</label>
-              <div className="mt-1 flex rounded-md shadow-sm">
-                <span className="inline-flex items-center rounded-l-md border border-r-0 border-gray-300 bg-gray-50 px-3 text-gray-500 sm:text-sm">
-                  /blog/
-                </span>
-                <input
+        <div className="p-4 sm:p-6">
+          {/* BASIC INFO TAB */}
+          {activeTab === "basic" && (
+            <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
+              <FormField label="Title" htmlFor="blog-title" required error={errors.title} className="md:col-span-2">
+                <Input
+                  id="blog-title"
                   type="text"
-                  className={`block w-full min-w-0 flex-1 rounded-none rounded-r-md px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${
-                    mode === "create" 
-                      ? "border-gray-200 bg-gray-50 text-gray-500 focus:ring-0" 
-                      : "border-gray-300"
-                  }`}
+                  placeholder="e.g., Five Ways to Style an Oversized Tee"
+                  value={form.title}
+                  invalid={!!errors.title}
+                  onChange={(e) => setField("title", e.target.value)}
+                />
+              </FormField>
+
+              <FormField
+                label="URL Slug"
+                htmlFor="blog-slug"
+                required
+                error={errors.slug}
+                hint={mode === "create" ? "Generated from the title. Only letters, numbers, and hyphens." : "Only letters, numbers, and hyphens."}
+                className="md:col-span-2"
+              >
+                <Input
+                  id="blog-slug"
+                  type="text"
+                  prefix="/blog/"
+                  className="pl-[3.75rem]"
                   value={form.slug}
+                  invalid={!!errors.slug}
                   onChange={(e) => setField("slug", e.target.value)}
                   placeholder="auto-generated-from-title"
                   readOnly={mode === "create"}
+                  disabled={mode === "create"}
                 />
+              </FormField>
+
+              <FormField label="Category" htmlFor="blog-category" required error={errors.categoryId}>
+                <Select
+                  id="blog-category"
+                  value={form.categoryId}
+                  invalid={!!errors.categoryId}
+                  onChange={(e) => setField("categoryId", e.target.value)}
+                >
+                  <option value="" disabled>
+                    Select a category
+                  </option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Author" htmlFor="blog-author" required error={errors.authorId}>
+                <Select
+                  id="blog-author"
+                  value={form.authorId}
+                  invalid={!!errors.authorId}
+                  onChange={(e) => setField("authorId", e.target.value)}
+                >
+                  <option value="" disabled>
+                    Select an author
+                  </option>
+                  {authors.map((author) => (
+                    <option key={author.id} value={author.id}>
+                      {author.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Status" htmlFor="blog-status" hint="Drafts are hidden from the storefront.">
+                <Select
+                  id="blog-status"
+                  value={form.status}
+                  onChange={(e) => setField("status", e.target.value as BlogFormData["status"])}
+                >
+                  <option value="published">Published</option>
+                  <option value="draft">Draft</option>
+                </Select>
+              </FormField>
+
+              <FormField label="Tags" htmlFor="blog-tags" hint="Separate tags with commas.">
+                <Input
+                  id="blog-tags"
+                  type="text"
+                  placeholder="e.g., poetry, culture, styling"
+                  value={form.tags?.join(", ") || ""}
+                  onChange={(e) => handleTagsChange(e.target.value)}
+                />
+              </FormField>
+            </div>
+          )}
+
+          {/* CONTENT TAB */}
+          {activeTab === "content" && (
+            <div className="space-y-3">
+              <div>
+                <p className="block text-sm font-medium text-stone-700">
+                  Blog Content <span className="text-red-500">*</span>
+                </p>
+                <p className="mt-0.5 text-xs text-stone-500">
+                  Write your post with the rich text editor. Pasted images are optimized when you save.
+                </p>
               </div>
-              <p className="mt-1 text-xs text-gray-500">Only letters, numbers, and hyphens.</p>
-              {errors.slug && <p className="mt-1 text-sm text-red-600">{errors.slug}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Category</label>
-              <select
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                value={form.categoryId}
-                onChange={(e) => setField("categoryId", e.target.value)}
-                required
-              >
-                <option value="" disabled>
-                  Select a category
-                </option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-              {errors.categoryId && <p className="mt-1 text-sm text-red-600">{errors.categoryId}</p>}
-              {mode === "edit" && (
-                <div className="mt-1 text-xs text-gray-500">
-                  Current category ID: {form.categoryId || "None selected"}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Author</label>
-              <select
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                value={form.authorId}
-                onChange={(e) => setField("authorId", e.target.value)}
-                required
-              >
-                <option value="" disabled>
-                  Select an author
-                </option>
-                {authors.map((author) => (
-                  <option key={author.id} value={author.id}>
-                    {author.name}
-                  </option>
-                ))}
-              </select>
-              {errors.authorId && <p className="mt-1 text-sm text-red-600">{errors.authorId}</p>}
-              {mode === "edit" && (
-                <div className="mt-1 text-xs text-gray-500">
-                  Current author ID: {form.authorId || "None selected"}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Status</label>
-              <select
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                value={form.status}
-                onChange={(e) => setField("status", e.target.value as BlogFormData["status"])}
-              >
-                <option value="published">Published</option>
-                <option value="draft">Draft</option>
-              </select>
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Tags (comma-separated)</label>
-              <input
-                type="text"
-                placeholder="e.g., poetry, culture, styling"
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
-                value={form.tags?.join(", ") || ""}
-                onChange={(e) => handleTagsChange(e.target.value)}
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
               <RichTextEditor
                 value={form.content || ""}
                 onChange={(content) => setField("content", content)}
@@ -515,163 +554,154 @@ export default function BlogForm({
                 error={errors.content}
               />
             </div>
+          )}
 
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Cover Image</label>
-              <div className="mt-1 flex items-center">
-                <label className="cursor-pointer">
-                  <span className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    {mode === "create" 
-                      ? "Upload Cover Image" 
-                      : coverImage 
-                        ? "Change Cover Image" 
-                        : "Upload New Cover Image"
-                    }
-                    <input
-                      type="file"
-                      className="sr-only"
-                      accept="image/*"
-                      onChange={(e) => handleFileChange(e, "cover")}
-                    />
-                  </span>
-                </label>
-                {coverImage && <span className="ml-4 text-sm text-gray-500">{coverImage.file.name}</span>}
+          {/* MEDIA TAB */}
+          {activeTab === "media" && (
+            <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                <ImageDropzone
+                  id="blog-cover"
+                  name="Cover image"
+                  label="Cover Image"
+                  required={mode === "create"}
+                  hint={
+                    <>
+                      Shown as the hero of the blog post. A wide landscape image works best (around{" "}
+                      <span className="font-semibold">1920 × 1080px</span>, 16:9).
+                    </>
+                  }
+                  file={coverImage}
+                  onFileChange={handleCoverChange}
+                  currentUrl={savedCover}
+                  error={errors.image}
+                  previewClassName="aspect-[16/9]"
+                  disabled={isLoading}
+                />
               </div>
-              {currentImageUrl && (
-                <div className="mt-2 relative h-32 w-full">
-                  <Image
-                    src={currentImageUrl}
-                    alt="Cover preview"
-                    fill
-                    className="object-cover rounded"
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    priority
-                  />
+
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                <ImageDropzone
+                  id="blog-thumbnail"
+                  name="Thumbnail"
+                  label="Thumbnail Image (Optional)"
+                  hint={
+                    <>
+                      Used in blog listing cards (around <span className="font-semibold">800 × 500px</span>, 16:10).
+                    </>
+                  }
+                  file={thumbnailImage}
+                  onFileChange={setThumbnailImage}
+                  currentUrl={savedThumbnail}
+                  previewClassName="aspect-[16/10]"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* SEO TAB */}
+          {activeTab === "seo" && (
+            <div className="grid grid-cols-1 gap-4 sm:gap-6">
+              {/* Google Preview Card */}
+              <div className="rounded-xl border border-stone-200 bg-white p-4">
+                <h4 className="mb-3 text-sm font-semibold text-stone-900">Google Search Preview</h4>
+                <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+                  <p className="truncate text-sm font-medium leading-snug text-[#1a0dab]">{previewTitle || "Your SEO Title Here"}</p>
+                  <p className="mt-1 text-xs text-[#006621]">{previewUrl}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-stone-600">{previewDesc || "Your meta description preview will appear here."}</p>
                 </div>
-              )}
-              {errors.image && <p className="mt-1 text-sm text-red-600">{errors.image}</p>}
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Thumbnail Image (Optional)</label>
-              <div className="mt-1 flex items-center">
-                <label className="cursor-pointer">
-                  <span className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    {mode === "create" 
-                      ? "Upload Thumbnail" 
-                      : thumbnailImage 
-                        ? "Change Thumbnail" 
-                        : "Upload New Thumbnail"
-                    }
-                    <input
-                      type="file"
-                      className="sr-only"
-                      accept="image/*"
-                      onChange={(e) => handleFileChange(e, "thumbnail")}
-                    />
-                  </span>
-                </label>
-                {thumbnailImage && <span className="ml-4 text-sm text-gray-500">{thumbnailImage.file.name}</span>}
+                <p className="mt-2 text-xs text-stone-500">Preview approximates Google snippets; actual display may vary.</p>
               </div>
-              {currentThumbnailUrl && (
-                <div className="mt-2 relative h-24 w-24">
-                  <Image
-                    src={currentThumbnailUrl}
-                    alt="Thumbnail preview"
-                    fill
-                    className="object-cover rounded"
-                    sizes="96px"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* SEO TAB */}
-        {activeTab === "seo" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Meta Title <span className="text-gray-400">({(form.metaTitle || "").length}/{META_TITLE_LIMIT})</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Keep it under ~60 characters, include primary keyword"
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
-                value={form.metaTitle || ""}
-                onChange={(e) => setField("metaTitle", e.target.value)}
-                maxLength={120}
-              />
-              {errors.metaTitle && <p className="mt-1 text-sm text-red-600">{errors.metaTitle}</p>}
-            </div>
+              <FormField
+                label={
+                  <>
+                    Meta Title{" "}
+                    <span className={(form.metaTitle || "").length > META_TITLE_LIMIT ? "text-red-500" : "text-stone-400"}>
+                      ({(form.metaTitle || "").length}/{META_TITLE_LIMIT})
+                    </span>
+                  </>
+                }
+                htmlFor="blog-meta-title"
+                error={errors.metaTitle}
+              >
+                <Input
+                  id="blog-meta-title"
+                  type="text"
+                  placeholder="Keep it under ~60 characters, include primary keyword"
+                  value={form.metaTitle || ""}
+                  invalid={!!errors.metaTitle}
+                  onChange={(e) => setField("metaTitle", e.target.value)}
+                  maxLength={120}
+                />
+              </FormField>
 
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Meta Description{" "}
-                <span className="text-gray-400">({(form.metaDescription || "").length}/{META_DESC_LIMIT})</span>
-              </label>
-              <textarea
-                rows={3}
-                placeholder="Compelling summary under ~155 characters"
-                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
-                value={form.metaDescription || ""}
-                onChange={(e) => setField("metaDescription", e.target.value)}
-                maxLength={320}
-              />
-              {errors.metaDescription && <p className="mt-1 text-sm text-red-600">{errors.metaDescription}</p>}
-            </div>
+              <FormField
+                label={
+                  <>
+                    Meta Description{" "}
+                    <span className={(form.metaDescription || "").length > META_DESC_LIMIT ? "text-red-500" : "text-stone-400"}>
+                      ({(form.metaDescription || "").length}/{META_DESC_LIMIT})
+                    </span>
+                  </>
+                }
+                htmlFor="blog-meta-description"
+                error={errors.metaDescription}
+                hint="Leave empty to use the start of the post."
+              >
+                <Textarea
+                  id="blog-meta-description"
+                  rows={3}
+                  placeholder="Compelling summary under ~155 characters"
+                  value={form.metaDescription || ""}
+                  invalid={!!errors.metaDescription}
+                  onChange={(e) => setField("metaDescription", e.target.value)}
+                  maxLength={320}
+                />
+              </FormField>
 
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Meta Keywords (comma-separated)</label>
-              <input
-                type="text"
-                placeholder="e.g., silsila journal, urdu poetry, streetwear"
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
-                value={form.metaKeywords || ""}
-                onChange={(e) => setField("metaKeywords", e.target.value)}
-              />
-            </div>
+              <FormField label="Meta Keywords" htmlFor="blog-meta-keywords" hint="Separate keywords with commas.">
+                <Input
+                  id="blog-meta-keywords"
+                  type="text"
+                  placeholder="e.g., silsila journal, urdu poetry, streetwear"
+                  value={form.metaKeywords || ""}
+                  onChange={(e) => setField("metaKeywords", e.target.value)}
+                />
+              </FormField>
 
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Meta Schema (JSON-LD)</label>
-              <textarea
-                rows={8}
-                placeholder='Paste valid JSON-LD here. Example: {"@context":"https://schema.org","@type":"BlogPosting",...}'
-                className={`mt-1 w-full rounded-md border px-3 py-2 text-sm font-mono ${
-                  errors.metaSchema ? "border-red-300 focus:border-red-400 focus:ring-red-200" : "border-gray-300 focus:border-indigo-500 focus:ring-indigo-500"
-                }`}
-                value={form.metaSchema || ""}
-                onChange={(e) => setField("metaSchema", e.target.value)}
-              />
-              {errors.metaSchema && <p className="mt-1 text-sm text-red-600">{errors.metaSchema}</p>}
+              <FormField label="Meta Schema (JSON-LD)" htmlFor="blog-meta-schema" error={errors.metaSchema}>
+                <Textarea
+                  id="blog-meta-schema"
+                  rows={8}
+                  placeholder='Paste valid JSON-LD here. Example: {"@context":"https://schema.org","@type":"BlogPosting",...}'
+                  className="font-mono text-xs sm:text-sm"
+                  value={form.metaSchema || ""}
+                  invalid={!!errors.metaSchema}
+                  onChange={(e) => setField("metaSchema", e.target.value)}
+                />
+              </FormField>
             </div>
-
-            {/* Google Preview */}
-            <div className="sm:col-span-2">
-              <div className="rounded-md border border-gray-200 p-4 bg-gray-50">
-                <p className="text-sm text-[#1a0dab] leading-snug truncate">{previewTitle || "Your SEO Title Here"}</p>
-                <p className="text-xs text-[#006621]">{previewUrl}</p>
-                <p className="text-sm text-gray-700">{previewDesc || "Your meta description preview will appear here."}</p>
-              </div>
-              <p className="mt-2 text-xs text-gray-500">Preview approximates Google snippets; actual display may vary.</p>
-            </div>
-          </div>
-        )}
-
-        <div className="pt-4 border-t">
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
-          >
-            {isLoading 
-              ? (mode === "create" ? "Creating..." : "Updating...")
-              : (mode === "create" ? "Create Blog" : "Update Blog")
-            }
-          </button>
+          )}
         </div>
-      </form>
-    </div>
+
+        <CardFooter>
+          {onCancel && (
+            <Button variant="secondary" onClick={onCancel} disabled={isLoading}>
+              Cancel
+            </Button>
+          )}
+          <Button
+            type="submit"
+            loading={isLoading}
+            loadingText={mode === "create" ? "Creating..." : "Updating..."}
+            leftIcon={<Save className="h-4 w-4" />}
+          >
+            {mode === "create" ? "Create Blog" : "Update Blog"}
+          </Button>
+        </CardFooter>
+      </Card>
+    </form>
   );
 }

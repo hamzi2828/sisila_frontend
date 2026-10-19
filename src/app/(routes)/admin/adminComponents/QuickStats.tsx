@@ -1,39 +1,58 @@
 import React from 'react';
-import { IconType } from 'react-icons';
+import Link from 'next/link';
+import type { ComponentType } from 'react';
+import { cn } from '@/lib/utils';
+import { toneIcon, type Tone } from '@/components/admin/ui';
 
-interface QuickStat {
+export interface QuickStat {
   name: string;
   value: string;
-  icon: IconType;
-  color: string;
+  icon: ComponentType<{ className?: string }>;
+  tone: Tone;
+  hint?: string;
+  href?: string;
 }
 
 interface QuickStatsProps {
   stats: QuickStat[];
+  title?: string;
 }
 
-export const QuickStats: React.FC<QuickStatsProps> = ({ stats }) => {
+/** Inked Wear's "Quick Stats" box: a white card holding small stone-50 tiles. */
+export const QuickStats: React.FC<QuickStatsProps> = ({ stats, title = 'Quick Stats' }) => {
   return (
-    <div className="p-3 bg-white rounded-lg shadow">
-      <h2 className="mb-2 text-xs font-semibold tracking-wide uppercase text-gray-500">
-        Quick Stats
-      </h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 border border-gray-200 rounded-md overflow-hidden divide-x divide-gray-200">
-        {stats.map((stat) => (
-          <div key={stat.name} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className={`inline-flex p-1.5 rounded-full ${stat.color}`}>
-                <stat.icon className="w-4 h-4" />
+    <div className="bg-white border border-stone-200 rounded-xl shadow-sm p-3 sm:p-4">
+      <h3 className="mb-3 sm:mb-4 text-sm sm:text-base font-semibold text-stone-900">{title}</h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+          const inner = (
+            <>
+              <span className={cn('shrink-0 rounded-lg p-1.5 sm:p-2', toneIcon[stat.tone])}>
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </span>
-              <p className="text-xs font-medium text-gray-600 leading-4 truncate">
-                {stat.name}
-              </p>
+              <span className="min-w-0">
+                <span className="block text-sm sm:text-lg font-semibold leading-tight text-stone-900">{stat.value}</span>
+                <span className="block truncate text-[10px] sm:text-xs text-stone-500">{stat.name}</span>
+                {stat.hint && <span className="block truncate text-[10px] text-stone-400">{stat.hint}</span>}
+              </span>
+            </>
+          );
+          const cls = 'flex items-center gap-2 sm:gap-3 rounded-lg bg-stone-50 p-2 sm:p-3';
+          return stat.href ? (
+            <Link
+              key={stat.name}
+              href={stat.href}
+              className={cn(cls, 'border border-transparent transition-colors hover:border-stone-200 hover:bg-stone-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-900/20')}
+            >
+              {inner}
+            </Link>
+          ) : (
+            <div key={stat.name} className={cls}>
+              {inner}
             </div>
-            <p className="text-sm font-semibold text-gray-900 leading-5 ml-2">
-              {stat.value}
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

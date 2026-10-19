@@ -1,13 +1,28 @@
 // src/app/(routes)/admin/blogs/components/CategoriesTab.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { FiEdit2, FiTrash2, FiCheckCircle, FiXCircle, FiStar } from 'react-icons/fi';
-import CategoryModal, { type CategoryInput } from './CategoryModal';
-import blogCategoryService  from '../services/blogCategoryService';
+import { CheckCircle2, Edit2, FileText, FolderOpen, Plus, Star, Trash2, XCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  IconButton,
+  LoadingState,
+  StatCard,
+  StatGrid,
+  StatusBadge,
+} from '@/components/admin/ui';
+import { cn } from '@/lib/utils';
 import { assetUrl } from '@/lib/productMedia';
+import CategoryModal, { type CategoryInput } from './CategoryModal';
+import blogCategoryService from '../services/blogCategoryService';
+import { getErrorMessage } from '../_shared/apiError';
 
 
 // Frontend category interface with normalized ID
@@ -29,22 +44,27 @@ export interface CategoryWithCount extends Category {
 
 export default function CategoriesTab() {
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Modal state
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [categoryModalMode, setCategoryModalMode] = useState<'create' | 'edit'>('create');
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Delete confirmation
+  const [pendingDelete, setPendingDelete] = useState<CategoryWithCount | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch categories when component mounts
   useEffect(() => {
     fetchCategories();
 
-    // Listen for the custom event to open create modal
+    // The page header's "Add Category" button opens the create modal
     const handleOpenCreate = () => openCreateCategory();
     window.addEventListener('openCreateCategory', handleOpenCreate);
-    
+
     return () => {
       window.removeEventListener('openCreateCategory', handleOpenCreate);
     };
@@ -53,16 +73,12 @@ export default function CategoriesTab() {
   const fetchCategories = async () => {
     try {
       setIsLoading(true);
-      // The service now returns properly typed data
       const categories = await blogCategoryService.getCategoriesWithCount();
-      console.log('Fetched categories:', categories);
-      
-      // The categories are already in the correct format from the service
       setCategories(categories);
       setError(null);
     } catch (err) {
       console.error('Failed to fetch categories:', err);
-      setError('Failed to load categories. Please try again.');
+      setError(getErrorMessage(err, 'Failed to load categories. Please try again.'));
       setCategories([]);
     } finally {
       setIsLoading(false);
@@ -96,6 +112,7 @@ export default function CategoriesTab() {
       categoryData = data;
     }
     try {
+      setIsSaving(true);
       if (categoryModalMode === 'create') {
         await blogCategoryService.createCategory({
           name: categoryData.name,
@@ -117,52 +134,43 @@ export default function CategoriesTab() {
         });
         toast.success('Category updated successfully');
       }
-      
+
       setCategoryModalOpen(false);
       fetchCategories(); // Refresh the list
     } catch (error) {
       console.error('Error submitting category:', error);
-      toast.error('Failed to save category. Please try again.');
+      toast.error(getErrorMessage(error, 'Failed to save category. Please try again.', { upload: true }));
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleDeleteCategory = async (id: string) => {
-    // Optional: Add confirmation dialog
-    const confirmDelete = window.confirm('Are you sure you want to delete this category? This action cannot be undone.');
-    if (!confirmDelete) return;
-
+  const handleDeleteCategory = async () => {
+    if (!pendingDelete) return;
     try {
-      await blogCategoryService.deleteCategory(id);
+      setIsDeleting(true);
+      await blogCategoryService.deleteCategory(pendingDelete.id);
       toast.success('Category deleted successfully');
+      setPendingDelete(null);
       fetchCategories(); // Refresh the list
     } catch (error) {
       console.error('Error deleting category:', error);
-      
-      // More specific error handling
-      let errorMessage = 'Failed to delete category';
-      
-      if (error && typeof error === 'object') {
-        const axiosError = error as { response?: { data?: { message?: string }, status?: number } };
-        
-        // Check if it's a 409 Conflict (category in use)
-        if (axiosError.response?.status === 409) {
-          errorMessage = 'Cannot delete category: It is currently being used by one or more blog posts. Please reassign or delete those blogs first.';
-        } else if (axiosError.response?.data?.message) {
-          errorMessage = axiosError.response.data.message;
-        } else if (error instanceof Error) {
-          errorMessage = error.message;
-        }
-      }
-      
-      toast.error(errorMessage);
+
+      // Check if it's a 409 Conflict (category in use)
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      toast.error(
+        status === 409
+          ? 'Cannot delete category: It is currently being used by one or more blog posts. Please reassign or delete those blogs first.'
+          : getErrorMessage(error, 'Failed to delete category'),
+        { duration: 6000 }
+      );
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const handleToggleActiveCategory = async (id: string) => {
-    console.log('Toggle active called with ID:', id);
-
-    if (!id || id === undefined || id === 'undefined') {
-      console.error('No category ID provided or ID is undefined');
+    if (!id || id === 'undefined') {
       toast.error('Error: No category selected');
       return;
     }
@@ -191,26 +199,13 @@ export default function CategoriesTab() {
     } catch (error: unknown) {
       // Revert optimistic update on error
       fetchCategories();
-
       console.error('Error toggling category active status:', error);
-      let errorMessage = 'Failed to update category status';
-
-      if (error && typeof error === 'object') {
-        const axiosError = error as { response?: { data?: { message?: string } } };
-        if (axiosError.response?.data?.message) {
-          errorMessage = axiosError.response.data.message;
-        } else if (error instanceof Error) {
-          errorMessage = error.message;
-        }
-      }
-
-      toast.error(`Error: ${errorMessage}`);
+      toast.error(getErrorMessage(error, 'Failed to update category status'));
     }
   };
 
   const handleToggleFeaturedCategory = async (id: string) => {
-    if (!id || id === undefined || id === 'undefined') {
-      console.error('No category ID provided or ID is undefined');
+    if (!id || id === 'undefined') {
       toast.error('Error: No category selected');
       return;
     }
@@ -233,150 +228,160 @@ export default function CategoriesTab() {
     } catch (error: unknown) {
       // Revert optimistic update on error
       fetchCategories();
-
       console.error('Error toggling category featured status:', error);
-      let errorMessage = 'Failed to update category featured status';
-
-      if (error && typeof error === 'object') {
-        const axiosError = error as { response?: { data?: { message?: string } } };
-        if (axiosError.response?.data?.message) {
-          errorMessage = axiosError.response.data.message;
-        } else if (error instanceof Error) {
-          errorMessage = error.message;
-        }
-      }
-
-      toast.error(`Error: ${errorMessage}`);
+      toast.error(getErrorMessage(error, 'Failed to update category featured status'));
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-8">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-      </div>
-    );
+  // Stable reference: the modal resets its fields whenever `initial` changes
+  const modalInitial = useMemo(
+    () =>
+      editingCategory
+        ? {
+            name: editingCategory.name,
+            description: editingCategory.description,
+            active: editingCategory.active,
+            thumbnailUrl: editingCategory.thumbnailUrl,
+            bannerUrl: editingCategory.bannerUrl
+          }
+        : undefined,
+    [editingCategory]
+  );
+
+  if (isLoading && categories.length === 0) {
+    return <LoadingState card label="Loading categories..." />;
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+      <Alert tone="error" title="Error loading categories" onRetry={fetchCategories}>
         {error}
-        <button
-          onClick={() => fetchCategories()}
-          className="ml-2 underline"
-        >
-          Retry
-        </button>
-      </div>
+      </Alert>
     );
   }
 
   return (
     <>
-      <div className="bg-white shadow sm:rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Categories</h3>
-          </div>
+      <StatGrid cols={4}>
+        <StatCard size="sm" label="Total" value={categories.length} icon={FolderOpen} />
+        <StatCard size="sm" label="Active" value={categories.filter(c => c.active).length} icon={CheckCircle2} tone="success" />
+        <StatCard size="sm" label="Featured" value={categories.filter(c => c.featured).length} icon={Star} />
+        <StatCard size="sm" label="Blogs" value={categories.reduce((acc, c) => acc + c.count, 0)} icon={FileText} tone="info" />
+      </StatGrid>
+
+      <Card padding="none">
+        <div className="p-3 sm:p-6">
           {categories.length === 0 ? (
-            <p className="text-sm text-gray-500">No categories found.</p>
+            <EmptyState
+              icon={FolderOpen}
+              title="No categories yet"
+              description="Get started by creating your first category."
+              action={
+                <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openCreateCategory}>
+                  Add Category
+                </Button>
+              }
+            />
           ) : (
-            <ul role="list" className="divide-y divide-gray-200">
+            <ul role="list" className="space-y-2 sm:space-y-3">
               {categories.map((cat) => (
-                <li key={cat.id} className="py-4">
-                  <div className="flex items-start gap-4">
-                    {/* Thumbnail */}
-                    <div className="flex-shrink-0">
+                <li
+                  key={cat.id}
+                  className="rounded-xl border border-stone-200 bg-stone-50 p-3 transition-all duration-200 hover:shadow-md sm:p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                    <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+                      {/* Thumbnail */}
                       {cat.thumbnailUrl ? (
-                        <div className="relative h-12 w-12 rounded-full border-2 border-gray-200 overflow-hidden">
-                          <Image
-                            src={assetUrl(cat.thumbnailUrl)}
-                            alt={cat.name}
-                            fill
-                            className="object-cover"
-                            sizes="48px"
-                          />
+                        <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border-2 border-stone-200 bg-white sm:h-14 sm:w-14">
+                          <Image src={assetUrl(cat.thumbnailUrl)} alt={cat.name} fill className="object-cover" sizes="56px" />
                         </div>
                       ) : (
-                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 text-lg font-semibold border-2 border-gray-200">
+                        <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border-2 border-stone-200 bg-stone-200 text-base font-semibold text-stone-600 sm:h-14 sm:w-14 sm:text-xl">
                           {cat.name.charAt(0).toUpperCase()}
                         </span>
                       )}
+
+                      {/* Content */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="truncate text-sm font-semibold text-stone-900 sm:text-base">{cat.name}</h3>
+                          {cat.featured && <Star className="h-3.5 w-3.5 flex-shrink-0 fill-current text-stone-900" aria-label="Featured" />}
+                        </div>
+                        <p className="truncate text-xs text-stone-500 sm:text-sm">/{cat.slug}</p>
+                        {cat.description && (
+                          <p className="mt-0.5 line-clamp-1 text-xs text-stone-600 sm:text-sm">{cat.description}</p>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <div className="truncate">
-                          <p className="text-sm font-medium text-gray-900 truncate">{cat.name}</p>
-                          <p className="text-xs text-gray-500 truncate">/{cat.slug}</p>
-                          {cat.description && (
-                            <p className="text-xs text-gray-600 mt-1 line-clamp-2">{cat.description}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 ml-4">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            {cat.count} {cat.count === 1 ? "blog" : "blogs"}
-                          </span>
-                          <button
-                            title={cat.featured ? "Remove from featured" : "Mark as featured"}
-                            onClick={() => handleToggleFeaturedCategory(cat.id)}
-                            className={cat.featured ? "text-yellow-500 hover:text-yellow-600" : "text-gray-400 hover:text-gray-500"}
-                          >
-                            <FiStar className={`h-5 w-5 ${cat.featured ? 'fill-current' : ''}`} />
-                          </button>
-                          <button
-                            title={cat.active ? "Set inactive" : "Set active"}
-                            onClick={() => {
-                              console.log('Button clicked for category:', cat); // Debug log
-                              if (cat.id) {
-                                handleToggleActiveCategory(cat.id);
-                              } else {
-                                console.error('Category has no ID:', cat);
-                                toast.error('Error: Category ID is missing');
-                              }
-                            }}
-                            className={"text-sm " + (cat.active ? "text-green-600 hover:text-green-700" : "text-gray-400 hover:text-gray-500")}
-                          >
-                            {cat.active ? <FiCheckCircle className="h-5 w-5" /> : <FiXCircle className="h-5 w-5" />}
-                          </button>
-                          <button
-                            title="Edit"
-                            onClick={() => openEditCategory(cat.id)}
-                            className="text-indigo-600 hover:text-indigo-800"
-                          >
-                            <FiEdit2 className="h-5 w-5" />
-                          </button>
-                          <button
-                            title="Delete"
-                            onClick={() => handleDeleteCategory(cat.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <FiTrash2 className="h-5 w-5" />
-                          </button>
-                        </div>
+                    {/* Banner preview */}
+                    {cat.bannerUrl && (
+                      <div className="relative hidden h-14 w-28 flex-shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-white lg:block">
+                        <Image
+                          src={assetUrl(cat.bannerUrl)}
+                          alt={`${cat.name} banner`}
+                          fill
+                          className="object-cover"
+                          sizes="112px"
+                        />
+                        <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                          Banner
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-2 border-t border-stone-200 pt-2 sm:justify-end sm:border-0 sm:pt-0">
+                      {/* Badges */}
+                      <div className="flex items-center gap-2">
+                        <Badge size="sm">
+                          {cat.count} {cat.count === 1 ? 'blog' : 'blogs'}
+                        </Badge>
+                        <StatusBadge size="sm" status={cat.active ? 'active' : 'inactive'} />
                       </div>
 
-                      {/* Banner Image */}
-                      {cat.bannerUrl && (
-                        <div className="mt-3">
-                          <div className="relative w-full h-24 rounded-lg border border-gray-200 overflow-hidden">
-                            <Image
-                              src={assetUrl(cat.bannerUrl)}
-                              alt={`${cat.name} banner`}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                            />
-                            <div className="absolute top-2 left-2">
-                              <span className="bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
-                                Banner
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5">
+                        <IconButton
+                          label={cat.featured ? 'Remove from featured' : 'Mark as featured'}
+                          icon={<Star className={cn('h-4 w-4', cat.featured && 'fill-current')} />}
+                          onClick={() => handleToggleFeaturedCategory(cat.id)}
+                          className={cn(
+                            cat.featured
+                              ? 'bg-stone-900 text-white hover:bg-stone-800 hover:text-white'
+                              : 'bg-white text-stone-400 ring-1 ring-stone-200 hover:bg-stone-100 hover:text-stone-700'
+                          )}
+                        />
+                        <IconButton
+                          label={cat.active ? 'Deactivate' : 'Activate'}
+                          icon={cat.active ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                          onClick={() => {
+                            if (cat.id) {
+                              handleToggleActiveCategory(cat.id);
+                            } else {
+                              toast.error('Error: Category ID is missing');
+                            }
+                          }}
+                          className={cn(
+                            cat.active
+                              ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700'
+                              : 'bg-white text-stone-400 ring-1 ring-stone-200 hover:bg-stone-100 hover:text-stone-700'
+                          )}
+                        />
+                        <IconButton
+                          label="Edit"
+                          icon={<Edit2 className="h-4 w-4" />}
+                          onClick={() => openEditCategory(cat.id)}
+                          className="bg-white text-stone-600 ring-1 ring-stone-200 hover:bg-stone-100"
+                        />
+                        <IconButton
+                          label="Delete"
+                          tone="danger"
+                          icon={<Trash2 className="h-4 w-4" />}
+                          onClick={() => setPendingDelete(cat)}
+                          className="bg-white text-red-500 ring-1 ring-stone-200 hover:bg-red-50 hover:text-red-600"
+                        />
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -384,24 +389,38 @@ export default function CategoriesTab() {
             </ul>
           )}
         </div>
-      </div>
+      </Card>
 
       <CategoryModal
         open={categoryModalOpen}
         mode={categoryModalMode}
-        initial={
-          editingCategory
-            ? {
-                name: editingCategory.name,
-                description: editingCategory.description,
-                active: editingCategory.active,
-                thumbnailUrl: editingCategory.thumbnailUrl,
-                bannerUrl: editingCategory.bannerUrl
-              }
-            : undefined
-        }
+        saving={isSaving}
+        initial={modalInitial}
         onClose={() => setCategoryModalOpen(false)}
         onSubmit={handleSubmitCategory}
+      />
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete category?"
+        message={
+          <div className="space-y-2">
+            <p>
+              <span className="font-medium text-stone-900">{pendingDelete?.name}</span> will be removed permanently. This
+              action cannot be undone.
+            </p>
+            {pendingDelete && pendingDelete.count > 0 && (
+              <p className="text-amber-700">
+                It is used by {pendingDelete.count} {pendingDelete.count === 1 ? 'blog' : 'blogs'}. Move those posts to
+                another category first so they aren&apos;t left without one.
+              </p>
+            )}
+          </div>
+        }
+        confirmLabel="Delete category"
+        loading={isDeleting}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={handleDeleteCategory}
       />
     </>
   );

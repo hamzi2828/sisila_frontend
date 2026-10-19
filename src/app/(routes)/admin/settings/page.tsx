@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Settings, Bell, Shield, Image as ImageIcon, Link2 } from 'lucide-react';
+import { Settings, Bell, Shield, Image as ImageIcon, Link2, RotateCcw } from 'lucide-react';
+import { AdminPage, Alert, Button, Card, ConfirmDialog, LoadingState, PageHeader, Tabs, type TabItem } from '@/components/admin/ui';
+import { compressImage } from '@/lib/compressImage';
 
 import GeneralSettings from './components/GeneralSettings';
 import NotificationSettings from './components/NotificationSettings';
@@ -12,183 +13,184 @@ import LogoUpload from './components/LogoUpload';
 import SocialLinks from './components/SocialLinks';
 import { settingsService, SettingsData } from './services/settingsService';
 
+type SettingsTab = 'general' | 'logo' | 'social' | 'notifications' | 'security';
+
+const TABS: TabItem<SettingsTab>[] = [
+  { key: 'general', label: 'General', icon: Settings },
+  { key: 'logo', label: 'Logo', icon: ImageIcon },
+  { key: 'social', label: 'Social Links', icon: Link2 },
+  { key: 'notifications', label: 'Notifications', icon: Bell },
+  { key: 'security', label: 'Security', icon: Shield },
+];
+
+const isSettingsTab = (value: string | null): value is SettingsTab => TABS.some((t) => t.key === value);
+
+const errorMessage = (error: unknown, fallback: string) => (error instanceof Error && error.message ? error.message : fallback);
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<SettingsData | null>(null);
+  const [isFetching, setIsFetching] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [confirmReset, setConfirmReset] = useState(false);
 
-  // Fetch settings on component mount
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
-      setIsLoading(true);
+      setIsFetching(true);
+      setLoadError(null);
       const data = await settingsService.getSettings();
       setSettings(data);
     } catch (error) {
       console.error('Error fetching settings:', error);
-      toast.error('Failed to load settings');
+      const message = errorMessage(error, 'Failed to load settings');
+      setLoadError(message);
+      toast.error(message);
     } finally {
-      setIsLoading(false);
+      setIsFetching(false);
     }
+  }, []);
+
+  // Fetch settings on component mount
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  // Deep-linkable tabs (?tab=logo) without useSearchParams (keeps the page free of Suspense requirements).
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (isSettingsTab(tab)) setActiveTab(tab);
+  }, []);
+
+  const changeTab = (tab: SettingsTab) => {
+    setActiveTab(tab);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    window.history.replaceState(window.history.state, '', url.toString());
   };
 
-  const updateSettings = async (updateData: Partial<SettingsData>) => {
+  const updateSettings = async (updateData: Partial<SettingsData>): Promise<boolean> => {
     try {
       setIsLoading(true);
       const data = await settingsService.updateSettings(updateData);
       setSettings(data);
       toast.success('Settings updated successfully');
+      return true;
     } catch (error) {
       console.error('Error updating settings:', error);
-      toast.error('Failed to update settings');
+      toast.error(errorMessage(error, 'Failed to update settings'));
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const uploadLogo = async (file: File) => {
+  const uploadLogo = async (file: File): Promise<boolean> => {
     try {
       setIsLoading(true);
-      const data = await settingsService.uploadLogo(file);
-      setSettings(prev => prev ? { ...prev, logoUrl: data.logoUrl } : null);
+      // Resize / re-encode in the browser so the request stays well under Vercel's 4.5 MB body limit.
+      const optimised = await compressImage(file, { maxDimension: 1200 });
+      const data = await settingsService.uploadLogo(optimised);
+      setSettings((prev) => (prev ? { ...prev, logoUrl: data.logoUrl } : prev));
       toast.success('Logo uploaded successfully');
+      return true;
     } catch (error) {
       console.error('Error uploading logo:', error);
-      toast.error('Failed to upload logo');
+      toast.error(errorMessage(error, 'Failed to upload logo'));
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const removeLogo = async () => {
+  const removeLogo = async (): Promise<boolean> => {
     try {
       setIsLoading(true);
-      await settingsService.removeLogo();
-      setSettings(prev => prev ? { ...prev, logoUrl: '' } : null);
+      const updated = await settingsService.removeLogo();
+      setSettings((prev) => (prev ? { ...prev, logoUrl: updated?.logoUrl ?? '' } : prev));
       toast.success('Logo removed successfully');
+      return true;
     } catch (error) {
       console.error('Error removing logo:', error);
-      toast.error('Failed to remove logo');
+      toast.error(errorMessage(error, 'Failed to remove logo'));
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
   const resetSettings = async () => {
-    if (!confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
-      return;
-    }
-
     try {
       setIsLoading(true);
       const data = await settingsService.resetSettings();
       setSettings(data);
+      setConfirmReset(false);
       toast.success('Settings reset to defaults');
     } catch (error) {
       console.error('Error resetting settings:', error);
-      toast.error('Failed to reset settings');
+      toast.error(errorMessage(error, 'Failed to reset settings'));
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!settings) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your application settings and preferences
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={resetSettings}
-            className="px-4 py-2 text-sm text-destructive border border-destructive rounded-md hover:bg-destructive hover:text-destructive-foreground transition-colors"
-            disabled={isLoading}
+    <AdminPage className="max-w-5xl">
+      <PageHeader
+        title="Settings"
+        subtitle="Manage your application settings and preferences"
+        actions={
+          <Button
+            variant="secondary"
+            onClick={() => setConfirmReset(true)}
+            disabled={!settings || isLoading}
+            leftIcon={<RotateCcw className="h-4 w-4" />}
           >
-            Reset to Defaults
-          </button>
-        </div>
-      </div>
+            <span className="hidden sm:inline">Reset to Defaults</span>
+            <span className="sm:hidden">Reset</span>
+          </Button>
+        }
+      />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="general" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            General
-          </TabsTrigger>
-          <TabsTrigger value="logo" className="flex items-center gap-2">
-            <ImageIcon className="h-4 w-4" />
-            Logo
-          </TabsTrigger>
-          <TabsTrigger value="social" className="flex items-center gap-2">
-            <Link2 className="h-4 w-4" />
-            Social Links
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Security
-          </TabsTrigger>
-        </TabsList>
+      {!settings ? (
+        isFetching ? (
+          <LoadingState card label="Loading settings..." />
+        ) : (
+          <Alert tone="error" title="Couldn't load settings" onRetry={fetchSettings}>
+            {loadError || 'Something went wrong while loading settings.'}
+          </Alert>
+        )
+      ) : (
+        <Card padding="none" className="overflow-hidden">
+          <Tabs tabs={TABS} value={activeTab} onChange={changeTab} />
 
-        <TabsContent value="general">
-          <GeneralSettings
-            settings={settings}
-            onUpdate={updateSettings}
-            isLoading={isLoading}
-          />
-        </TabsContent>
+          <div className="p-4 sm:p-6">
+            {activeTab === 'general' && <GeneralSettings settings={settings} onUpdate={updateSettings} isLoading={isLoading} />}
 
-        <TabsContent value="logo">
-          <LogoUpload
-            currentLogo={settings.logoUrl}
-            onUpload={uploadLogo}
-            onRemove={removeLogo}
-            isLoading={isLoading}
-          />
-        </TabsContent>
+            {activeTab === 'logo' && (
+              <LogoUpload currentLogo={settings.logoUrl} onUpload={uploadLogo} onRemove={removeLogo} isLoading={isLoading} />
+            )}
 
-        <TabsContent value="social">
-          <SocialLinks
-            settings={settings}
-            onUpdate={updateSettings}
-            isLoading={isLoading}
-          />
-        </TabsContent>
+            {activeTab === 'social' && <SocialLinks settings={settings} onUpdate={updateSettings} isLoading={isLoading} />}
 
-        <TabsContent value="notifications">
-          <NotificationSettings
-            settings={settings}
-            onUpdate={updateSettings}
-            isLoading={isLoading}
-          />
-        </TabsContent>
+            {activeTab === 'notifications' && (
+              <NotificationSettings settings={settings} onUpdate={updateSettings} isLoading={isLoading} />
+            )}
 
-        <TabsContent value="security">
-          <SecuritySettings
-            settings={settings}
-            onUpdate={updateSettings}
-            isLoading={isLoading}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
+            {activeTab === 'security' && <SecuritySettings settings={settings} onUpdate={updateSettings} isLoading={isLoading} />}
+          </div>
+        </Card>
+      )}
+
+      <ConfirmDialog
+        open={confirmReset}
+        title="Reset all settings?"
+        message="All settings will be restored to their defaults, including the site details, logo and social links. This action cannot be undone."
+        confirmLabel="Reset settings"
+        loading={isLoading}
+        onCancel={() => setConfirmReset(false)}
+        onConfirm={resetSettings}
+      />
+    </AdminPage>
   );
 }

@@ -2,23 +2,36 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { FiPlus } from 'react-icons/fi';
+import { FileText, FolderOpen, PenSquare, Plus, Users } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import Tabs from '../products/components/Tabs';
+import { AdminPage, Button, ConfirmDialog, PageHeader, Tabs } from '@/components/admin/ui';
 import CategoriesTab from './components/CategoriesTab';
 import AuthorsTab from './components/AuthorsTab';
 import AllBlogs, { type Blog } from './components/AllBlogs';
 import CreateBlog from './components/CreateBlog';
 import EditBlog from './components/EditBlog';
 import blogService from './services/blogService';
+import { getErrorMessage } from './_shared/apiError';
+
+type BlogTab = 'all' | 'categories' | 'authors' | 'create' | 'edit';
+
+const SUBTITLES: Record<BlogTab, string> = {
+  all: 'Manage your blog posts',
+  categories: 'Organize blogs with categories',
+  authors: 'Manage blog authors',
+  create: 'Write a new post with rich content and images',
+  edit: 'Update this post',
+};
 
 const BlogsPage = () => {
-  const [activeTab, setActiveTab] = useState<'all' | 'categories' | 'authors' | 'create' | 'edit'>('all');
+  const [activeTab, setActiveTab] = useState<BlogTab>('all');
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingBlog, setEditingBlog] = useState<Blog | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pendingDelete, setPendingDelete] = useState<Blog | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
@@ -38,7 +51,7 @@ const BlogsPage = () => {
       setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching blogs:', error);
-      setError('Failed to load blogs. Please try again.');
+      setError(getErrorMessage(error, 'Failed to load blogs. Please try again.'));
       toast.error('Failed to load blogs');
     } finally {
       setIsLoading(false);
@@ -71,17 +84,33 @@ const BlogsPage = () => {
     setEditingBlog(null);
     setActiveTab('all');
   };
-  
-  // Blog deletion handler
-  const handleDelete = async (id: string) => {
+
+  const handleCreated = () => {
+    setCurrentPage(1);
+    setActiveTab('all');
+  };
+
+  // Blog deletion: ask first, then delete
+  const handleDelete = (id: string) => {
+    const blog = blogs.find(b => b.id === id);
+    if (blog) setPendingDelete(blog);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
     try {
-      await blogService.deleteBlog(id);
-      // Refresh current page after deletion
-      fetchBlogs(currentPage);
+      setIsDeleting(true);
+      await blogService.deleteBlog(pendingDelete.id);
+      // Step back a page when the last post on this page was removed
+      if (blogs.length === 1 && currentPage > 1) setCurrentPage(currentPage - 1);
+      else fetchBlogs(currentPage);
       toast.success('Blog deleted successfully');
+      setPendingDelete(null);
     } catch (error) {
       console.error('Error deleting blog:', error);
-      toast.error('Failed to delete blog');
+      toast.error(getErrorMessage(error, 'Failed to delete blog'));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -93,7 +122,7 @@ const BlogsPage = () => {
       toast.success(`Blog ${featured ? 'marked as featured' : 'removed from featured'}`);
     } catch (error) {
       console.error('Error toggling blog featured status:', error);
-      toast.error('Failed to update blog featured status');
+      toast.error(getErrorMessage(error, 'Failed to update blog featured status'));
     }
   };
 
@@ -105,7 +134,7 @@ const BlogsPage = () => {
       toast.success(`Blog ${status === 'published' ? 'published' : 'saved as draft'} successfully`);
     } catch (error) {
       console.error('Error toggling blog status:', error);
-      toast.error('Failed to update blog status');
+      toast.error(getErrorMessage(error, 'Failed to update blog status'));
     }
   };
 
@@ -114,80 +143,93 @@ const BlogsPage = () => {
     setCurrentPage(newPage);
   };
 
+  const headerAction =
+    activeTab === 'categories' ? (
+      <Button
+        leftIcon={<Plus className="h-4 w-4" />}
+        onClick={() => window.dispatchEvent(new CustomEvent('openCreateCategory'))}
+      >
+        <span className="hidden sm:inline">Add Category</span>
+        <span className="sm:hidden">Add</span>
+      </Button>
+    ) : activeTab === 'authors' ? (
+      <Button
+        leftIcon={<Plus className="h-4 w-4" />}
+        onClick={() => window.dispatchEvent(new CustomEvent('openCreateAuthor'))}
+      >
+        <span className="hidden sm:inline">Add Author</span>
+        <span className="sm:hidden">Add</span>
+      </Button>
+    ) : activeTab === 'all' ? (
+      <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setActiveTab('create')}>
+        <span className="hidden sm:inline">Create Blog</span>
+        <span className="sm:hidden">Add</span>
+      </Button>
+    ) : null;
+
   return (
-    <div className="space-y-6 overflow-x-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Blogs</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage your blog posts and categories</p>
-        </div>
-        {activeTab === 'categories' ? (
-          <button
-            onClick={() => {
-              const event = new CustomEvent('openCreateCategory');
-              window.dispatchEvent(event);
-            }}
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <FiPlus className="-ml-1 mr-2 h-5 w-5" />
-            Add Category
-          </button>
-        ) : activeTab === 'authors' ? (
-          null
-        ) : (
-          <button
-            onClick={() => setActiveTab('create')}
-            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <FiPlus className="-ml-1 mr-2 h-5 w-5" />
-            Create Blog
-          </button>
-        )}
-      </div>
-
-      {activeTab !== 'edit' && (
-        <Tabs
-          tabs={[
-            { key: 'all', label: 'All Blogs', count: pagination.total || blogs.length },
-            { key: 'categories', label: 'Blog Categories' },
-            { key: 'authors', label: 'Authors' },
-            { key: 'create', label: 'Create Blog' },
-          ]}
-          activeKey={activeTab}
-          onChange={(key) => setActiveTab(key as 'all' | 'categories' | 'authors' | 'create')}
-        />
-      )}
-
-      {activeTab === 'all' && (
-        <AllBlogs
-          blogs={blogs}
-          onDelete={handleDelete}
-          onEdit={handleEdit}
-          onToggleFeatured={handleToggleFeatured}
-          onToggleStatus={handleToggleStatus}
-          loading={isLoading}
-          error={error}
-          pagination={pagination}
-          onPageChange={handlePageChange}
-        />
-      )}
-
-      {activeTab === 'categories' && <CategoriesTab />}
-
-      {activeTab === 'authors' && <AuthorsTab />}
-
-      {activeTab === 'create' && (
-        <CreateBlog />
-      )}
-
-      {activeTab === 'edit' && editingBlog && (
+    <AdminPage>
+      {activeTab === 'edit' && editingBlog ? (
         <EditBlog
           blog={editingBlog}
           onUpdate={handleUpdate}
           onCancel={handleCancelEdit}
         />
+      ) : (
+        <>
+          <PageHeader title="Blogs" subtitle={SUBTITLES[activeTab]} actions={headerAction} />
+
+          <Tabs
+            variant="pills"
+            tabs={[
+              { key: 'all', label: 'All Blogs', icon: FileText, count: pagination.total || blogs.length },
+              { key: 'categories', label: 'Blog Categories', icon: FolderOpen },
+              { key: 'authors', label: 'Authors', icon: Users },
+              { key: 'create', label: 'Create Blog', icon: PenSquare },
+            ]}
+            value={activeTab}
+            onChange={(key) => setActiveTab(key as BlogTab)}
+          />
+
+          {activeTab === 'all' && (
+            <AllBlogs
+              blogs={blogs}
+              onDelete={handleDelete}
+              onEdit={handleEdit}
+              onToggleFeatured={handleToggleFeatured}
+              onToggleStatus={handleToggleStatus}
+              loading={isLoading}
+              error={error}
+              onRetry={() => fetchBlogs(currentPage)}
+              onCreate={() => setActiveTab('create')}
+              pagination={pagination}
+              onPageChange={handlePageChange}
+            />
+          )}
+
+          {activeTab === 'categories' && <CategoriesTab />}
+
+          {activeTab === 'authors' && <AuthorsTab />}
+
+          {activeTab === 'create' && <CreateBlog onCreated={handleCreated} />}
+        </>
       )}
-    </div>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete blog?"
+        message={
+          <>
+            <span className="font-medium text-stone-900">&ldquo;{pendingDelete?.title}&rdquo;</span> will be removed
+            permanently. This can&apos;t be undone.
+          </>
+        }
+        confirmLabel="Delete blog"
+        loading={isDeleting}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+      />
+    </AdminPage>
   );
 };
 

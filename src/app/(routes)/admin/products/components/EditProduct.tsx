@@ -1,9 +1,13 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ProductForm from "./ProductForm";
 import type { Product } from "./AllProducts";
 import type { Category } from "./CategoriesTab";
 import { productService } from "../services/productService";
+import { toast } from "react-hot-toast";
+import { ArrowLeft, Package } from "lucide-react";
+import { getApiErrorMessage } from "@/lib/apiError";
+import { Button, EmptyState, LoadingState } from "@/components/admin/ui";
 
 interface EditProductProps {
   productId: string;
@@ -26,7 +30,13 @@ export default function EditProduct({
 }: EditProductProps) {
   const [loading, setLoading] = useState(true);
   const [product, setProduct] = useState<Product | null>(null);
-  
+  // Parents pass a new onCancel on every render; keep it out of the effect deps so a re-render
+  // does not reload the product and wipe the admin's unsaved edits.
+  const onCancelRef = useRef(onCancel);
+  useEffect(() => {
+    onCancelRef.current = onCancel;
+  }, [onCancel]);
+
   // Load product data
   useEffect(() => {
     const loadProduct = async () => {
@@ -36,44 +46,35 @@ export default function EditProduct({
         setProduct(data);
       } catch (error) {
         console.error("Failed to load product:", error);
-        onCancel();
+        toast.error(`Could not load product: ${getApiErrorMessage(error)}`);
+        onCancelRef.current();
       } finally {
         setLoading(false);
       }
     };
-    
+
     if (productId) {
       loadProduct();
     }
-  }, [productId, onCancel]);
+  }, [productId]);
   
   if (loading) {
-    return (
-      <div className="bg-white shadow sm:rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="flex items-center justify-center">
-            <div className="animate-pulse text-gray-500">Loading product...</div>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingState label="Loading product..." card />;
   }
-  
+
   if (!product) {
     return (
-      <div className="bg-white shadow sm:rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="text-center">
-            <p className="text-red-600">Product not found</p>
-            <button
-              onClick={onCancel}
-              className="mt-2 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-            >
-              Go Back
-            </button>
-          </div>
-        </div>
-      </div>
+      <EmptyState
+        card
+        icon={Package}
+        title="Product not found"
+        description="It may have been deleted. Go back to the product list and try again."
+        action={
+          <Button variant="secondary" onClick={onCancel} leftIcon={<ArrowLeft className="h-4 w-4" />}>
+            Back to products
+          </Button>
+        }
+      />
     );
   }
 

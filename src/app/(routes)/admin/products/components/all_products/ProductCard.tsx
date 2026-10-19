@@ -1,259 +1,245 @@
 "use client";
 import React from "react";
-import Image from "next/image";
-import { FiEdit2, FiTrash2, FiStar } from "react-icons/fi";
-import { Product } from "../AllProducts";
+import Link from "next/link";
+import { Pencil, Star, Trash2 } from "lucide-react";
+import { IconButton, StatusBadge, Switch, TD, TR } from "@/components/admin/ui";
 import { formatPrice } from "@/lib/formatPrice";
+import { cn } from "@/lib/utils";
+import type { Product } from "../AllProducts";
+import ProductThumb from "./ProductThumb";
+import { formatCollectionId, getPriceRange, getVariantColors } from "./productImage";
 
-interface ProductCardProps {
+type ProductStatus = Product["status"];
+
+export interface ProductItemProps {
   product: Product;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
-  onToggleStatus?: (id: string, newStatus: 'published' | 'draft') => Promise<void>;
   onToggleFeatured?: (id: string) => void;
+  /** Present when publishing is allowed from the list. */
+  onToggleStatus?: (id: string, newStatus: "published" | "draft") => Promise<void>;
   togglingStatus: Set<string>;
-  handleToggleStatus: (productId: string, currentStatus: 'published' | 'draft' | 'out_of_stock') => Promise<void>;
+  handleToggleStatus: (productId: string, currentStatus: ProductStatus) => Promise<void>;
 }
 
-export default function ProductCard({
+const editHref = (id: string) => `/admin/products/edit/${id}`;
+
+/** "Poetry · Series: Poets" */
+function metaLine(product: Product) {
+  const parts = [product.category || "Uncategorised"];
+  if (product.collectionType && product.collectionType !== "none") {
+    const kind = product.collectionType === "theme" ? "Theme" : "Series";
+    parts.push(product.collectionId ? `${kind}: ${formatCollectionId(product.collectionId)}` : kind);
+  }
+  return parts.join(" · ");
+}
+
+function variantSummary(product: Product) {
+  if (product.productType !== "variant") return "Single product";
+  const count = product.variants?.length ?? 0;
+  return `${count} ${count === 1 ? "variant" : "variants"}`;
+}
+
+function Price({ product, compact }: { product: Product; compact?: boolean }) {
+  const range = getPriceRange(product);
+  if (range) {
+    return (
+      <span className="whitespace-nowrap font-semibold text-stone-900">
+        {range.min === range.max ? formatPrice(range.min) : `${formatPrice(range.min)} – ${formatPrice(range.max)}`}
+      </span>
+    );
+  }
+  const onSale = !!product.discountedPrice && product.discountedPrice > 0 && product.discountedPrice < product.price;
+  if (!onSale) return <span className="whitespace-nowrap font-semibold text-stone-900">{formatPrice(product.price)}</span>;
+  return (
+    <span className={cn("inline-flex flex-wrap items-baseline whitespace-nowrap", compact ? "gap-x-1.5" : "gap-x-2")}>
+      <span className="font-semibold text-stone-900">{formatPrice(product.discountedPrice)}</span>
+      <span className="text-xs text-stone-400 line-through">{formatPrice(product.price)}</span>
+    </span>
+  );
+}
+
+/** Stock + variant summary ("54 in stock" / "12 variants · 2 sold out"). */
+function Inventory({ product }: { product: Product }) {
+  const variants = product.productType === "variant" ? product.variants ?? [] : [];
+  const soldOut = variants.filter((v) => !(v.stock > 0)).length;
+  const colors = getVariantColors(product);
+  const detail =
+    product.productType === "variant"
+      ? `${variantSummary(product)}${soldOut > 0 ? ` · ${soldOut} sold out` : colors.length > 0 ? ` · ${colors.length} ${colors.length === 1 ? "colour" : "colours"}` : ""}`
+      : "Single product";
+
+  return (
+    <div className="max-w-[13rem]" title={colors.length > 0 ? `Colours: ${colors.join(", ")}` : undefined}>
+      {product.stock <= 0 ? (
+        <div className="font-medium text-red-600">Out of stock</div>
+      ) : (
+        <div>
+          <span className="font-medium text-stone-900">{product.stock}</span>{" "}
+          <span className={product.stock <= 5 ? "font-medium text-amber-600" : "text-stone-500"}>
+            {product.stock <= 5 ? "left · low stock" : "in stock"}
+          </span>
+        </div>
+      )}
+      <div className={cn("truncate text-xs", soldOut > 0 ? "text-amber-600" : "text-stone-500")}>{detail}</div>
+    </div>
+  );
+}
+
+/** Compact cell padding so the table fits the card from md (no sidebar) and lg (sidebar) up. */
+export const productCell = {
+  first: "pl-4 pr-3 sm:pl-4 sm:pr-3",
+  mid: "px-3 sm:px-3",
+  last: "pl-2 pr-3 sm:pl-2 sm:pr-3",
+} as const;
+
+function ProductActions({
   product,
   onEdit,
   onDelete,
-  onToggleStatus,
   onToggleFeatured,
+  onToggleStatus,
   togglingStatus,
-  handleToggleStatus
-}: ProductCardProps) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "published":
-        return "bg-green-100 text-green-800";
-      case "draft":
-        return "bg-yellow-100 text-yellow-800";
-      case "out_of_stock":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const formatStatus = (status: string) =>
-    status
-      .split("_")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
+  handleToggleStatus,
+  size,
+  idPrefix,
+}: ProductItemProps & { size: "sm" | "md"; idPrefix: "row" | "card" }) {
+  const toggling = togglingStatus.has(product.id);
+  const canPublish = !!onToggleStatus && product.status !== "out_of_stock";
+  const switchId = `publish-${idPrefix}-${product.id}`;
+  const switchTitle =
+    product.status === "out_of_stock"
+      ? "Out of stock products can't be published from the list"
+      : product.status === "published"
+        ? "Published – click to unpublish"
+        : "Draft – click to publish";
 
   return (
-    <tr key={product.id} className="hover:bg-gray-50">
-      {/* Product Info */}
-      <td className="px-4 py-4 whitespace-nowrap">
-        <div className="flex items-center">
-          <div className="flex-shrink-0 h-12 w-12">
-            {(() => {
-              // For variant products, show placeholder instead of first color thumbnail
-              if (product.productType === "variant") {
-                return (
-                  <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-indigo-100 to-blue-200 border border-gray-200 shadow-sm flex items-center justify-center">
-                    <span className="text-sm font-semibold text-indigo-600">
-                      {product.variants?.length || 0}
-                    </span>
-                  </div>
-                );
-              } else {
-                // For single products, use thumbnailUrl or bannerUrls
-                const displayImage = product.thumbnailUrl || product.bannerUrls?.[0] || product.image || "/images/logo.png";
-                return (
-                  <Image
-                    className="h-12 w-12 rounded-lg object-cover border border-gray-200 shadow-sm"
-                    src={displayImage.startsWith('/') ? `http://localhost:3001${displayImage}` : displayImage}
-                    alt={product.name}
-                    width={48}
-                    height={48}
-                  />
-                );
-              }
-            })()}
-          </div>
-          <div className="ml-3 min-w-0 flex-1">
-            <div className="flex items-center space-x-2 mb-1">
-              <div className="text-sm font-medium text-gray-900 truncate" title={product.name}>{product.name}</div>
-              {product.featured && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                  Featured
-                </span>
-              )}
-            </div>
-            {product.slug && (
-              <div className="text-xs text-gray-500 truncate mb-1">/{product.slug}</div>
-            )}
-            {/* Category and Collection */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-              {/* Category Badge */}
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
-                {product.category}
-              </span>
-
-              {/* Collection Badge */}
-              {product.collectionType && product.collectionType !== 'none' && (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                  product.collectionType === 'theme'
-                    ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                    : 'bg-pink-100 text-pink-700 border border-pink-200'
-                }`} title={`${product.collectionType === 'theme' ? 'Theme' : 'Series'}: ${product.collectionId}`}>
-                  {product.collectionType === 'theme' ? '🎨 Theme' : '📚 Series'}: {product.collectionId}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </td>
-
-      {/* Variants */}
-      <td className="px-3 py-4 whitespace-nowrap">
-        <div className="flex flex-col space-y-1">
-          {product.productType === "variant" ? (
-            <>
-              <div className="flex items-center space-x-2">
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Variant
-                </span>
-                <span className="text-xs font-semibold text-gray-600">
-                  {product.variants?.length || 0} variants
-                </span>
-              </div>
-              {product.variants && product.variants.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {Array.from(new Set(product.variants.map(v => v.color))).slice(0, 4).map((color, idx) => (
-                    <span key={idx} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700 border">
-                      {color}
-                    </span>
-                  ))}
-                  {Array.from(new Set(product.variants.map(v => v.color))).length > 4 && (
-                    <span className="text-xs text-gray-400">+{Array.from(new Set(product.variants.map(v => v.color))).length - 4} more</span>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-              Single
-            </span>
-          )}
-        </div>
-      </td>
-
-      {/* Status */}
-      <td className="px-3 py-4 whitespace-nowrap">
-        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(product.status)}`}>
-          {formatStatus(product.status)}
+    <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+      {onToggleStatus && (
+        <span title={switchTitle} className={cn("relative mr-1 inline-flex", toggling && "animate-pulse")}>
+          <label htmlFor={switchId} className="sr-only">
+            {product.status === "published" ? "Unpublish" : "Publish"} {product.name}
+          </label>
+          <Switch
+            id={switchId}
+            checked={product.status === "published"}
+            disabled={!canPublish || toggling}
+            onChange={() => handleToggleStatus(product.id, product.status)}
+          />
         </span>
-      </td>
+      )}
+      <IconButton
+        label={product.featured ? "Remove from featured" : "Mark as featured"}
+        size={size}
+        tone="warning"
+        className={product.featured ? "text-amber-500 hover:text-amber-600" : undefined}
+        icon={<Star className={cn("h-4 w-4", product.featured && "fill-current")} />}
+        aria-pressed={!!product.featured}
+        onClick={() => onToggleFeatured?.(product.id)}
+      />
+      <IconButton label="Edit product" size={size} icon={<Pencil className="h-4 w-4" />} onClick={() => onEdit?.(product.id)} />
+      <IconButton
+        label="Delete product"
+        size={size}
+        tone="danger"
+        icon={<Trash2 className="h-4 w-4" />}
+        onClick={() => onDelete?.(product.id)}
+      />
+    </div>
+  );
+}
 
-      {/* Price */}
-      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-        <div className="flex flex-col">
-          {product.productType === "variant" && product.variants && product.variants.length > 0 ? (
-            <>
-              <span className="font-medium">
-                {formatPrice(Math.min(...product.variants.map(v => v.price)))} - {formatPrice(Math.max(...product.variants.map(v => v.price)))}
-              </span>
-              <span className="text-xs text-gray-500">
-                {product.variants.length} price points
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="font-medium">{formatPrice(product.price)}</span>
-              {product.discountedPrice && product.discountedPrice < product.price && (
-                <span className="text-xs text-green-600">
-                  Sale: {formatPrice(product.discountedPrice)}
-                </span>
-              )}
-            </>
-          )}
+/** Table row (md and up). */
+export function ProductRow(props: ProductItemProps) {
+  const { product } = props;
+
+  return (
+    <TR>
+      <TD className={cn("w-full max-w-0 py-3 whitespace-normal", productCell.first)}>
+        <div className="flex min-w-0 items-center gap-3">
+          <ProductThumb product={product} className="h-12 w-12" />
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Link
+                href={editHref(product.id)}
+                title={product.name}
+                className="truncate font-medium text-stone-900 underline-offset-4 hover:underline focus:outline-none focus-visible:underline"
+              >
+                {product.name}
+              </Link>
+              {product.featured && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" aria-label="Featured" />}
+            </div>
+            <p className="mt-0.5 truncate text-xs text-stone-500" title={metaLine(product)}>
+              {metaLine(product)}
+            </p>
+          </div>
         </div>
-      </td>
+      </TD>
 
-      {/* Stock */}
-      <td className="px-3 py-4 whitespace-nowrap text-sm">
-        <div className="flex flex-col">
-          <span className={`font-medium ${product.stock <= 5 ? 'text-red-600' : 'text-gray-900'}`}>
-            {product.stock} {product.stock === 1 ? "item" : "items"}
-          </span>
-          {product.productType === "variant" && product.variants && product.variants.length > 0 && (
-            <span className="text-xs text-gray-500">
-              {product.variants.filter(v => v.stock > 0).length} of {product.variants.length} in stock
-            </span>
-          )}
-          {product.stock <= 5 && product.stock > 0 && (
-            <span className="text-xs text-red-500">Low Stock</span>
-          )}
-          {product.stock === 0 && (
-            <span className="text-xs text-red-500">Out of Stock</span>
-          )}
+      <TD className={cn("py-3", productCell.mid)}>
+        <Price product={product} />
+      </TD>
+
+      <TD className={cn("hidden py-3 xl:table-cell", productCell.mid)}>
+        <Inventory product={product} />
+      </TD>
+
+      <TD className={cn("py-3", productCell.mid)}>
+        <StatusBadge status={product.status} />
+      </TD>
+
+      <TD align="right" className={cn("py-3", productCell.last)}>
+        <div className="flex justify-end">
+          <ProductActions {...props} size="sm" idPrefix="row" />
         </div>
-      </td>
+      </TD>
+    </TR>
+  );
+}
 
-      {/* Actions */}
-      <td className="px-3 py-4 whitespace-nowrap text-right text-sm font-medium">
-        <div className="flex items-center justify-end space-x-3">
-          {/* Status Toggle */}
-          {onToggleStatus && product.status !== 'out_of_stock' && (
-            <button
-              onClick={() => handleToggleStatus(product.id, product.status)}
-              disabled={togglingStatus.has(product.id)}
-              className={`
-                relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
-                ${product.status === 'published' 
-                  ? 'bg-green-600' 
-                  : 'bg-gray-200'
-                }
-                ${togglingStatus.has(product.id) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-              `}
-              title={`Click to ${product.status === 'published' ? 'unpublish' : 'publish'}`}
+/** Stacked card (below md). */
+export default function ProductCard(props: ProductItemProps) {
+  const { product } = props;
+  const stockLabel = product.stock <= 0 ? "Out of stock" : `${product.stock} in stock`;
+
+  return (
+    <li className="flex flex-col rounded-xl border border-stone-200 bg-white p-3 transition-shadow duration-200 hover:shadow-md">
+      <div className="flex gap-3">
+        <ProductThumb product={product} className="h-16 w-16" size={64} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <Link
+              href={editHref(product.id)}
+              className="line-clamp-2 text-sm font-semibold text-stone-900 underline-offset-4 hover:underline"
             >
-              <span
-                className={`
-                  inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform
-                  ${product.status === 'published' ? 'translate-x-6' : 'translate-x-1'}
-                `}
-              />
-              {togglingStatus.has(product.id) && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></div>
-                </div>
+              {product.name}
+              {product.featured && (
+                <Star className="ml-1 inline h-3.5 w-3.5 -translate-y-px fill-amber-400 text-amber-400" aria-label="Featured" />
               )}
-            </button>
-          )}
-
-          {/* Featured Toggle */}
-          <button
-            title={product.featured ? "Remove from featured" : "Make featured"}
-            onClick={() => onToggleFeatured?.(product.id)}
-            className={"text-sm " + (product.featured ? "text-yellow-600 hover:text-yellow-700" : "text-gray-400 hover:text-gray-500")}
-          >
-            <FiStar className={`h-5 w-5 ${product.featured ? 'fill-current' : ''}`} />
-          </button>
-
-          {/* Edit Button */}
-          <button 
-            className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50" 
-            onClick={() => onEdit?.(product.id)}
-            title="Edit product"
-          >
-            <FiEdit2 className="h-4 w-4" />
-          </button>
-
-          {/* Delete Button */}
-          <button 
-            className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50" 
-            onClick={() => onDelete?.(product.id)}
-            title="Delete product"
-          >
-            <FiTrash2 className="h-4 w-4" />
-          </button>
+            </Link>
+            <StatusBadge status={product.status} size="sm" className="shrink-0" />
+          </div>
+          <p className="mt-0.5 truncate text-xs text-stone-500">{metaLine(product)}</p>
+          <div className="mt-1 text-sm">
+            <Price product={product} compact />
+          </div>
         </div>
-      </td>
-    </tr>
+      </div>
+
+      <div className="grow" aria-hidden />
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-stone-200 pt-2">
+        <p
+          className={cn(
+            "min-w-0 truncate text-xs",
+            product.stock <= 0 ? "font-medium text-red-600" : product.stock <= 5 ? "font-medium text-amber-600" : "text-stone-500"
+          )}
+        >
+          {stockLabel}
+          {product.productType === "variant" && <span className="text-stone-500"> · {variantSummary(product)}</span>}
+        </p>
+        <ProductActions {...props} size="sm" idPrefix="card" />
+      </div>
+    </li>
   );
 }

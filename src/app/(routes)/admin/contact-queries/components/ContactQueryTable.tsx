@@ -1,266 +1,210 @@
 'use client';
 
 import React from 'react';
-import { FiEye, FiClock, FiUser, FiMail, FiPhone, FiCalendar, FiMessageSquare } from 'react-icons/fi';
+import type { ReactNode } from 'react';
+import { Calendar, Eye, Mail, MessageSquare, Phone } from 'lucide-react';
+import { Button, Card, CardHeader, EmptyState, Table, TBody, TD, TH, THead, TR } from '@/components/admin/ui';
 import { ContactQuery } from '../services/contactQueriesService';
+import { CategoryBadge, PriorityBadge, QueryStatusBadge } from './queryBadges';
 
 interface ContactQueryTableProps {
   queries: ContactQuery[];
   loading: boolean;
   onViewQuery: (query: ContactQuery) => void;
+  /** Total matching queries (all pages). */
+  totalCount?: number;
+  /** Rendered at the bottom of the card (pagination). */
+  footer?: ReactNode;
+  hasFilters?: boolean;
 }
 
-export default function ContactQueryTable({ queries, loading, onViewQuery }: ContactQueryTableProps) {
-  const getStatusBadge = (status: string) => {
-    const statusStyles = {
-      new: 'bg-blue-100 text-blue-700 border border-blue-200',
-      in_progress: 'bg-yellow-100 text-yellow-700 border border-yellow-200',
-      resolved: 'bg-green-100 text-green-700 border border-green-200',
-      closed: 'bg-gray-100 text-gray-700 border border-gray-200',
-    };
+const formatDate = (dateString: string) =>
+  new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
-    return (
-      <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statusStyles[status as keyof typeof statusStyles] || 'bg-gray-100 text-gray-700 border border-gray-200'}`}>
-        {status.replace('_', ' ').toUpperCase()}
-      </span>
-    );
-  };
+const truncateText = (text: string, maxLength: number = 100) =>
+  text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
 
-  const getPriorityBadge = (priority: string) => {
-    const priorityStyles = {
-      low: 'bg-gray-100 text-gray-700 border border-gray-200',
-      medium: 'bg-blue-100 text-blue-700 border border-blue-200',
-      high: 'bg-orange-100 text-orange-700 border border-orange-200',
-      urgent: 'bg-red-100 text-red-700 border border-red-200',
-    };
-
-    return (
-      <span className={`px-3 py-1 text-xs font-semibold rounded-full ${priorityStyles[priority as keyof typeof priorityStyles] || 'bg-gray-100 text-gray-700 border border-gray-200'}`}>
-        {priority.toUpperCase()}
-      </span>
-    );
-  };
-
-  const getCategoryBadge = (category: string) => {
-    const categoryStyles = {
-      general: 'bg-gray-100 text-gray-700 border border-gray-200',
-      support: 'bg-purple-100 text-purple-700 border border-purple-200',
-      returns: 'bg-indigo-100 text-indigo-700 border border-indigo-200',
-      wholesale: 'bg-teal-100 text-teal-700 border border-teal-200',
-      technical: 'bg-red-100 text-red-700 border border-red-200',
-      feedback: 'bg-green-100 text-green-700 border border-green-200',
-    };
-
-    return (
-      <span className={`px-3 py-1 text-xs font-semibold rounded-full ${categoryStyles[category as keyof typeof categoryStyles] || 'bg-gray-100 text-gray-700 border border-gray-200'}`}>
-        {category.toUpperCase()}
-      </span>
-    );
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const truncateText = (text: string, maxLength: number = 100) => {
-    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
-  };
-
-  if (loading) {
-    return (
-      <div className="bg-white shadow-sm rounded-xl border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Contact Queries</h3>
-        </div>
-        <div className="p-6">
-          <div className="animate-pulse space-y-6">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex space-x-4 p-4 bg-gray-50 rounded-lg">
-                <div className="flex-shrink-0">
-                  <div className="h-10 w-10 bg-gray-200 rounded-full"></div>
-                </div>
-                <div className="flex-1 space-y-3">
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  <div className="space-y-2">
-                    <div className="h-3 bg-gray-200 rounded"></div>
-                    <div className="h-3 bg-gray-200 rounded w-5/6"></div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <div className="h-6 w-16 bg-gray-200 rounded-full"></div>
-                    <div className="h-6 w-16 bg-gray-200 rounded-full"></div>
-                  </div>
-                </div>
-              </div>
-            ))}
+function SkeletonRows() {
+  return (
+    <div className="animate-pulse space-y-3 p-4 sm:p-6" aria-hidden>
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="flex gap-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+          <div className="h-10 w-10 shrink-0 rounded-full bg-stone-200" />
+          <div className="flex-1 space-y-3">
+            <div className="h-4 w-3/4 rounded bg-stone-200" />
+            <div className="space-y-2">
+              <div className="h-3 rounded bg-stone-200" />
+              <div className="h-3 w-5/6 rounded bg-stone-200" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-5 w-16 rounded-full bg-stone-200" />
+              <div className="h-5 w-16 rounded-full bg-stone-200" />
+            </div>
           </div>
         </div>
-      </div>
-    );
-  }
+      ))}
+    </div>
+  );
+}
 
-  if (queries.length === 0) {
-    return (
-      <div className="bg-white shadow-sm rounded-xl border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Contact Queries</h3>
-        </div>
-        <div className="p-12 text-center">
-          <div className="flex items-center justify-center w-16 h-16 mx-auto bg-gray-100 rounded-full mb-4">
-            <FiMail className="h-8 w-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No contact queries found</h3>
-          <p className="text-gray-500 max-w-sm mx-auto">No contact queries match your current filters. Try adjusting your search criteria or clearing filters.</p>
-        </div>
-      </div>
-    );
-  }
+export default function ContactQueryTable({ queries, loading, onViewQuery, totalCount, footer, hasFilters }: ContactQueryTableProps) {
+  const count = typeof totalCount === 'number' ? totalCount : queries.length;
 
   return (
-    <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-          <FiMessageSquare className="w-5 h-5 mr-2 text-gray-600" />
-          Contact Queries
-          <span className="ml-2 px-2 py-1 text-sm bg-gray-100 text-gray-600 rounded-full">
-            {queries.length}
+    <Card padding="none" className="overflow-hidden">
+      <CardHeader
+        title={
+          <span className="flex items-center gap-2">
+            Contact Queries
+            <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">{count}</span>
           </span>
-        </h3>
-      </div>
+        }
+        icon={<MessageSquare className="h-4 w-4" />}
+      />
 
-      {/* Desktop Table View */}
-      <div className="hidden lg:block overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Contact Info
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Subject & Message
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Status & Priority
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Category
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Created
-              </th>
-              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+      {loading && queries.length === 0 ? (
+        <SkeletonRows />
+      ) : queries.length === 0 ? (
+        <EmptyState
+          icon={Mail}
+          title="No contact queries found"
+          description={
+            hasFilters
+              ? 'No contact queries match your current filters. Try adjusting your search or clearing filters.'
+              : 'Messages sent through the contact form will appear here.'
+          }
+        />
+      ) : (
+        <div className={loading ? 'pointer-events-none opacity-60 transition-opacity' : 'transition-opacity'} aria-busy={loading}>
+          {/* Desktop table */}
+          <Table wrapperClassName="hidden lg:block">
+            <THead>
+              <tr>
+                <TH>Contact Info</TH>
+                <TH>Subject &amp; Message</TH>
+                <TH>Status &amp; Priority</TH>
+                <TH>Category</TH>
+                <TH>Created</TH>
+                <TH align="right">
+                  <span className="sr-only">Actions</span>
+                </TH>
+              </tr>
+            </THead>
+            <TBody>
+              {queries.map((query) => (
+                <TR key={query._id} className="cursor-pointer" onClick={() => onViewQuery(query)}>
+                  <TD>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium text-stone-900">{query.fullName}</span>
+                      <span className="flex items-center gap-1.5 text-xs text-stone-500">
+                        <Mail className="h-3.5 w-3.5 text-stone-400" />
+                        {query.emailAddress}
+                      </span>
+                      {query.phoneNumber && (
+                        <span className="flex items-center gap-1.5 text-xs text-stone-500">
+                          <Phone className="h-3.5 w-3.5 text-stone-400" />
+                          {query.phoneNumber}
+                        </span>
+                      )}
+                    </div>
+                  </TD>
+                  <TD className="min-w-[260px] max-w-md whitespace-normal">
+                    <p className="font-medium text-stone-900">{query.subject}</p>
+                    <p className="mt-0.5 text-xs text-stone-500">{truncateText(query.message)}</p>
+                  </TD>
+                  <TD>
+                    <div className="flex flex-col items-start gap-1.5">
+                      <QueryStatusBadge status={query.status} />
+                      <PriorityBadge priority={query.priority} />
+                    </div>
+                  </TD>
+                  <TD>
+                    <CategoryBadge category={query.category} />
+                  </TD>
+                  <TD className="text-stone-500">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-stone-400" />
+                      {formatDate(query.createdAt)}
+                    </span>
+                  </TD>
+                  <TD align="right">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      leftIcon={<Eye className="h-4 w-4" />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewQuery(query);
+                      }}
+                    >
+                      View
+                    </Button>
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+
+          {/* Mobile / tablet cards */}
+          <ul className="space-y-3 p-3 sm:p-4 lg:hidden">
             {queries.map((query) => (
-              <tr key={query._id} className="hover:bg-gray-50 transition-colors duration-150">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex flex-col space-y-1">
-                    <div className="flex items-center">
-                      <FiUser className="h-4 w-4 text-gray-400 mr-2" />
-                      <span className="text-sm font-semibold text-gray-900">{query.fullName}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <FiMail className="h-4 w-4 text-gray-400 mr-2" />
-                      <span className="text-sm text-gray-600">{query.emailAddress}</span>
-                    </div>
+              <li
+                key={query._id}
+                className="rounded-xl border border-stone-200 bg-white p-4 transition-shadow duration-200 hover:shadow-md"
+              >
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="truncate text-sm font-semibold text-stone-900">{query.fullName}</h4>
+                    <p className="flex min-w-0 items-center gap-1.5 text-xs text-stone-500">
+                      <Mail className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+                      <span className="truncate">{query.emailAddress}</span>
+                    </p>
                     {query.phoneNumber && (
-                      <div className="flex items-center">
-                        <FiPhone className="h-4 w-4 text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-600">{query.phoneNumber}</span>
-                      </div>
+                      <p className="flex items-center gap-1.5 text-xs text-stone-500">
+                        <Phone className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+                        {query.phoneNumber}
+                      </p>
                     )}
                   </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-col space-y-1">
-                    <span className="text-sm font-semibold text-gray-900">{query.subject}</span>
-                    <span className="text-sm text-gray-600">{truncateText(query.message)}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex flex-col space-y-2">
-                    {getStatusBadge(query.status)}
-                    {getPriorityBadge(query.priority)}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {getCategoryBadge(query.category)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <FiCalendar className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-600">{formatDate(query.createdAt)}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    leftIcon={<Eye className="h-4 w-4" />}
                     onClick={() => onViewQuery(query)}
-                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 shadow-sm"
+                    aria-label={`View query from ${query.fullName}`}
                   >
-                    <FiEye className="h-4 w-4 mr-1" />
-                    View
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile Card View */}
-      <div className="lg:hidden">
-        <div className="p-4 space-y-4">
-          {queries.map((query) => (
-            <div key={query._id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow duration-200">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-1">{query.fullName}</h4>
-                  <div className="flex items-center text-sm text-gray-600 mb-1">
-                    <FiMail className="h-4 w-4 mr-1" />
-                    {query.emailAddress}
-                  </div>
-                  {query.phoneNumber && (
-                    <div className="flex items-center text-sm text-gray-600">
-                      <FiPhone className="h-4 w-4 mr-1" />
-                      {query.phoneNumber}
-                    </div>
-                  )}
+                    <span className="hidden sm:inline">View</span>
+                  </Button>
                 </div>
-                <button
-                  onClick={() => onViewQuery(query)}
-                  className="ml-2 inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
-                >
-                  <FiEye className="h-4 w-4" />
+
+                <button type="button" onClick={() => onViewQuery(query)} className="mb-3 block w-full text-left">
+                  <h5 className="text-sm font-medium text-stone-900">{query.subject}</h5>
+                  <p className="mt-0.5 text-sm text-stone-500">{truncateText(query.message, 80)}</p>
                 </button>
-              </div>
 
-              <div className="mb-3">
-                <h5 className="text-sm font-semibold text-gray-900 mb-1">{query.subject}</h5>
-                <p className="text-sm text-gray-600">{truncateText(query.message, 80)}</p>
-              </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <QueryStatusBadge status={query.status} size="sm" />
+                  <PriorityBadge priority={query.priority} size="sm" />
+                  <CategoryBadge category={query.category} size="sm" />
+                </div>
 
-              <div className="flex flex-wrap gap-2 mb-3">
-                {getStatusBadge(query.status)}
-                {getPriorityBadge(query.priority)}
-                {getCategoryBadge(query.category)}
-              </div>
-
-              <div className="flex items-center text-xs text-gray-500">
-                <FiCalendar className="h-3 w-3 mr-1" />
-                {formatDate(query.createdAt)}
-              </div>
-            </div>
-          ))}
+                <p className="mt-3 flex items-center gap-1.5 border-t border-stone-200 pt-2 text-xs text-stone-500">
+                  <Calendar className="h-3.5 w-3.5 text-stone-400" />
+                  {formatDate(query.createdAt)}
+                </p>
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
-    </div>
+      )}
+
+      {footer}
+    </Card>
   );
 }

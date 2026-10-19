@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import React, { useState, useEffect } from 'react';
 import { publicProductService, type PublicProduct } from '../../main/services/publicProductService';
+import { resolveImage } from '@/lib/productMedia';
 
 type RelatedProduct = {
   id: string;
@@ -66,16 +67,11 @@ export default function ProductMore({
             if (p.productType === 'variant' && p.colorMedia) {
               const firstColor = Object.keys(p.colorMedia)[0];
               if (firstColor && p.colorMedia[firstColor]?.thumbnailUrl) {
-                const url = p.colorMedia[firstColor].thumbnailUrl;
-                image = url.startsWith('http')
-                  ? url
-                  : `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}${url}`;
+                image = resolveImage(p.colorMedia[firstColor].thumbnailUrl);
               }
             }
             if (!image && p.thumbnailUrl) {
-              image = p.thumbnailUrl.startsWith('http')
-                ? p.thumbnailUrl
-                : `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}${p.thumbnailUrl}`;
+              image = resolveImage(p.thumbnailUrl);
             }
 
             return {

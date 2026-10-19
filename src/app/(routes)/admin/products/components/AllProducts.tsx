@@ -1,13 +1,17 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Table, TBody, TH, THead } from "@/components/admin/ui";
+import { cn } from "@/lib/utils";
+import { productCell } from "./all_products/ProductCard";
 import {
-  ProductStats,
   ProductFilters,
   ProductCard,
+  ProductRow,
   ProductPagination,
   EmptyState,
   LoadingState,
-  ErrorState
+  ErrorState,
+  type ProductStatusFilter,
 } from "./all_products";
 
 export interface ProductVariant {
@@ -53,42 +57,52 @@ export interface Product {
 
 interface AllProductsProps {
   products: Product[];
+  /** Status filter is owned by the page so the stat tiles can drive it. */
+  statusFilter: ProductStatusFilter;
+  onStatusFilterChange: (status: ProductStatusFilter) => void;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   onToggleStatus?: (id: string, newStatus: 'published' | 'draft') => Promise<void>;
   onToggleFeatured?: (id: string) => void;
+  onRetry?: () => void;
   loading?: boolean;
   error?: string | null;
 }
 
-export default function AllProducts({ 
-  products, 
-  onEdit, 
-  onDelete, 
-  onToggleStatus, 
-  onToggleFeatured, 
-  loading = false, 
-  error = null 
+const productsPerPage = 10;
+
+export default function AllProducts({
+  products,
+  statusFilter,
+  onStatusFilterChange,
+  onEdit,
+  onDelete,
+  onToggleStatus,
+  onToggleFeatured,
+  onRetry,
+  loading = false,
+  error = null
 }: AllProductsProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft" | "out_of_stock">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [collectionFilter, setCollectionFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [togglingStatus, setTogglingStatus] = useState<Set<string>>(new Set());
-  const productsPerPage = 10;
 
   // Get unique categories for filter dropdown
-  const availableCategories = useMemo(() => {
-    const categories = Array.from(new Set(products.map(p => p.category))).sort();
-    return categories;
-  }, [products]);
+  const availableCategories = useMemo(
+    () => Array.from(new Set(products.map((p) => p.category).filter(Boolean))).sort(),
+    [products]
+  );
 
   const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return products.filter((product) => {
-      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           product.slug?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch =
+        !q ||
+        product.name?.toLowerCase().includes(q) ||
+        product.category?.toLowerCase().includes(q) ||
+        product.slug?.toLowerCase().includes(q);
 
       const matchesStatus = statusFilter === "all" || product.status === statusFilter;
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
@@ -103,17 +117,26 @@ export default function AllProducts({
     });
   }, [products, searchQuery, statusFilter, categoryFilter, collectionFilter]);
 
-  const indexOfLastProduct = currentPage * productsPerPage;
-  const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
-  const currentProducts = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
-  const totalPages = Math.ceil(filteredProducts.length / productsPerPage) || 1;
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / productsPerPage));
+  const page = Math.min(currentPage, totalPages);
+  const currentProducts = filteredProducts.slice((page - 1) * productsPerPage, page * productsPerPage);
+
+  // Back to page 1 whenever the status filter changes (e.g. from a stat tile)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter]);
+
+  // Keep the page in range when deletes/filters shrink the list
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   const handleToggleStatus = async (productId: string, currentStatus: 'published' | 'draft' | 'out_of_stock') => {
     if (!onToggleStatus || currentStatus === 'out_of_stock') return;
-    
+
     const newStatus = currentStatus === 'published' ? 'draft' : 'published';
     setTogglingStatus(prev => new Set([...prev, productId]));
-    
+
     try {
       await onToggleStatus(productId, newStatus);
     } catch (error) {
@@ -127,114 +150,102 @@ export default function AllProducts({
     }
   };
 
-
   const resetCurrentPage = () => setCurrentPage(1);
+
+  const hasFilters =
+    !!searchQuery.trim() || statusFilter !== "all" || categoryFilter !== "all" || collectionFilter !== "all";
 
   const handleClearAllFilters = () => {
     setSearchQuery("");
-    setStatusFilter("all");
+    onStatusFilterChange("all");
     setCategoryFilter("all");
+    setCollectionFilter("all");
     setCurrentPage(1);
   };
 
-  // Loading state
-  if (loading) {
-    return <LoadingState />;
-  }
+  const itemProps = {
+    onEdit,
+    onDelete,
+    onToggleStatus,
+    onToggleFeatured,
+    togglingStatus,
+    handleToggleStatus,
+  };
 
-  // Error state
-  if (error) {
-    return <ErrorState error={error} />;
-  }
+  const showInitialLoader = loading && products.length === 0;
 
   return (
-    <div className="space-y-6">
-      {/* Statistics */}
-      <ProductStats 
-        products={products} 
-        filteredCount={filteredProducts.length} 
-      />
-
+    <>
       {/* Filters */}
-      <ProductFilters
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
-        categoryFilter={categoryFilter}
-        setCategoryFilter={setCategoryFilter}
-        availableCategories={availableCategories}
-        collectionFilter={collectionFilter}
-        setCollectionFilter={setCollectionFilter}
-        onCurrentPageReset={resetCurrentPage}
-      />
-
-      {/* Products Table */}
-      <div className="flex flex-col">
-        <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-            <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0 w-2/5">
-                      Product
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                      Variants
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
-                      Status
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
-                      Price
-                    </th>
-                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                      Stock
-                    </th>
-                    <th scope="col" className="relative px-6 py-3">
-                      <span className="sr-only">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {currentProducts.length > 0 ? (
-                    currentProducts.map((product) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        onEdit={onEdit}
-                        onDelete={onDelete}
-                        onToggleStatus={onToggleStatus}
-                        onToggleFeatured={onToggleFeatured}
-                        togglingStatus={togglingStatus}
-                        handleToggleStatus={handleToggleStatus}
-                      />
-                    ))
-                  ) : (
-                    <EmptyState
-                      searchQuery={searchQuery}
-                      statusFilter={statusFilter}
-                      categoryFilter={categoryFilter}
-                      onClearFilters={handleClearAllFilters}
-                    />
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+      <div className="border-b border-stone-200 p-3 sm:p-4">
+        <ProductFilters
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          statusFilter={statusFilter}
+          setStatusFilter={onStatusFilterChange}
+          categoryFilter={categoryFilter}
+          setCategoryFilter={setCategoryFilter}
+          availableCategories={availableCategories}
+          collectionFilter={collectionFilter}
+          setCollectionFilter={setCollectionFilter}
+          onCurrentPageReset={resetCurrentPage}
+          resultCount={filteredProducts.length}
+          totalCount={products.length}
+          onClearFilters={handleClearAllFilters}
+        />
       </div>
 
+      {error && (
+        <div className="p-3 sm:p-6">
+          <ErrorState error={error} onRetry={onRetry} />
+        </div>
+      )}
+
+      {showInitialLoader ? (
+        <LoadingState />
+      ) : error && products.length === 0 ? null : currentProducts.length === 0 ? (
+        <EmptyState hasFilters={hasFilters} onClearFilters={handleClearAllFilters} />
+      ) : (
+        <div className={loading ? "pointer-events-none opacity-60 transition-opacity" : "transition-opacity"} aria-busy={loading}>
+          {/* Phones / small tablets: stacked cards */}
+          <ul className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2 sm:gap-3 sm:p-4 md:hidden">
+            {currentProducts.map((product) => (
+              <ProductCard key={product.id} product={product} {...itemProps} />
+            ))}
+          </ul>
+
+          {/* md and up: table */}
+          <Table wrapperClassName="hidden md:block">
+            <THead>
+              <tr>
+                <TH className={productCell.first}>Product</TH>
+                <TH className={productCell.mid}>Price</TH>
+                <TH className={cn("hidden xl:table-cell", productCell.mid)}>Inventory</TH>
+                <TH className={productCell.mid}>Status</TH>
+                <TH align="right" className={cn("relative", productCell.last)}>
+                  <span className="sr-only">Actions</span>
+                </TH>
+              </tr>
+            </THead>
+            <TBody>
+              {currentProducts.map((product) => (
+                <ProductRow key={product.id} product={product} {...itemProps} />
+              ))}
+            </TBody>
+          </Table>
+        </div>
+      )}
+
       {/* Pagination */}
-      <ProductPagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        setCurrentPage={setCurrentPage}
-        filteredCount={filteredProducts.length}
-        indexOfFirstProduct={indexOfFirstProduct}
-        indexOfLastProduct={indexOfLastProduct}
-      />
-    </div>
+      {!showInitialLoader && (
+        <ProductPagination
+          currentPage={page}
+          totalPages={totalPages}
+          setCurrentPage={setCurrentPage}
+          filteredCount={filteredProducts.length}
+          pageSize={productsPerPage}
+        />
+      )}
+    </>
   );
 }

@@ -24,7 +24,8 @@ export interface ContactQuery {
 export interface AdminNote {
   _id?: string;
   note: string;
-  addedBy: string;
+  /** Populated by the backend with the admin's name/email; may be a bare id on older records. */
+  addedBy: string | { _id?: string; firstName?: string; lastName?: string; email?: string } | null;
   addedAt: string;
 }
 
@@ -80,13 +81,16 @@ class ContactQueriesService {
     }
 
     const result = await response.json();
+    // Backend sends { page, pages, total, limit }; the UI works with `current`.
+    const p = result.pagination || {};
+    const limit = Number(p.limit) || filters.limit || 20;
     return {
       queries: result.data || [],
-      pagination: result.pagination || {
-        current: 1,
-        total: 0,
-        pages: 1,
-        limit: 20
+      pagination: {
+        current: Number(p.current ?? p.page) || filters.page || 1,
+        total: Number(p.total) || 0,
+        pages: Math.max(1, Number(p.pages) || 0),
+        limit,
       }
     };
   }

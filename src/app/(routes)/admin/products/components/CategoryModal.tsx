@@ -1,7 +1,9 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
-import { FiX, FiImage } from "react-icons/fi";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import Image from "next/image";
+import { ImagePlus, Save, X } from "lucide-react";
+import { Button, FormField, Input, Modal, Switch, Textarea } from "@/components/admin/ui";
+import { cn } from "@/lib/utils";
 
 export interface CategoryInput {
   name: string;
@@ -18,7 +20,8 @@ interface CategoryModalProps {
   mode: "create" | "edit";
   initial?: Partial<CategoryInput>;
   onClose: () => void;
-  onSubmit: (data: CategoryInput | FormData) => void;
+  /** May return a promise; the modal shows a saving state until it settles. */
+  onSubmit: (data: CategoryInput | FormData) => void | Promise<void>;
 }
 
 const slugify = (str: string) =>
@@ -29,7 +32,73 @@ const slugify = (str: string) =>
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
 
+function ImageField({
+  id,
+  label,
+  hint,
+  preview,
+  wide,
+  onFile,
+  onRemove,
+}: {
+  id: string;
+  label: string;
+  hint: string;
+  preview: string | null;
+  wide?: boolean;
+  onFile: (file: File) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div>
+      <span className="mb-1 block text-sm font-medium text-stone-700">{label}</span>
+      {preview ? (
+        <div
+          className={cn(
+            "relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100",
+            wide ? "h-32 w-full" : "h-32 w-32"
+          )}
+        >
+          <Image src={preview} alt={`${label} preview`} fill sizes={wide ? "320px" : "128px"} className="object-cover" />
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove ${label.toLowerCase()}`}
+            className="absolute right-2 top-2 rounded-full bg-white/90 p-1 text-stone-700 shadow-sm transition-colors hover:bg-white hover:text-red-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <label
+          htmlFor={id}
+          className={cn(
+            "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 p-4 text-center text-sm text-stone-500 transition-colors hover:border-stone-400 hover:bg-stone-100 focus-within:border-stone-900",
+            wide ? "h-32 w-full" : "h-32 w-32"
+          )}
+        >
+          <ImagePlus className="h-6 w-6 text-stone-400" aria-hidden />
+          <span className="font-medium text-stone-700">Upload</span>
+          <span className="text-xs">{hint}</span>
+          <input
+            id={id}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onFile(file);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      )}
+    </div>
+  );
+}
+
 export default function CategoryModal({ open, mode, initial, onClose, onSubmit }: CategoryModalProps) {
+  const uid = useId();
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [active, setActive] = useState(initial?.active ?? true);
@@ -38,6 +107,7 @@ export default function CategoryModal({ open, mode, initial, onClose, onSubmit }
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(initial?.thumbnailUrl || null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(initial?.bannerUrl || null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -49,258 +119,161 @@ export default function CategoryModal({ open, mode, initial, onClose, onSubmit }
       setBannerFile(null);
       setThumbnailPreview(initial?.thumbnailUrl || null);
       setBannerPreview(initial?.bannerUrl || null);
+      setSaving(false);
     }
   }, [open, initial]);
 
-  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setThumbnailFile(file);
-      const reader = new FileReader();
-      reader.onload = () => setThumbnailPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setBannerFile(file);
-      const reader = new FileReader();
-      reader.onload = () => setBannerPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeThumbnail = () => {
-    setThumbnailFile(null);
-    setThumbnailPreview(null);
-  };
-
-  const removeBanner = () => {
-    setBannerFile(null);
-    setBannerPreview(null);
+  const readPreview = (file: File, set: (v: string) => void) => {
+    const reader = new FileReader();
+    reader.onload = () => set(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   const slug = useMemo(() => slugify(name), [name]);
+  const formId = `${uid}-category-form`;
 
-  if (!open) return null;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || saving) return;
+
+    let payload: CategoryInput | FormData;
+    // If we have files, use FormData
+    if (thumbnailFile || bannerFile) {
+      const formData = new FormData();
+      formData.append("name", name.trim());
+      formData.append("slug", slug);
+      formData.append("description", description.trim());
+      formData.append("active", active.toString());
+      formData.append("featured", featured.toString());
+      if (thumbnailFile) formData.append("thumbnail", thumbnailFile);
+      if (bannerFile) formData.append("banner", bannerFile);
+      payload = formData;
+    } else {
+      // Otherwise use regular JSON
+      payload = {
+        name: name.trim(),
+        slug,
+        description: description.trim(),
+        active,
+        featured,
+        thumbnailUrl: thumbnailPreview || undefined,
+        bannerUrl: bannerPreview || undefined,
+      };
+    }
+
+    setSaving(true);
+    try {
+      await onSubmit(payload);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black bg-opacity-30" onClick={onClose} />
-      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b">
-          <h3 className="text-lg font-medium text-gray-900">
-            {mode === "create" ? "Add Category" : "Edit Category"}
-          </h3>
+    <Modal
+      open={open}
+      onClose={saving ? () => {} : onClose}
+      dismissible={!saving}
+      size="xl"
+      title={mode === "create" ? "Add category" : "Edit category"}
+      description={mode === "create" ? "Group products together on the storefront." : "Update this category's details and images."}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            loading={saving}
+            loadingText="Saving..."
+            disabled={!name.trim()}
+            leftIcon={<Save className="h-4 w-4" />}
+          >
+            {mode === "create" ? "Create category" : "Save changes"}
+          </Button>
+        </>
+      }
+    >
+      <form id={formId} onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormField label="Name" htmlFor={`${uid}-name`} required>
+            <Input
+              id={`${uid}-name`}
+              type="text"
+              placeholder="e.g. Bottoms"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoFocus
+            />
+          </FormField>
+          <FormField label="Slug" htmlFor={`${uid}-slug`} hint="Generated from the name">
+            <Input id={`${uid}-slug`} type="text" value={slug} readOnly className="bg-stone-50 text-stone-500" />
+          </FormField>
         </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            
-            // If we have files, use FormData
-            if (thumbnailFile || bannerFile) {
-              const formData = new FormData();
-              formData.append('name', name.trim());
-              formData.append('slug', slug);
-              formData.append('description', description.trim());
-              formData.append('active', active.toString());
-              formData.append('featured', featured.toString());
-              
-              if (thumbnailFile) {
-                formData.append('thumbnail', thumbnailFile);
-              }
-              if (bannerFile) {
-                formData.append('banner', bannerFile);
-              }
-              
-              onSubmit(formData);
-            } else {
-              // Otherwise use regular JSON
-              onSubmit({ 
-                name: name.trim(), 
-                slug, 
-                description: description.trim(), 
-                active,
-                featured,
-                thumbnailUrl: thumbnailPreview || undefined,
-                bannerUrl: bannerPreview || undefined
-              });
-            }
-          }}
-        >
-          <div className="px-6 py-4 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Name</label>
-              <input
-                type="text"
-                placeholder="e.g., Bottoms"
-                className="mt-1 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Slug (auto)</label>
-              <input
-                type="text"
-                className="mt-1 h-11 w-full rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-600"
-                value={slug}
-                readOnly
-              />
-            </div>
+        <FormField label="Description" htmlFor={`${uid}-description`}>
+          <Textarea
+            id={`${uid}-description`}
+            rows={3}
+            placeholder="Optional: short description of this category"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </FormField>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
-              <textarea
-                rows={4}
-                placeholder="Optional: short description of this category"
-                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-indigo-500"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[auto_minmax(0,1fr)]">
+          <ImageField
+            id={`${uid}-thumbnail`}
+            label="Thumbnail"
+            hint="Square, up to 10MB"
+            preview={thumbnailPreview}
+            onFile={(file) => {
+              setThumbnailFile(file);
+              readPreview(file, setThumbnailPreview);
+            }}
+            onRemove={() => {
+              setThumbnailFile(null);
+              setThumbnailPreview(null);
+            }}
+          />
+          <ImageField
+            id={`${uid}-banner`}
+            label="Banner"
+            hint="Wide image, up to 10MB"
+            preview={bannerPreview}
+            wide
+            onFile={(file) => {
+              setBannerFile(file);
+              readPreview(file, setBannerPreview);
+            }}
+            onRemove={() => {
+              setBannerFile(null);
+              setBannerPreview(null);
+            }}
+          />
+        </div>
 
-            {/* Thumbnail Upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Thumbnail Image (Optional)
-              </label>
-              {thumbnailPreview ? (
-                <div className="relative inline-block">
-                  <Image
-                    src={thumbnailPreview}
-                    alt="Thumbnail preview"
-                    width={120}
-                    height={120}
-                    className="w-30 h-30 object-cover rounded-lg border border-gray-200"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeThumbnail}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                  >
-                    <FiX className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400">
-                  <div className="space-y-1 text-center">
-                    <FiImage className="mx-auto h-12 w-12 text-gray-400" />
-                    <div className="flex text-sm text-gray-600">
-                      <label
-                        htmlFor="thumbnail-upload"
-                        className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
-                      >
-                        <span>Upload thumbnail</span>
-                        <input
-                          id="thumbnail-upload"
-                          name="thumbnail-upload"
-                          type="file"
-                          accept="image/*"
-                          className="sr-only"
-                          onChange={handleThumbnailChange}
-                        />
-                      </label>
-                    </div>
-                    <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Banner Upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Banner Image (Optional)
-              </label>
-              {bannerPreview ? (
-                <div className="relative inline-block">
-                  <Image
-                    src={bannerPreview}
-                    alt="Banner preview"
-                    width={240}
-                    height={120}
-                    className="w-60 h-30 object-cover rounded-lg border border-gray-200"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeBanner}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                  >
-                    <FiX className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400">
-                  <div className="space-y-1 text-center">
-                    <FiImage className="mx-auto h-12 w-12 text-gray-400" />
-                    <div className="flex text-sm text-gray-600">
-                      <label
-                        htmlFor="banner-upload"
-                        className="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
-                      >
-                        <span>Upload banner</span>
-                        <input
-                          id="banner-upload"
-                          name="banner-upload"
-                          type="file"
-                          accept="image/*"
-                          className="sr-only"
-                          onChange={handleBannerChange}
-                        />
-                      </label>
-                    </div>
-                    <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <input
-                  id="active"
-                  type="checkbox"
-                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                  checked={active}
-                  onChange={(e) => setActive(e.target.checked)}
-                />
-                <label htmlFor="active" className="text-sm text-gray-700">Active</label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="featured"
-                  type="checkbox"
-                  className="h-4 w-4 text-yellow-600 border-gray-300 rounded"
-                  checked={featured}
-                  onChange={(e) => setFeatured(e.target.checked)}
-                />
-                <label htmlFor="featured" className="text-sm text-gray-700">Featured</label>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-6 py-4 border-t flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-            >
-              {mode === "create" ? "Create" : "Save"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-stone-50/60">
+          <Switch
+            id={`${uid}-active`}
+            className="px-4 py-3"
+            checked={active}
+            onChange={setActive}
+            label="Active"
+            description="Only active categories can be picked in the product form and featured on the storefront."
+          />
+          <Switch
+            id={`${uid}-featured`}
+            className="px-4 py-3"
+            checked={featured}
+            onChange={setFeatured}
+            label="Featured"
+            description="Highlight this category on the storefront."
+          />
+        </div>
+      </form>
+    </Modal>
   );
 }

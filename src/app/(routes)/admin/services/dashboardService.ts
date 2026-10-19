@@ -4,27 +4,40 @@ import { getAuthHeader } from "@/helper/helper";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
+export type DashboardTimeRange = 'today' | 'week' | 'month' | 'year';
+
 interface DashboardStats {
+  /** Number of orders placed in the selected period. */
   totalSales: number;
+  /** All registered users. */
   totalUsers: number;
+  /** Published products. */
   totalProducts: number;
+  /** Sum of order totals in the period (PKR). */
   totalRevenue: number;
   ordersToday: number;
-  avgOrderValue: number;
+  /** Null when there are no orders in the period. */
+  avgOrderValue: number | null;
+  /** NOTE: the backend returns a hard-coded placeholder (2.4) — not shown in the UI. */
   conversionRate: number;
   refundRate: number;
 }
 
 interface QuickStats {
   pendingOrders: number;
+  /** Published products with stock < 10. */
   lowStockItems: number;
+  /** Users registered in the last 7 days. */
   newCustomers: number;
+  /** Orders with status "refunded". */
   returnedItems: number;
+  /** Average days from order to delivery; 0 when no delivered orders. */
   avgFulfillmentTime: number;
 }
 
 interface Order {
   id: string;
+  orderNumber?: string;
   customerId: string;
   customerName: string;
   amount: number;
@@ -33,6 +46,7 @@ interface Order {
 }
 
 interface SalesTrendPoint {
+  /** UTC day bucket, "YYYY-MM-DD". Only days with orders are returned. */
   date: string;
   sales: number;
   orders: number;
@@ -69,6 +83,20 @@ interface DashboardData {
   topProducts: Product[];
   recentActivity: Activity[];
   customerDistribution: CustomerDistribution;
+}
+
+interface InventoryStatus {
+  totalProducts: number;
+  outOfStock: number;
+  lowStock: number;
+  inStock: number;
+}
+
+interface MetricComparison {
+  current: number;
+  previous: number;
+  change: number;
+  trend: Array<{ date: string; value: number }>;
 }
 
 interface DashboardAnalytics {
@@ -205,6 +233,19 @@ class DashboardService {
     }
   }
 
+  /** Published-product stock breakdown (in stock / low < 10 / out of stock). */
+  async getInventoryStatus(): Promise<InventoryStatus> {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/dashboard/inventory-status`, {
+        headers: getAuthHeader()
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching inventory status:', error);
+      throw error;
+    }
+  }
+
   async getAnalytics(timeRange: string): Promise<DashboardAnalytics> {
     try {
       const response = await axios.get(`${API_BASE_URL}/dashboard/analytics`, {
@@ -287,12 +328,8 @@ class DashboardService {
     }
   }
 
-  async getMetrics(metricType: string, timeRange: string): Promise<{
-    current: number;
-    previous: number;
-    change: number;
-    trend: Array<{ date: string; value: number }>;
-  }> {
+  /** Current vs previous period for 'revenue' | 'orders' | 'customers' (new sign-ups). */
+  async getMetrics(metricType: 'revenue' | 'orders' | 'customers', timeRange: string): Promise<MetricComparison> {
     try {
       const response = await axios.get(`${API_BASE_URL}/dashboard/metrics/${metricType}`, {
         params: { timeRange },
@@ -318,5 +355,7 @@ export type {
   Product,
   Activity,
   CustomerDistribution,
-  DashboardAnalytics
+  DashboardAnalytics,
+  InventoryStatus,
+  MetricComparison
 };

@@ -1,29 +1,17 @@
 "use client";
 import React from "react";
-import { FiX } from "react-icons/fi";
+import { Alert } from "@/components/admin/ui";
 
 interface ErrorStateProps {
   error: string;
+  title?: string;
+  onRetry?: () => void;
 }
 
-export default function ErrorState({ error }: ErrorStateProps) {
+export default function ErrorState({ error, title = "Couldn't load products", onRetry }: ErrorStateProps) {
   return (
-    <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-      <div className="px-4 py-5 sm:p-6">
-        <div className="rounded-md bg-red-50 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <FiX className="h-5 w-5 text-red-400" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error loading products</h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>{error}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Alert tone="error" title={title} onRetry={onRetry}>
+      {error}
+    </Alert>
   );
 }

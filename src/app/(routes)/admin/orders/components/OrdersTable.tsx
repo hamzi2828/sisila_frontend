@@ -1,116 +1,215 @@
 "use client";
 import React, { useState } from "react";
-import { FiEye, FiTruck, FiCheckCircle, FiXCircle, FiLoader } from "react-icons/fi";
+import Image from "next/image";
+import { CheckCircle2, Eye, Package, PackageCheck, Truck, XCircle } from "lucide-react";
+import { ConfirmDialog, IconButton, StatusBadge } from "@/components/admin/ui";
+import { cn } from "@/lib/utils";
 import { Order, OrderStatus, OrdersTableProps } from "../types";
+import { FALLBACK_PRODUCT_IMAGE, getCustomerEmail, getCustomerName, getItemCount, getItemImage } from "./orderHelpers";
 
-export default function OrdersTable({ orders, onView, onUpdateStatus, formatCurrency, formatDate, getStatusColor }: OrdersTableProps) {
+// Inked Wear-style chip buttons: white on the grey row card
+const chip = "bg-white border border-stone-200";
+
+function OrderThumb({ order, className }: { order: Order; className?: string }) {
+  const src = getItemImage(order.items?.[0]);
+  const [failed, setFailed] = useState(false);
+
+  if (src === FALLBACK_PRODUCT_IMAGE || failed) {
+    return (
+      <div className={cn("flex shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-stone-100", className)}>
+        <Package className="h-5 w-5 text-stone-500" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("relative shrink-0 overflow-hidden rounded-lg border border-stone-200 bg-stone-100", className)}>
+      <Image src={src} alt="" fill sizes="48px" className="object-cover" onError={() => setFailed(true)} />
+    </div>
+  );
+}
+
+export default function OrdersTable({ orders, onView, onUpdateStatus, formatCurrency, formatDate }: OrdersTableProps) {
   const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
 
   const handleStatusUpdate = async (orderId: string, status: OrderStatus) => {
     const loadingKey = `${orderId}-${status}`;
     setLoadingStatus(loadingKey);
     try {
       await onUpdateStatus(orderId, status);
+      return true;
+    } catch {
+      // The page shows the error toast
+      return false;
     } finally {
       setLoadingStatus(null);
     }
   };
-  return (
-    <div className="flex flex-col">
-      <div className="-my-2">
-        <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-          <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                  <th className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {orders.length > 0 ? (
-                  orders.map((order) => {
-                    const customerName = order.user
-                      ? `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim() || 'Unknown Customer'
-                      : order.shippingAddress?.fullName || 'Unknown Customer';
-                    const customerEmail = order.user?.email || order.shippingAddress?.email || 'No email provided';
 
-                    return (
-                      <tr key={order._id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.orderNumber}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{customerName}</div>
-                          <div className="text-sm text-gray-500">{customerEmail}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(order.createdAt)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.orderStatus)}`}>
-                            {order.orderStatus.charAt(0).toUpperCase() + order.orderStatus.slice(1)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatCurrency(order.total)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-2">
-                            <button onClick={() => onView(order)} className="text-indigo-600 hover:text-indigo-900" title="View Details">
-                              <FiEye className="h-5 w-5" />
-                            </button>
-                            <button
-                              className="text-green-600 hover:text-green-900 disabled:opacity-50"
-                              title="Mark as Shipped"
-                              onClick={() => handleStatusUpdate(order._id, 'shipped')}
-                              disabled={loadingStatus === `${order._id}-shipped`}
-                            >
-                              {loadingStatus === `${order._id}-shipped` ? (
-                                <FiLoader className="h-5 w-5 animate-spin" />
-                              ) : (
-                                <FiTruck className="h-5 w-5" />
-                              )}
-                            </button>
-                            <button
-                              className="text-blue-600 hover:text-blue-900 disabled:opacity-50"
-                              title="Mark as Delivered"
-                              onClick={() => handleStatusUpdate(order._id, 'delivered')}
-                              disabled={loadingStatus === `${order._id}-delivered`}
-                            >
-                              {loadingStatus === `${order._id}-delivered` ? (
-                                <FiLoader className="h-5 w-5 animate-spin" />
-                              ) : (
-                                <FiCheckCircle className="h-5 w-5" />
-                              )}
-                            </button>
-                            <button
-                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                              title="Cancel Order"
-                              onClick={() => handleStatusUpdate(order._id, 'cancelled')}
-                              disabled={loadingStatus === `${order._id}-cancelled`}
-                            >
-                              {loadingStatus === `${order._id}-cancelled` ? (
-                                <FiLoader className="h-5 w-5 animate-spin" />
-                              ) : (
-                                <FiXCircle className="h-5 w-5" />
-                              )}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                      No orders found. Try adjusting your search or filter criteria.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+  const confirmCancel = async () => {
+    if (!cancelTarget) return;
+    await handleStatusUpdate(cancelTarget._id, "cancelled");
+    setCancelTarget(null);
+  };
+
+  const renderActions = (order: Order, size: "sm" | "md") => {
+    const busy = loadingStatus?.startsWith(`${order._id}-`) ?? false;
+    return (
+      <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+        <IconButton
+          label="View details"
+          size={size}
+          className={chip}
+          icon={<Eye className="h-4 w-4" />}
+          onClick={() => onView(order)}
+        />
+        {order.orderStatus === "pending" && (
+          <IconButton
+            label="Mark as Processing"
+            size={size}
+            tone="warning"
+            className={chip}
+            icon={<PackageCheck className="h-4 w-4" />}
+            loading={loadingStatus === `${order._id}-processing`}
+            disabled={busy}
+            onClick={() => handleStatusUpdate(order._id, "processing")}
+          />
+        )}
+        <IconButton
+          label="Mark as Shipped"
+          size={size}
+          tone="info"
+          className={chip}
+          icon={<Truck className="h-4 w-4" />}
+          loading={loadingStatus === `${order._id}-shipped`}
+          disabled={busy || order.orderStatus === "shipped"}
+          onClick={() => handleStatusUpdate(order._id, "shipped")}
+        />
+        <IconButton
+          label="Mark as Delivered"
+          size={size}
+          tone="success"
+          className={chip}
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          loading={loadingStatus === `${order._id}-delivered`}
+          disabled={busy || order.orderStatus === "delivered"}
+          onClick={() => handleStatusUpdate(order._id, "delivered")}
+        />
+        <IconButton
+          label="Cancel Order"
+          size={size}
+          tone="danger"
+          className={chip}
+          icon={<XCircle className="h-4 w-4" />}
+          loading={loadingStatus === `${order._id}-cancelled`}
+          disabled={busy || order.orderStatus === "cancelled"}
+          onClick={() => setCancelTarget(order)}
+        />
       </div>
-    </div>
+    );
+  };
+
+  return (
+    <>
+      <ul className="space-y-2 sm:space-y-3">
+        {orders.map((order) => {
+          const customerName = getCustomerName(order);
+          const customerEmail = getCustomerEmail(order);
+          const itemCount = getItemCount(order);
+
+          return (
+            <li
+              key={order._id}
+              className="rounded-xl border border-stone-200 bg-stone-50 p-3 transition-shadow duration-200 hover:shadow-md sm:p-4"
+            >
+              {/* Mobile layout */}
+              <div className="flex flex-col gap-3 sm:hidden">
+                <div className="flex items-start justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => onView(order)}
+                    className="flex min-w-0 flex-1 items-start gap-3 text-left focus:outline-none"
+                  >
+                    <OrderThumb order={order} className="h-10 w-10" />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h3 className="text-sm font-semibold text-stone-900">#{order.orderNumber}</h3>
+                        <StatusBadge status={order.orderStatus} size="sm" />
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-stone-500">{customerName}</p>
+                    </div>
+                  </button>
+                  <p className="whitespace-nowrap text-sm font-semibold text-stone-900">{formatCurrency(order.total)}</p>
+                </div>
+                <div className="flex items-center justify-between gap-2 border-t border-stone-200 pt-2">
+                  <p className="min-w-0 truncate text-xs text-stone-500">
+                    {formatDate(order.createdAt)} · {itemCount} {itemCount === 1 ? "item" : "items"}
+                  </p>
+                  {renderActions(order, "sm")}
+                </div>
+              </div>
+
+              {/* Desktop layout */}
+              <div className="hidden items-center gap-4 sm:flex">
+                <OrderThumb order={order} className="h-12 w-12" />
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onView(order)}
+                      className="text-base font-semibold text-stone-900 underline-offset-4 hover:underline focus:outline-none focus-visible:underline"
+                    >
+                      #{order.orderNumber}
+                    </button>
+                    <StatusBadge status={order.orderStatus} />
+                  </div>
+                  <p className="truncate text-sm text-stone-500">
+                    {customerName}
+                    {customerEmail && ` • ${customerEmail}`}
+                  </p>
+                </div>
+
+                <div className="hidden text-right md:block">
+                  <p className="text-xs text-stone-500">Order Date</p>
+                  <p className="whitespace-nowrap text-sm text-stone-700">{formatDate(order.createdAt)}</p>
+                </div>
+
+                <div className="hidden text-right lg:block">
+                  <p className="text-xs text-stone-500">Items</p>
+                  <p className="text-sm text-stone-700">{itemCount}</p>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-xs text-stone-500">Total</p>
+                  <p className="whitespace-nowrap text-sm font-semibold text-stone-900">{formatCurrency(order.total)}</p>
+                </div>
+
+                {renderActions(order, "md")}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <ConfirmDialog
+        open={!!cancelTarget}
+        title="Cancel this order?"
+        message={
+          cancelTarget ? (
+            <>
+              Order <span className="font-semibold text-stone-900">#{cancelTarget.orderNumber}</span> for{" "}
+              {getCustomerName(cancelTarget)} will be marked as cancelled.
+            </>
+          ) : null
+        }
+        confirmLabel="Cancel order"
+        cancelLabel="Keep order"
+        loading={!!cancelTarget && loadingStatus === `${cancelTarget._id}-cancelled`}
+        onCancel={() => setCancelTarget(null)}
+        onConfirm={confirmCancel}
+      />
+    </>
   );
 }

@@ -102,8 +102,10 @@ const blogService: BlogService = {
    */
   getAllBlogs: async (page: number = 1, limit: number = 10): Promise<{ blogs: Blog[]; pagination: PaginationInfo }> => {
     try {
+      // Send the admin token: GET /blogs only includes drafts for a signed-in admin.
       const response = await axios.get(
-        `${API_URL}/blogs?page=${page}&limit=${limit}`
+        `${API_URL}/blogs?page=${page}&limit=${limit}`,
+        { headers: getAuthHeader() }
       );
 
       if (!response.data.success) {
@@ -156,7 +158,10 @@ const blogService: BlogService = {
    */
   getBlogById: async (id: string): Promise<Blog> => {
     try {
-      const response = await axios.get<ApiResponse<BackendBlog>>(`${API_URL}/blogs/${id}`);
+      // Admin token needed so drafts can be opened for editing (visitors only get published posts).
+      const response = await axios.get<ApiResponse<BackendBlog>>(`${API_URL}/blogs/${id}`, {
+        headers: getAuthHeader()
+      });
       
       if (!response.data.success) {
         throw new Error(response.data.message || 'Failed to fetch blog');
