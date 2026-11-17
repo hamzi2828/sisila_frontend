@@ -27,6 +27,11 @@ const nextConfig: NextConfig = {
         hostname: 'other-levels.com',
       },
       {
+        // S3 storage on Coolify
+        protocol: 'https',
+        hostname: 'media.silsilla.pk',
+      },
+      {
         protocol: 'https',
         hostname: '*.public.blob.vercel-storage.com',
       },
